@@ -99,6 +99,36 @@ workflows:
 	}
 }
 
+func TestLoad_WorkflowDescription(t *testing.T) {
+	dir := t.TempDir()
+	writeOrcYAML(t, dir, `
+workflows:
+  default:
+    description: General feature workflow — intake → develop
+    stages:
+      - name: intake
+        worker: fred-documentor
+        advance: auto
+  bare:
+    stages:
+      - name: intake
+        worker: fred-documentor
+        advance: auto
+`)
+
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if got := cfg.WorkflowDescription("default"); got != "General feature workflow — intake → develop" {
+		t.Errorf("WorkflowDescription(default) = %q, want the description", got)
+	}
+	if got := cfg.WorkflowDescription("bare"); got != "" {
+		t.Errorf("WorkflowDescription(bare) = %q, want empty (no description set)", got)
+	}
+}
+
 func TestLoad_StageConfig(t *testing.T) {
 	dir := t.TempDir()
 	writeOrcYAML(t, dir, `

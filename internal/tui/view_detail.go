@@ -511,6 +511,14 @@ func renderWorkflowDetail(name string, chains []workflowChain, allWorkers []*wor
 	innerW := width - 4
 	var sb strings.Builder
 
+	// Description — a one-line summary of what this workflow is for.
+	if chain.description != "" {
+		for _, l := range strings.Split(wrapText(chain.description, innerW), "\n") {
+			sb.WriteString("  " + styleSubtext.Render(l) + "\n")
+		}
+		sb.WriteString("\n")
+	}
+
 	// Route chain visualization
 	chainLines := renderRouteChain(chain.steps, chain.loops, innerW)
 	routeLines := make([]string, 0, len(chainLines))

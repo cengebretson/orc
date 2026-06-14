@@ -30,7 +30,8 @@ type Settings struct {
 
 // WorkflowDef is a named sequence of stages.
 type WorkflowDef struct {
-	Stages []StageDef `yaml:"stages"`
+	Description string     `yaml:"description,omitempty"`
+	Stages      []StageDef `yaml:"stages"`
 }
 
 // LoopDef configures a loop stage attached to a pipeline stage.
@@ -83,6 +84,12 @@ func (c *Config) Names() []string {
 // Stages returns the ordered StageDefs for the named workflow.
 func (c *Config) Stages(name string) []StageDef {
 	return c.Workflows[name].Stages
+}
+
+// WorkflowDescription returns the human-readable description for the named
+// workflow, or "" if none is set.
+func (c *Config) WorkflowDescription(name string) string {
+	return c.Workflows[name].Description
 }
 
 // StageNames returns just the stage names for the named workflow.

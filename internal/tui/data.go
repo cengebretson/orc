@@ -46,7 +46,7 @@ func loadData(root string) tea.Cmd {
 					maxRetries: sc.Loop.Max,
 				})
 			}
-			chains = append(chains, workflowChain{name: wfName, steps: steps, loops: loops, repairSteps: repairs})
+			chains = append(chains, workflowChain{name: wfName, description: workflowCfg.WorkflowDescription(wfName), steps: steps, loops: loops, repairSteps: repairs})
 		}
 		// fallback: flat list of all stage files
 		if len(chains) == 0 {

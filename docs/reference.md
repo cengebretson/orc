@@ -125,6 +125,7 @@ repos:
 
 workflows:
   default:
+    description: General feature workflow — intake → develop → PR → QA
     stages:
       - name: intake
         worker: fred-documentor

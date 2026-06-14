@@ -94,6 +94,7 @@ type repairStep struct {
 
 type workflowChain struct {
 	name        string
+	description string
 	steps       []routeStep
 	loops       []repairLoop
 	repairSteps []repairStep

@@ -25,6 +25,7 @@ repos:
 
 workflows:
   default:
+    description: General feature workflow — intake → develop → PR → QA
     stages:
       - name: intake
         worker: fred-documentor
@@ -72,6 +73,13 @@ workflows:
 `workflows` is a map of workflow names to ordered stage lists. A ticket stores
 its selected workflow in `STATE.yaml`. If the ticket omits `workflow`, `orc`
 uses `settings.default_workflow`.
+
+Each workflow supports:
+
+| Field | Required | Meaning |
+|-------|----------|---------|
+| `description` | No | One-line summary of what the workflow is for. Shown in the TUI workflow detail. Packs set this so a pack's description survives install. |
+| `stages` | Yes | Ordered list of stages (below). |
 
 Each workflow stage supports:
 
