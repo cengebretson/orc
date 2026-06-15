@@ -71,19 +71,34 @@ Releases are **automated** — do not create them by hand. The release ritual
 matches the sibling tmux repos: a `VERSION` file and a `CHANGELOG.md` drive
 the release, and a `v*` tag triggers it.
 
-To cut a release:
+### Keep the changelog current (do this as you work)
 
-1. Bump `VERSION` to the new number (no `v` prefix, e.g. `0.4.0`).
-2. In `CHANGELOG.md`, rename the `## [Unreleased]` section to
-   `## [0.4.0] - YYYY-MM-DD` and add a fresh empty `## [Unreleased]` above it.
-3. Commit, then tag and push:
+**Every user-facing change adds a bullet to the `## [Unreleased]` section of
+`CHANGELOG.md`, in the same commit/PR that makes the change.** Group bullets
+under `### Added` / `### Changed` / `### Fixed` / `### Removed`. This is the one
+part nobody automates: `git release` promotes and dates the section but does
+**not** author the notes — write them as work lands so release time is trivial.
+At release time, if `[Unreleased]` was missed, reconstruct it from
+`git log <last-tag>..HEAD` before cutting.
 
-   ```bash
-   git tag -a v0.4.0 -m "v0.4.0"
-   git push origin v0.4.0
-   ```
+### Cutting a release
 
-Pushing the tag triggers `.github/workflows/release.yml`, which: verifies
+Use the repo-agnostic `git release` helper (`~/.local/bin/git-release`, shared
+across the tmux plugins):
+
+```bash
+git release minor          # or: patch | major | an explicit X.Y.Z
+git push origin main --follow-tags
+```
+
+`git release` bumps `VERSION`, promotes `## [Unreleased]` to
+`## [X.Y.Z] - <date>` (adding a fresh empty `[Unreleased]` and rewriting the
+compare links), runs `make test`, commits "Release vX.Y.Z", and tags — it does
+**not** push, and it **refuses** to release if `[Unreleased]` is empty (override
+with `--allow-empty-changelog`). Preview with `git release minor --dry-run`. Add
+`-p`/`--push` to push automatically.
+
+Pushing the `v*` tag triggers `.github/workflows/release.yml`, which: verifies
 `VERSION` matches the tag, runs `go test ./...`, extracts the matching
 `CHANGELOG.md` section into the release notes, then runs goreleaser
 (`release --clean --release-notes=...`) to build the binaries and create the
