@@ -67,15 +67,28 @@ The hook runs tidy → fmt → lint → test on every commit.
 
 ## Releases
 
-Releases are **automated** — do not create them by hand. Pushing a `v*` tag
-triggers `.github/workflows/release.yml`, which runs `go test ./...` then
-goreleaser (`release --clean`), building the binaries and creating the GitHub
-Release with auto-generated notes. To cut a release, just tag and push:
+Releases are **automated** — do not create them by hand. The release ritual
+matches the sibling tmux repos: a `VERSION` file and a `CHANGELOG.md` drive
+the release, and a `v*` tag triggers it.
 
-```bash
-git tag -a v0.2.0 -m "v0.2.0"
-git push origin v0.2.0
-```
+To cut a release:
+
+1. Bump `VERSION` to the new number (no `v` prefix, e.g. `0.4.0`).
+2. In `CHANGELOG.md`, rename the `## [Unreleased]` section to
+   `## [0.4.0] - YYYY-MM-DD` and add a fresh empty `## [Unreleased]` above it.
+3. Commit, then tag and push:
+
+   ```bash
+   git tag -a v0.4.0 -m "v0.4.0"
+   git push origin v0.4.0
+   ```
+
+Pushing the tag triggers `.github/workflows/release.yml`, which: verifies
+`VERSION` matches the tag, runs `go test ./...`, extracts the matching
+`CHANGELOG.md` section into the release notes, then runs goreleaser
+(`release --clean --release-notes=...`) to build the binaries and create the
+GitHub Release with those notes. The workflow **fails** if `VERSION` doesn't
+match the tag or there's no changelog section for it.
 
 Never run `gh release create` or otherwise create the release manually — it
 collides with goreleaser. After pushing the tag, watch the Release workflow in
