@@ -36,6 +36,7 @@ orc/
     tui/                          Bubble Tea dashboard
     workspace/                    init, work, and template embedding
       templates/                  embedded workspace scaffold templates
+    workspacectx/                 loads a workspace root into a shared Context (config + workers), with a validated variant
   scripts/
     pre-commit                    tidy → fmt → lint → test (symlink to .git/hooks/pre-commit)
   docs/
@@ -55,6 +56,8 @@ make lint    # golangci-lint (errcheck, govet, staticcheck, unused, ineffassign)
 make check   # lint + test together
 make fmt     # gofmt -w
 make tidy    # go mod tidy
+make install # go install ./cmd/orc/... (with version LDFLAGS)
+make clean   # rm -f orc
 ```
 
 Install the pre-commit hook once after cloning:
