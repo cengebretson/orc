@@ -17,7 +17,8 @@ func TestArchiverArchivesFeatureAndCleansRuntime(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := &state.State{
-		Slug: "TICKET-1",
+		Slug:   "TICKET-1",
+		Status: "done",
 		Runtime: state.Runtime{
 			Tmux: &state.TmuxRuntime{Session: "custom-session"},
 		},
@@ -97,7 +98,8 @@ func TestArchiverKeepsGoingAfterCleanupWarnings(t *testing.T) {
 	root := t.TempDir()
 	featureDir := filepath.Join(root, "features", "TICKET-1")
 	s := &state.State{
-		Slug: "TICKET-1",
+		Slug:   "TICKET-1",
+		Status: "done",
 		Repos: map[string]state.Repo{
 			"app": {Main: "/repo", Worktree: "worktrees/app/TICKET-1", Branch: "feature/TICKET-1"},
 		},
@@ -142,10 +144,15 @@ func TestArchiverKeepsGoingAfterCleanupWarnings(t *testing.T) {
 func TestArchiverFailsBeforeMoveWhenStatusCannotBeSet(t *testing.T) {
 	root := t.TempDir()
 	featureDir := filepath.Join(root, "features", "TICKET-1")
-	s := &state.State{Slug: "TICKET-1"}
+	s := &state.State{Slug: "TICKET-1", Status: "done"}
 
+	var removed bool
 	var renamed bool
 	archiver := Archiver{
+		RemoveWorktree: func(repoMain, worktreePath string) error {
+			removed = true
+			return nil
+		},
 		SetStatus: func(featureDir, status string) error {
 			return errors.New("readonly")
 		},
@@ -163,7 +170,82 @@ func TestArchiverFailsBeforeMoveWhenStatusCannotBeSet(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected archive error")
 	}
+	if removed {
+		t.Fatal("worktree was removed despite status failure")
+	}
 	if renamed {
 		t.Fatal("feature was moved despite status failure")
+	}
+}
+
+func TestArchiverRejectsNonDoneTicket(t *testing.T) {
+	root := t.TempDir()
+	featureDir := filepath.Join(root, "features", "TICKET-1")
+	s := &state.State{Slug: "TICKET-1", Status: "active"}
+
+	var removed bool
+	archiver := Archiver{
+		RemoveWorktree: func(repoMain, worktreePath string) error {
+			removed = true
+			return nil
+		},
+	}
+
+	_, err := archiver.Archive(ArchiveOptions{
+		Root:       root,
+		FeatureDir: featureDir,
+		State:      s,
+	})
+	if err == nil {
+		t.Fatal("expected archive refusal")
+	}
+	if removed {
+		t.Fatal("worktree was removed despite non-done status")
+	}
+}
+
+func TestArchiverFailsBeforeCleanupWhenDestinationExists(t *testing.T) {
+	root := t.TempDir()
+	featureDir := filepath.Join(root, "features", "TICKET-1")
+	dest := filepath.Join(root, "features", "_archive", "TICKET-1")
+	if err := os.MkdirAll(dest, 0755); err != nil {
+		t.Fatal(err)
+	}
+	s := &state.State{
+		Slug:   "TICKET-1",
+		Status: "done",
+		Repos: map[string]state.Repo{
+			"app": {Main: "/repo", Worktree: "worktrees/app/TICKET-1", Branch: "feature/TICKET-1"},
+		},
+	}
+
+	var removed bool
+	var statusSet bool
+	var renamed bool
+	archiver := Archiver{
+		RemoveWorktree: func(repoMain, worktreePath string) error {
+			removed = true
+			return nil
+		},
+		SetStatus: func(featureDir, status string) error {
+			statusSet = true
+			return nil
+		},
+		Rename: func(oldpath, newpath string) error {
+			renamed = true
+			return nil
+		},
+	}
+
+	_, err := archiver.Archive(ArchiveOptions{
+		Root:       root,
+		FeatureDir: featureDir,
+		State:      s,
+	})
+	if err == nil {
+		t.Fatal("expected destination error")
+	}
+	if removed || statusSet || renamed {
+		t.Fatalf("mutated despite destination error: removed=%v statusSet=%v renamed=%v", removed, statusSet, renamed)
 	}
 }

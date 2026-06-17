@@ -1238,7 +1238,7 @@ func runMarkNext(root, featureDir string) error {
 		fmt.Printf("Stage:    %s  (unchanged)\n", result.Previous)
 	}
 	if result.Worker != "" {
-		fmt.Printf("Worker:   %s\n", markWorker)
+		fmt.Printf("Worker:   %s\n", result.Worker)
 	}
 
 	if result.Outcome == orchestrator.AdvanceOutcomeDone {

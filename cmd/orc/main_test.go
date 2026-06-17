@@ -536,6 +536,21 @@ func TestRunArchiveMovesDoneTicketToArchive(t *testing.T) {
 	}
 }
 
+func TestRunArchiveRefusesActiveTicket(t *testing.T) {
+	resetCommandGlobals(t)
+	globalWorkspace = mutableFixtureWorkspace(t)
+
+	_, err := captureStdout(func() error {
+		return runArchive(nil, []string{"STORY-123"})
+	})
+	if err == nil || !strings.Contains(err.Error(), "must be done") {
+		t.Fatalf("runArchive err = %v, want refusal", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(globalWorkspace, "features", "STORY-123-add-user-auth")); statErr != nil {
+		t.Fatalf("active ticket folder missing after refused archive: %v", statErr)
+	}
+}
+
 func TestRunDeleteRefusesActiveTicket(t *testing.T) {
 	resetCommandGlobals(t)
 	globalWorkspace = mutableFixtureWorkspace(t)

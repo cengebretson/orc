@@ -14,6 +14,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Stage files now come from the workspace pack; the superseded `nextStep.md` was removed.
 
+### Fixed
+
+- `orc archive` now refuses non-completed tickets and checks the archive destination before cleanup.
+
 ## [0.3.0] - 2026-06-14
 
 ### Added

@@ -41,6 +41,7 @@ type Archiver struct {
 	RemoveWorktree func(repoMain, worktreePath string) error
 	SetStatus      func(featureDir, status string) error
 	MkdirAll       func(path string, perm os.FileMode) error
+	Stat           func(path string) (os.FileInfo, error)
 	Rename         func(oldpath, newpath string) error
 	TmuxAvailable  func() bool
 	SessionExists  func(string) bool
@@ -53,6 +54,7 @@ func NewArchiver() Archiver {
 		RemoveWorktree: removeWorktree,
 		SetStatus:      state.SetStatus,
 		MkdirAll:       os.MkdirAll,
+		Stat:           os.Stat,
 		Rename:         os.Rename,
 		TmuxAvailable:  tmux.Available,
 		SessionExists:  tmux.SessionExists,
@@ -70,6 +72,9 @@ func (a Archiver) Archive(opts ArchiveOptions) (*ArchiveResult, error) {
 	if opts.State == nil {
 		return nil, fmt.Errorf("state is required")
 	}
+	if opts.State.Status != "done" {
+		return nil, fmt.Errorf("cannot archive %q: status is %q (must be done)", opts.State.Slug, opts.State.Status)
+	}
 	if a.RemoveWorktree == nil {
 		a.RemoveWorktree = removeWorktree
 	}
@@ -78,6 +83,9 @@ func (a Archiver) Archive(opts ArchiveOptions) (*ArchiveResult, error) {
 	}
 	if a.MkdirAll == nil {
 		a.MkdirAll = os.MkdirAll
+	}
+	if a.Stat == nil {
+		a.Stat = os.Stat
 	}
 	if a.Rename == nil {
 		a.Rename = os.Rename
@@ -100,6 +108,22 @@ func (a Archiver) Archive(opts ArchiveOptions) (*ArchiveResult, error) {
 		TmuxSession: tmuxSessionName(opts.State),
 	}
 
+	archiveDir := filepath.Join(opts.Root, "features", "_archive")
+	if err := a.MkdirAll(archiveDir, 0755); err != nil {
+		return nil, fmt.Errorf("creating _archive dir: %w", err)
+	}
+
+	dest := filepath.Join(archiveDir, result.Slug)
+	if _, err := a.Stat(dest); err == nil {
+		return nil, fmt.Errorf("archive destination already exists: %s", dest)
+	} else if !os.IsNotExist(err) {
+		return nil, fmt.Errorf("checking archive destination: %w", err)
+	}
+
+	if err := a.SetStatus(opts.FeatureDir, "archived"); err != nil {
+		return nil, fmt.Errorf("updating status: %w", err)
+	}
+
 	for name, repo := range opts.State.Repos {
 		if repo.Worktree == "" {
 			continue
@@ -118,16 +142,6 @@ func (a Archiver) Archive(opts ArchiveOptions) (*ArchiveResult, error) {
 		result.Worktrees = append(result.Worktrees, removed)
 	}
 
-	if err := a.SetStatus(opts.FeatureDir, "archived"); err != nil {
-		return nil, fmt.Errorf("updating status: %w", err)
-	}
-
-	archiveDir := filepath.Join(opts.Root, "features", "_archive")
-	if err := a.MkdirAll(archiveDir, 0755); err != nil {
-		return nil, fmt.Errorf("creating _archive dir: %w", err)
-	}
-
-	dest := filepath.Join(archiveDir, result.Slug)
 	if err := a.Rename(opts.FeatureDir, dest); err != nil {
 		return nil, fmt.Errorf("moving feature folder: %w", err)
 	}
