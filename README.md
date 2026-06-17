@@ -175,26 +175,29 @@ orc tui
 flowchart TD
     W(["orc work"])
     W --> intake["intake<br/>fred-documentor"]
-    intake -->|auto| develop["develop<br/>bob-the-developer"]
-    develop -->|manual| CR["code-review<br/>zach-the-reviewer"]
-    CR -->|auto| PO["pr-open<br/>bob-the-developer"]
-    PO -->|manual| QA["qa-automation<br/>brian-qa"]
-    PO -.->|CI failures| PR["pr-repair<br/>bob-the-developer"]
+    intake -->|auto| develop["develop<br/>bob-developer"]
+    develop -->|manual approval| PO["pr-open<br/>bob-developer"]
+    develop -.->|review loop| CR["code-review<br/>zach-reviewer"]
+    CR -.->|approved| PO
+    CR -.->|changes needed| develop
+    PO -->|manual approval| QA["qa-automation<br/>brian-qa"]
+    PO -.->|CI/review fixes| PR["pr-repair<br/>bob-developer"]
     PR -.-> PO
-    QA -->|auto| A(["orc archive"])
+    QA -->|auto| D(["done"])
+    D -.->|optional| A(["orc archive"])
 
     classDef edge fill:#313244,stroke:#a6e3a1,color:#cdd6f4
     classDef stage fill:#313244,stroke:#cba6f7,color:#cdd6f4
     classDef repair fill:#313244,stroke:#f38ba8,color:#cdd6f4
 
-    class W,A edge
+    class W,D,A edge
     class intake,develop,CR,PO,QA stage
     class PR repair
 ```
 
-Workers are markdown files in `workers/`. Each stage in `orc.yaml` names a worker — mix models and agents freely. Use `--worker` to override for a single run.
+Workers are markdown files in `workers/`. Each stage in `orc.yaml` names a worker — mix models and agents freely. Use `--worker` to override for a single run. Loop stages (`code-review`, `pr-repair`) are configured under the pipeline stage that owns the loop, not as separate linear steps.
 
-`auto` — agent calls `orc mark <ticket> next`, next stage picks up immediately  
+`auto` — agent calls `orc mark <ticket> next`, and `orc next <ticket>` launches the next stage  
 `manual` — agent calls `orc mark <ticket> pause`; a human approves before continuing
 
 ---
@@ -203,21 +206,24 @@ Workers are markdown files in `workers/`. Each stage in `orc.yaml` names a worke
 
 ```mermaid
 flowchart TD
-    N([orc next]) -->|prints launch command| R[Agent works]
+    N([orc next]) -->|pending| S["orc mark start<br/>status: active"]
+    N -->|paused| RS["recovery prompt<br/>orc mark resume"]
+    S -->|prints launch command| R[Agent works]
+    RS -->|prints launch command| R
 
     R --> AD["orc mark next<br/>stage complete"]
     R --> WT["orc mark pause<br/>human needed"]
-    R --> DN["orc mark done<br/>final stage"]
+    R --> DN["orc mark next/done<br/>final stage or explicit close"]
 
     AD -->|"status: pending"| N
-    WT -->|"human resolves,<br/>orc next"| N
+    WT -->|"status: paused<br/>human resolves"| N
     DN -->|"status: done"| E([done])
 
     classDef step fill:#313244,stroke:#a6e3a1,color:#cdd6f4
     classDef work fill:#313244,stroke:#89b4fa,color:#cdd6f4
     classDef wait fill:#313244,stroke:#f9e2af,color:#cdd6f4
 
-    class N,AD,DN,E step
+    class N,S,RS,AD,DN,E step
     class R work
     class WT wait
 ```
@@ -234,7 +240,7 @@ When a session is paused (`orc mark <ticket> pause`), the reason is recorded in 
 `orc jit` runs a one-off agent task that doesn't belong in the pipeline — a spot check, a secondary review, an exploratory investigation — without touching the stage or status.
 
 ```bash
-orc jit STORY-123 --worker zach-the-reviewer "make sure the auth middleware handles token expiry correctly"
+orc jit STORY-123 --worker zach-reviewer "make sure the auth middleware handles token expiry correctly"
 ```
 
 The agent gets the same orientation prompt as `orc next` (reads `STATE.yaml`, `TICKET.md`, `SPEC.md`), then does the task; output lands in `features/<slug>/jit/<timestamp>/`. `runtime.jit` is written before launch so the task shows up in `orc status` and the TUI:
