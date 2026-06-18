@@ -1,5 +1,5 @@
 ---
-id: brian-qa
+id: default:brian
 name: Brian (QA)
 engine: claude
 model: claude-sonnet-4-6

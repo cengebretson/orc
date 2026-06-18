@@ -4,7 +4,7 @@ slug: STORY-456-export-api
 status: ready
 workflow: default
 stage:
-  worker: fred-documentor
+  worker: default:fred
   name: qa-automation
 repos:
   app:
@@ -12,19 +12,19 @@ repos:
     worktree: ../../worktrees/my-app/STORY-456-export-api
     branch: feature/STORY-456-export-api
 next_action:
-  worker: fred-documentor
+  worker: default:fred
   prompt: Write QA plan and source context for the CSV export endpoint — cover pagination, encoding edge cases, and large dataset limits
   cwd: "."
 history:
   - at: "2026-05-27T10:00:00-05:00"
     stage: intake
-    worker: fred-documentor
+    worker: default:fred
     result: ticket loaded, spec written
   - at: "2026-05-28T11:30:00-05:00"
     stage: develop
-    worker: bob-developer
+    worker: default:bob
     result: implementation complete, PR opened
   - at: "2026-05-29T15:50:00-05:00"
     stage: code-review
-    worker: bob-developer
+    worker: default:bob
     result: review passed, QA handoff written

@@ -17,9 +17,9 @@ workflows:
   default:
     stages:
       - name: intake
-        worker: fred
+        worker: custom:fred
         advance: auto
-`, []string{"fred"})
+`, []string{"custom:fred"})
 
 	ctx, err := workspacectx.Load(root)
 	if err != nil {
@@ -28,11 +28,11 @@ workflows:
 	if ctx.Config.DefaultWorkflow() != "default" {
 		t.Fatalf("DefaultWorkflow = %q, want default", ctx.Config.DefaultWorkflow())
 	}
-	if len(ctx.Workers) != 1 || ctx.Workers[0].ID != "fred" {
-		t.Fatalf("Workers = %#v, want one fred worker", ctx.Workers)
+	if len(ctx.Workers) != 1 || ctx.Workers[0].ID != "custom:fred" {
+		t.Fatalf("Workers = %#v, want one custom:fred worker", ctx.Workers)
 	}
-	if len(ctx.WorkerIDs) != 1 || ctx.WorkerIDs[0] != "fred" {
-		t.Fatalf("WorkerIDs = %#v, want [fred]", ctx.WorkerIDs)
+	if len(ctx.WorkerIDs) != 1 || ctx.WorkerIDs[0] != "custom:fred" {
+		t.Fatalf("WorkerIDs = %#v, want [custom:fred]", ctx.WorkerIDs)
 	}
 }
 
@@ -46,7 +46,7 @@ workflows:
       - name: intake
         worker: missing
         advance: auto
-`, []string{"fred"})
+`, []string{"custom:fred"})
 
 	ctx, errs, err := workspacectx.LoadValidated(root)
 	if err != nil {
@@ -71,10 +71,10 @@ workflows:
   default:
     stages:
       - name: intake
-        worker: fred
+        worker: custom:fred
         advance: auto
 `, nil)
-	writeFile(t, filepath.Join(root, "workers", "broken.md"), "not frontmatter\n")
+	writeFile(t, filepath.Join(root, "workers", "custom", "broken.md"), "not frontmatter\n")
 
 	_, err := workspacectx.Load(root)
 	if err == nil {
@@ -87,7 +87,7 @@ workflows:
 
 func TestLoadMissingConfigIsExplicit(t *testing.T) {
 	root := t.TempDir()
-	writeWorker(t, root, "fred")
+	writeWorker(t, root, "custom:fred")
 
 	ctx, err := workspacectx.Load(root)
 	if err != nil {
@@ -107,14 +107,14 @@ func TestLoadMissingConfigIsExplicit(t *testing.T) {
 }
 
 func TestWorkerIDs(t *testing.T) {
-	root := writeWorkspace(t, ``, []string{"bob", "fred"})
+	root := writeWorkspace(t, ``, []string{"custom:bob", "custom:fred"})
 	ctx, err := workspacectx.Load(root)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
 	got := workspacectx.WorkerIDs(ctx.Workers)
-	if len(got) != 2 || got[0] != "bob" || got[1] != "fred" {
-		t.Fatalf("WorkerIDs = %#v, want [bob fred]", got)
+	if len(got) != 2 || got[0] != "custom:bob" || got[1] != "custom:fred" {
+		t.Fatalf("WorkerIDs = %#v, want [custom:bob custom:fred]", got)
 	}
 }
 
@@ -132,7 +132,7 @@ func writeWorkspace(t *testing.T, orcYAML string, workerIDs []string) string {
 
 func writeWorker(t *testing.T, root, id string) {
 	t.Helper()
-	writeFile(t, filepath.Join(root, "workers", id+".md"), `---
+	writeFile(t, filepath.Join(root, "workers", strings.ReplaceAll(id, ":", "/")+".md"), `---
 id: `+id+`
 name: `+id+`
 engine: claude

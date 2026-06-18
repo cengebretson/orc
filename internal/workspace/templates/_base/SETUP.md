@@ -128,11 +128,12 @@ This section makes the workflow match the user's process and ensures every
 
 **Make every worker id resolve** (engine and model are assigned later, in the
 Claude / Codex sections):
-- If you installed a pack (e.g. `orc init --pack default`), `workers/` already
-  contains its persona workers — `fred-documentor`, `bob-developer`,
-  `zach-reviewer`, `brian-qa`, and others — edit those rather than creating new ones.
+- If you installed a pack (e.g. `orc init --pack default`), `workers/<pack>/`
+  already contains its persona workers — `fred`, `bob`, `zach`, `brian`, and
+  others — edit those rather than creating new ones.
 - If `workers/` only has `_template.md` (e.g. `orc init --pack none`), copy it
-  once per `worker:` id in `orc.yaml`.
+  once per `worker:` id in `orc.yaml` using the namespaced path format, such as
+  `workers/custom/chris.md` for worker ID `custom:chris`.
 
 ---
 

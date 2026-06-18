@@ -21,7 +21,7 @@ Repair a PR that has CI failures, review feedback, or merge conflicts.
 
 ## Cost Note
 
-Prefer bob-developer for lint, type, selector, test, and CI fixes. Escalate to
+Prefer default:bob for lint, type, selector, test, and CI fixes. Escalate to
 ada-architect only for design-level problems.
 
 ## Exit Criteria

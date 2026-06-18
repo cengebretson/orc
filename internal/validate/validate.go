@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cengebretson/orc/internal/config"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/ticketview"
 	"github.com/cengebretson/orc/internal/workers"
@@ -147,11 +148,12 @@ func Run(root, featureDir string) *Report {
 	}
 
 	// Stage markdown file exists.
-	stageMD := filepath.Join(root, "stages", stageName+".md")
+	stagePath := config.ResourcePath(stageName)
+	stageMD := filepath.Join(root, "stages", stagePath)
 	if _, err := os.Stat(stageMD); err != nil {
-		r.Checks = append(r.Checks, fail("stage file", fmt.Sprintf("stages/%s.md missing", stageName)))
+		r.Checks = append(r.Checks, fail("stage file", fmt.Sprintf("stages/%s missing", stagePath)))
 	} else {
-		r.Checks = append(r.Checks, okd("stage file", fmt.Sprintf("stages/%s.md", stageName)))
+		r.Checks = append(r.Checks, okd("stage file", fmt.Sprintf("stages/%s", stagePath)))
 	}
 
 	// Worker exists.

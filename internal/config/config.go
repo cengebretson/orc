@@ -34,6 +34,12 @@ type WorkflowDef struct {
 	Stages      []StageDef `yaml:"stages"`
 }
 
+type Aliases struct {
+	Workflows map[string]string `yaml:"workflows,omitempty"`
+	Stages    map[string]string `yaml:"stages,omitempty"`
+	Workers   map[string]string `yaml:"workers,omitempty"`
+}
+
 // LoopDef configures a loop stage attached to a pipeline stage.
 // The loop stage (Via) runs when the owning stage needs to cycle back.
 // It is not part of the linear pipeline — only reachable via the loop or orc jit.
@@ -55,6 +61,7 @@ type StageDef struct {
 type Config struct {
 	Repos     []Repo                 `yaml:"repos"`
 	Settings  Settings               `yaml:"settings"`
+	Aliases   Aliases                `yaml:"aliases,omitempty"`
 	Workflows map[string]WorkflowDef `yaml:"workflows"`
 }
 

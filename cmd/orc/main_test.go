@@ -280,7 +280,7 @@ func TestRunJITDryPrintsResolvedWorkerAndPrompt(t *testing.T) {
 	resetCommandGlobals(t)
 	globalWorkspace = fixtureWorkspace()
 	jitDry = true
-	jitWorker = "bob-developer"
+	jitWorker = "default:bob"
 
 	out, err := captureStdout(func() error {
 		return runJIT(nil, []string{"STORY-123", "check state"})

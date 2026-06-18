@@ -1,13 +1,61 @@
-# pack.yaml — metadata for the `default` pack.
-#
-# A pack bundles a workflow with the workers it routes to and the stage files
-# those stages read — the closed set needed to run the workflow. `orc init
-# --pack <name>` installs base + the selected pack(s).
+---
 name: default
 description: General feature workflow — intake → develop → PR → QA
 schema: 1                     # worker/workflow frontmatter schema version
 engines: [claude, codex]      # engines this pack's workers are written for
 provides:
-  workflow: default           # primary workflow; becomes settings.default_workflow
-  workers: [bob-developer, fred-documentor, zach-reviewer, brian-qa, ada-architect]
-  stages:  [intake, develop, code-review, pr-open, pr-repair, qa-automation]
+  workflows:
+    - id: default:standard
+      path: workflow.yaml
+      description: General feature workflow
+  workers:
+    - id: default:bob
+      path: workers/bob.md
+      description: Implementation worker
+    - id: default:fred
+      path: workers/fred.md
+      description: Intake and documentation worker
+    - id: default:zach
+      path: workers/zach.md
+      description: Code review worker
+    - id: default:brian
+      path: workers/brian.md
+      description: QA automation worker
+    - id: default:ada
+      path: workers/ada.md
+      description: Architecture worker
+  stages:
+    - id: default:intake
+      path: stages/intake.md
+      description: Gather ticket context
+    - id: default:develop
+      path: stages/develop.md
+      description: Implement the change
+    - id: default:code-review
+      path: stages/code-review.md
+      description: Review implementation
+    - id: default:pr-open
+      path: stages/pr-open.md
+      description: Open the pull request
+    - id: default:pr-repair
+      path: stages/pr-repair.md
+      description: Repair PR feedback and CI failures
+    - id: default:qa-automation
+      path: stages/qa-automation.md
+      description: Add or run automated QA
+aliases:
+  workflows:
+    default: default:standard
+  workers:
+    bob: default:bob
+    fred: default:fred
+    zach: default:zach
+    brian: default:brian
+    ada: default:ada
+  stages:
+    intake: default:intake
+    develop: default:develop
+    code-review: default:code-review
+    pr-open: default:pr-open
+    pr-repair: default:pr-repair
+    qa-automation: default:qa-automation

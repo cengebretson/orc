@@ -18,17 +18,17 @@ workflows:
   default:
     stages:
       - name: develop
-        worker: bob-developer
+        worker: default:bob
         loop:
           via: code-review
-          worker: zach-reviewer
+          worker: default:zach
           max: 3
       - name: qa
-        worker: brian-qa
+        worker: default:brian
         advance: manual
 `)
-	writeFile(t, filepath.Join(root, "workers", "zach.md"), `---
-id: zach-reviewer
+	writeFile(t, filepath.Join(root, "workers", "default", "zach.md"), `---
+id: default:zach
 name: Zach Reviewer
 engine: codex
 model: gpt-5
@@ -54,8 +54,8 @@ model: gpt-5
 	if summary.Workflow != "default" {
 		t.Fatalf("Workflow = %q, want default", summary.Workflow)
 	}
-	if summary.WorkerID != "zach-reviewer" {
-		t.Fatalf("WorkerID = %q, want zach-reviewer", summary.WorkerID)
+	if summary.WorkerID != "default:zach" {
+		t.Fatalf("WorkerID = %q, want default:zach", summary.WorkerID)
 	}
 	if summary.WorkerName != "Zach Reviewer" {
 		t.Fatalf("WorkerName = %q, want Zach Reviewer", summary.WorkerName)
@@ -77,7 +77,7 @@ func TestBuildSummarizesPausedAndDeadTmux(t *testing.T) {
 		Ticket: "TICKET-1",
 		Slug:   "TICKET-1",
 		Status: "paused",
-		Stage:  state.Stage{Worker: "bob-developer", Name: "develop"},
+		Stage:  state.Stage{Worker: "default:bob", Name: "develop"},
 		Runtime: state.Runtime{
 			Tmux: &state.TmuxRuntime{Session: "TICKET-1"},
 		},

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cengebretson/orc/internal/config"
 	"github.com/cengebretson/orc/internal/report"
 	"github.com/cengebretson/orc/internal/ticketview"
 	"github.com/cengebretson/orc/internal/workers"
@@ -502,7 +503,7 @@ func renderWorkflowDetail(name string, chains []workflowChain, allWorkers []*wor
 	}
 
 	stageExists := func(stageName string) string {
-		if _, err := os.Stat(filepath.Join(stagesDir, stageName+".md")); err == nil {
+		if _, err := os.Stat(filepath.Join(stagesDir, config.ResourcePath(stageName))); err == nil {
 			return styleHealthOK.Render("✓")
 		}
 		return styleHealthErr.Render("✗")

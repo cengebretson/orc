@@ -4,7 +4,7 @@ slug: STORY-789-migrate-database
 status: paused
 workflow: default
 stage:
-  worker: bob-developer
+  worker: default:bob
   name: pr-repair
 blocker:
   reason: staging environment unavailable — infra team notified
@@ -17,17 +17,17 @@ next_action:
 history:
   - at: "2026-05-26T09:00:00-05:00"
     stage: intake
-    worker: fred-documentor
+    worker: default:fred
     result: ticket loaded, migration scope documented
   - at: "2026-05-27T13:00:00-05:00"
     stage: develop
-    worker: bob-developer
+    worker: default:bob
     result: migration scripts written, tests passing locally
   - at: "2026-05-28T10:15:00-05:00"
     stage: pr-open
-    worker: bob-developer
+    worker: default:bob
     result: PR opened, CI failing on staging deploy step
   - at: "2026-05-30T11:00:00-05:00"
     stage: pr-repair
-    worker: bob-developer
+    worker: default:bob
     result: blocked — staging environment unavailable

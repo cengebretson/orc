@@ -35,11 +35,11 @@ func TestLoad(t *testing.T) {
 	if s.Stage.Name != "develop" {
 		t.Errorf("stage.name = %q, want develop", s.Stage.Name)
 	}
-	if s.Stage.Worker != "bob-developer" {
-		t.Errorf("stage.worker = %q, want bob-developer", s.Stage.Worker)
+	if s.Stage.Worker != "default:bob" {
+		t.Errorf("stage.worker = %q, want default:bob", s.Stage.Worker)
 	}
-	if s.NextAction.Worker != "bob-developer" {
-		t.Errorf("next_action.worker = %q, want bob-developer", s.NextAction.Worker)
+	if s.NextAction.Worker != "default:bob" {
+		t.Errorf("next_action.worker = %q, want default:bob", s.NextAction.Worker)
 	}
 }
 

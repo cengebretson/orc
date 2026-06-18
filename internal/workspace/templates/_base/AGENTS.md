@@ -24,7 +24,8 @@ At the start of every ticket session, before doing any work:
 1. Identify the ticket from your prompt or context
 2. Run `orc status <ticket> --json` to read current state — note `stage.name`
 3. Read `features/<ticket-slug>/STATE.yaml` for full feature context
-4. Read `stages/<stage>.md` for the current stage instructions
+4. Read the current stage file. Namespaced stage IDs map to nested paths:
+   `default:develop` is `stages/default/develop.md`.
 
 At the end of every session, run exactly one of:
 - `orc mark <ticket> next --worker <who> --result "<what was done>"` — stage complete
@@ -59,4 +60,3 @@ in `ORC.md`. Do not leave repository changes untracked by the feature state.
 <!-- This section is yours. Add team-specific conventions, coding standards,
      review expectations, naming rules, or anything else agents should know
      about how this team works. orc does not read or modify this section. -->
-

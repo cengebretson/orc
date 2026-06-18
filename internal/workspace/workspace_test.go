@@ -32,11 +32,13 @@ func TestInit_CreatesExpectedFiles(t *testing.T) {
 		"workers/_template.md",
 		"orc.yaml",
 		"ORC.md",
-		"stages/intake.md",
-		"stages/develop.md",
-		"stages/pr-open.md",
-		"stages/pr-repair.md",
-		"stages/qa-automation.md",
+		"packs/default/pack.yaml",
+		"packs/default/workflow.yaml",
+		"stages/default/intake.md",
+		"stages/default/develop.md",
+		"stages/default/pr-open.md",
+		"stages/default/pr-repair.md",
+		"stages/default/qa-automation.md",
 	}
 
 	for _, rel := range required {
@@ -193,9 +195,9 @@ func TestInit_DefaultPackInstallsWorkers(t *testing.T) {
 	}
 
 	workers := []string{
-		"workers/bob-the-developer.md",
-		"workers/fred-the-documentor.md",
-		"workers/zach-the-reviewer.md",
+		"workers/default/bob.md",
+		"workers/default/fred.md",
+		"workers/default/zach.md",
 	}
 	for _, rel := range workers {
 		if _, err := os.Stat(filepath.Join(dir, rel)); err != nil {
@@ -216,7 +218,7 @@ func TestInit_NonePackIsBaseOnly(t *testing.T) {
 		t.Errorf("base file AGENTS.md missing: %v", err)
 	}
 	// pack content absent
-	for _, rel := range []string{"workers/bob-the-developer.md", "stages/develop.md"} {
+	for _, rel := range []string{"workers/default/bob.md", "stages/default/develop.md", "packs/default/pack.yaml"} {
 		if _, err := os.Stat(filepath.Join(dir, rel)); err == nil {
 			t.Errorf("--pack none should not install %s", rel)
 		}
@@ -237,6 +239,13 @@ provides:
   stages:
     - id: hotfix:develop
       path: stages/develop.md
+aliases:
+  workflows:
+    hotfix: hotfix:standard
+  workers:
+    bob: hotfix:bob
+  stages:
+    develop: hotfix:develop
 `)
 	writePackFile(t, filepath.Join(packDir, "workflow.yaml"), `workflows:
   "hotfix:standard":
@@ -255,8 +264,8 @@ provides:
 	for _, rel := range []string{
 		"packs/hotfix/pack.yaml",
 		"packs/hotfix/workflow.yaml",
-		"stages/hotfix-develop.md",
-		"workers/hotfix-bob.md",
+		"stages/hotfix/develop.md",
+		"workers/hotfix/bob.md",
 	} {
 		if _, err := os.Stat(filepath.Join(dir, rel)); err != nil {
 			t.Fatalf("missing %s: %v", rel, err)
@@ -272,6 +281,7 @@ provides:
 		`"hotfix:standard":`,
 		"name: hotfix:develop",
 		"worker: hotfix:bob",
+		"aliases:",
 	} {
 		if !strings.Contains(string(orcYAML), want) {
 			t.Fatalf("orc.yaml missing %q:\n%s", want, string(orcYAML))

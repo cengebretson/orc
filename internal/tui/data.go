@@ -84,24 +84,16 @@ func loadData(root string) tea.Cmd {
 			si["workflows"] = append(si["workflows"], sectionItem{label: c.name, path: ""})
 		}
 
-		// workers: actual .md files in workers/
-		workersDir := filepath.Join(root, "workers")
-		if entries, err := filepath.Glob(filepath.Join(workersDir, "*.md")); err == nil {
-			for _, p := range entries {
-				base := filepath.Base(p)
-				if base == "_template.md" {
-					continue
-				}
-				id := strings.TrimSuffix(base, ".md")
-				label := id
-				for _, w := range allWorkers {
-					if w.ID == id && w.Name != "" {
-						label = w.Name
-						break
-					}
-				}
-				si["workers"] = append(si["workers"], sectionItem{label: label, path: p})
+		// workers: actual namespaced .md files in workers/<namespace>/
+		for _, w := range allWorkers {
+			if w.FilePath == "" {
+				continue
 			}
+			label := w.ID
+			if w.Name != "" {
+				label = w.Name
+			}
+			si["workers"] = append(si["workers"], sectionItem{label: label, path: w.FilePath})
 		}
 
 		// routes: ROUTER.md as a single item

@@ -17,14 +17,14 @@ workflows:
   default:
     stages:
       - name: develop
-        worker: bob-developer
+        worker: default:bob
         loop:
           via: code-review
-          worker: bob-developer
+          worker: default:bob
           max: 3
 `)
-	writeFile(t, filepath.Join(root, "workers", "bob.md"), `---
-id: bob-developer
+	writeFile(t, filepath.Join(root, "workers", "default", "bob.md"), `---
+id: default:bob
 name: Bob Developer
 engine: codex
 ---
@@ -53,8 +53,8 @@ runtime:
 		t.Fatalf("len(features) = %d, want 1", len(features))
 	}
 	f := features[0]
-	if f.WorkerID != "bob-developer" {
-		t.Fatalf("WorkerID = %q, want bob-developer", f.WorkerID)
+	if f.WorkerID != "default:bob" {
+		t.Fatalf("WorkerID = %q, want default:bob", f.WorkerID)
 	}
 	if f.WorkerName != "Bob Developer" {
 		t.Fatalf("WorkerName = %q, want Bob Developer", f.WorkerName)
@@ -77,7 +77,7 @@ ticket: TICKET-2
 slug: TICKET-2
 status: archived
 stage:
-  worker: bob-developer
+  worker: default:bob
   name: develop
 `)
 	writeFile(t, filepath.Join(root, "features", "BROKEN", "STATE.yaml"), `: bad yaml`)

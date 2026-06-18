@@ -4,14 +4,14 @@ slug: HOT-42-login-500-error
 status: active
 workflow: hotfix
 stage:
-  worker: bob-developer
+  worker: default:bob
   name: patch
 next_action:
-  worker: bob-developer
+  worker: default:bob
   prompt: Fix 500 on POST /auth/login — stack trace in TICKET.md points to null session store on cold start
   cwd: worktrees/my-app/HOT-42-login-500-error
 history:
   - at: "2026-05-31T07:45:00-05:00"
     stage: intake
-    worker: fred-documentor
+    worker: default:fred
     result: regression confirmed — login 500 on cold start, root cause identified as null session store

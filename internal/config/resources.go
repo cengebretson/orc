@@ -2,9 +2,9 @@ package config
 
 import "strings"
 
-// ResourceFileName maps a resource ID to the flat markdown filename used in
-// workspace runtime folders. Pack resources use "pack:name" IDs but materialize
-// as "pack-name.md" so stages/ and workers/ remain shell-friendly.
-func ResourceFileName(id string) string {
-	return strings.ReplaceAll(id, ":", "-") + ".md"
+// ResourcePath maps a resource ID to the markdown path used under workspace
+// runtime folders. Pack resources use "pack:name" IDs and materialize as
+// "pack/name.md" so the runtime layout mirrors the pack namespace.
+func ResourcePath(id string) string {
+	return strings.ReplaceAll(id, ":", "/") + ".md"
 }

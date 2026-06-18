@@ -37,5 +37,6 @@ Ask before:
 `orc` builds the launch command and the prompt automatically — you do not specify
 them here. The launch command is derived from the `engine` field above (plus
 `model` and `args`), and the prompt is assembled from the ticket's `STATE.yaml`
-and the current `stages/<stage>.md`. Set `engine` correctly and the rest follows;
+and the current stage file. Namespaced stage IDs map to nested paths, so
+`default:develop` is `stages/default/develop.md`. Set `engine` correctly and the rest follows;
 run `orc next <ticket> --dry` to see exactly what will be launched.

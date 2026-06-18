@@ -1,5 +1,5 @@
 ---
-id: zach-reviewer
+id: default:zach
 name: Zach (Ninja)
 engine: claude
 model: claude-sonnet-4-6

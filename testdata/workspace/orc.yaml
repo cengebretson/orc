@@ -43,38 +43,38 @@ workflows:
     description: General feature workflow — intake → develop → PR → QA
     stages:
       - name: intake
-        worker: fred-documentor
+        worker: default:fred
         advance: auto
       - name: develop
-        worker: bob-developer
+        worker: default:bob
         advance: manual
         loop:
           via: code-review
-          worker: zach-reviewer
+          worker: default:zach
           max: 3
           on_max: pause
       - name: pr-open
-        worker: bob-developer
+        worker: default:bob
         advance: manual
         loop:
           via: pr-repair
-          worker: bob-developer
+          worker: default:bob
           max: 3
           on_max: pause
       - name: qa-automation
-        worker: brian-qa
+        worker: default:brian
         advance: auto
 
   hotfix:
     description: Fast-track urgent fixes — intake → patch → deploy
     stages:
       - name: intake
-        worker: fred-documentor
+        worker: default:fred
         advance: auto
       - name: patch
-        worker: bob-developer
+        worker: default:bob
         advance: manual
       - name: deploy
-        worker: bob-developer
+        worker: default:bob
         advance: auto
 

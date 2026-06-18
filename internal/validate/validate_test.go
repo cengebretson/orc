@@ -173,14 +173,14 @@ status: pending
 stage:
   name: intake
 next_action:
-  worker: fred-documentor
+  worker: default:fred
   cwd: .
 repos: {}
 `)
 
 	report := validate.Run(root, featureDir)
 
-	assertCheck(t, report, "STATE.yaml.stage.worker", validate.OK, "fred-documentor")
+	assertCheck(t, report, "STATE.yaml.stage.worker", validate.OK, "default:fred")
 	if !report.OK() {
 		for _, check := range report.Checks {
 			if check.Status == validate.Fail {
@@ -202,7 +202,7 @@ workflows:
         worker: missing-worker
         advance: auto
 `)
-	writeWorker(t, root, "fred-documentor")
+	writeWorker(t, root, "default:fred")
 	featureDir := writeValidateFeature(t, root, `
 schema_version: 1
 ticket: TICKET-1
@@ -230,7 +230,7 @@ slug: TICKET-1
 status: pending
 stage:
   name: intake
-  worker: fred-documentor
+  worker: default:fred
 next_action:
   worker: human
   cwd: somewhere-else
@@ -259,18 +259,18 @@ workflows:
   default:
     stages:
       - name: intake
-        worker: fred-documentor
+        worker: default:fred
         advance: auto
       - name: develop
-        worker: bob-developer
+        worker: default:bob
         advance: manual
         loop:
           via: code-review
-          worker: zach-reviewer
+          worker: default:zach
           max: 3
           on_max: pause
 `)
-	for _, id := range []string{"fred-documentor", "bob-developer", "zach-reviewer"} {
+	for _, id := range []string{"default:fred", "default:bob", "default:zach"} {
 		writeWorker(t, root, id)
 	}
 	writeValidateFile(t, filepath.Join(root, "stages", "intake.md"), "# intake\n")
@@ -281,7 +281,7 @@ workflows:
 
 func writeWorker(t *testing.T, root, id string) {
 	t.Helper()
-	writeValidateFile(t, filepath.Join(root, "workers", id+".md"), `---
+	writeValidateFile(t, filepath.Join(root, "workers", strings.ReplaceAll(id, ":", "/")+".md"), `---
 id: `+id+`
 name: `+id+`
 engine: claude

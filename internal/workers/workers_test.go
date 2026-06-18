@@ -1,37 +1,32 @@
 package workers_test
 
 import (
+	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/cengebretson/orc/internal/workers"
 )
 
-func fixtureWorkersDir() string {
-	_, file, _, _ := runtime.Caller(0)
-	return filepath.Join(filepath.Dir(file), "..", "..", "testdata", "workspace", "workers")
-}
-
 func TestLoad(t *testing.T) {
-	all, err := workers.Load(fixtureWorkersDir())
+	all, err := workers.Load(fixtureWorkersDir(t))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if len(all) != 4 {
-		t.Errorf("loaded %d workers, want 4", len(all))
+	if len(all) != 2 {
+		t.Errorf("loaded %d workers, want 2", len(all))
 	}
 }
 
 func TestLoad_ParsesFrontmatter(t *testing.T) {
-	all, err := workers.Load(fixtureWorkersDir())
+	all, err := workers.Load(fixtureWorkersDir(t))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
 
-	bob := findWorker(all, "bob-developer")
+	bob := findWorker(all, "custom:bob")
 	if bob == nil {
-		t.Fatal("bob-developer not found")
+		t.Fatal("custom:bob not found")
 	}
 	if bob.Engine != "codex" {
 		t.Errorf("product = %q, want codex", bob.Engine)
@@ -44,20 +39,61 @@ func TestLoad_ParsesFrontmatter(t *testing.T) {
 	}
 }
 
-func TestFindByID_Found(t *testing.T) {
-	all, _ := workers.Load(fixtureWorkersDir())
+func TestLoad_UsesNamespacedPathAsDefaultID(t *testing.T) {
+	root := t.TempDir()
+	writeWorker(t, root, "custom", "chris", "")
 
-	w := workers.FindByID(all, "bob-developer")
-	if w == nil {
-		t.Fatal("expected bob-developer, got nil")
+	all, err := workers.Load(root)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
 	}
-	if w.ID != "bob-developer" {
-		t.Errorf("id = %q, want bob-developer", w.ID)
+	if findWorker(all, "custom:chris") == nil {
+		t.Fatal("custom:chris not found")
+	}
+}
+
+func TestLoad_IgnoresRootWorkerFiles(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "chris.md"), `---
+id: custom:chris
+name: Chris
+engine: codex
+---
+`)
+
+	all, err := workers.Load(root)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(all) != 0 {
+		t.Fatalf("loaded %d workers, want 0", len(all))
+	}
+}
+
+func TestLoad_RejectsIDThatDoesNotMatchPath(t *testing.T) {
+	root := t.TempDir()
+	writeWorker(t, root, "custom", "chris", "other:chris")
+
+	_, err := workers.Load(root)
+	if err == nil {
+		t.Fatal("Load returned nil error")
+	}
+}
+
+func TestFindByID_Found(t *testing.T) {
+	all, _ := workers.Load(fixtureWorkersDir(t))
+
+	w := workers.FindByID(all, "custom:bob")
+	if w == nil {
+		t.Fatal("expected custom:bob, got nil")
+	}
+	if w.ID != "custom:bob" {
+		t.Errorf("id = %q, want custom:bob", w.ID)
 	}
 }
 
 func TestFindByID_NotFound(t *testing.T) {
-	all, _ := workers.Load(fixtureWorkersDir())
+	all, _ := workers.Load(fixtureWorkersDir(t))
 
 	w := workers.FindByID(all, "nonexistent-worker")
 	if w != nil {
@@ -66,8 +102,8 @@ func TestFindByID_NotFound(t *testing.T) {
 }
 
 func TestLaunchCommand_Codex(t *testing.T) {
-	all, _ := workers.Load(fixtureWorkersDir())
-	bob := findWorker(all, "bob-developer")
+	all, _ := workers.Load(fixtureWorkersDir(t))
+	bob := findWorker(all, "custom:bob")
 
 	cmd := workers.LaunchCommand(bob, "/workspace", "/workspace/worktrees/app/FLYWL-123", "do the thing")
 	if cmd == "" {
@@ -76,8 +112,8 @@ func TestLaunchCommand_Codex(t *testing.T) {
 }
 
 func TestLaunchCommand_Claude(t *testing.T) {
-	all, _ := workers.Load(fixtureWorkersDir())
-	fred := findWorker(all, "fred-documentor")
+	all, _ := workers.Load(fixtureWorkersDir(t))
+	fred := findWorker(all, "custom:fred")
 
 	cmd := workers.LaunchCommand(fred, "/workspace", "/workspace", "do the thing")
 	if cmd == "" {
@@ -92,4 +128,39 @@ func findWorker(list []*workers.Worker, id string) *workers.Worker {
 		}
 	}
 	return nil
+}
+
+func fixtureWorkersDir(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	writeWorker(t, root, "custom", "bob", "custom:bob")
+	writeWorker(t, root, "custom", "fred", "custom:fred")
+	return root
+}
+
+func writeWorker(t *testing.T, root, namespace, name, id string) {
+	t.Helper()
+	if id == "" {
+		id = "\n"
+	} else {
+		id = "id: " + id + "\n"
+	}
+	writeFile(t, filepath.Join(root, namespace, name+".md"), `---
+`+id+`name: `+name+`
+engine: codex
+args:
+  service_tier: medium
+  reasoning_effort: high
+---
+`)
+}
+
+func writeFile(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
 }

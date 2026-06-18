@@ -31,7 +31,7 @@ func (errs ValidationErrors) Error() string {
 }
 
 // Validate checks the workspace configuration contract. workerIDs is the set of
-// worker IDs loaded from workers/*.md.
+// worker IDs loaded from workers/<namespace>/*.md.
 func Validate(cfg *Config, workerIDs []string) ValidationErrors {
 	if cfg == nil {
 		return ValidationErrors{{Path: "orc.yaml", Message: "config is required"}}

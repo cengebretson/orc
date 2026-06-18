@@ -4,7 +4,7 @@ slug: STORY-101-onboarding-flow
 status: archived
 workflow: default
 stage:
-  worker: fred-documentor
+  worker: default:fred
   name: qa-automation
 next_action:
   worker: ""
@@ -13,21 +13,21 @@ next_action:
 history:
   - at: "2026-05-20T09:00:00-05:00"
     stage: intake
-    owner: fred-documentor
+    owner: default:fred
     result: ticket loaded, spec and plan written
   - at: "2026-05-21T14:00:00-05:00"
     stage: develop
-    owner: bob-developer
+    owner: default:bob
     result: implementation complete
   - at: "2026-05-22T10:30:00-05:00"
     stage: code-review
-    owner: bob-developer
+    owner: default:bob
     result: review passed
   - at: "2026-05-23T11:00:00-05:00"
     stage: pr-open
-    owner: bob-developer
+    owner: default:bob
     result: PR merged
   - at: "2026-05-24T15:00:00-05:00"
     stage: qa-automation
-    owner: fred-documentor
+    owner: default:fred
     result: all tests passing, feature archived

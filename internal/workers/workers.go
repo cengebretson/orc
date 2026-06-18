@@ -21,25 +21,61 @@ type Worker struct {
 	FilePath string `yaml:"-"` // set at load time, not in frontmatter
 }
 
-// Load parses all worker markdown files in the given directory.
+// Load parses all namespaced worker markdown files in the given directory.
 func Load(workersDir string) ([]*Worker, error) {
-	entries, err := filepath.Glob(filepath.Join(workersDir, "*.md"))
-	if err != nil {
-		return nil, fmt.Errorf("scanning workers/: %w", err)
-	}
-
 	var workers []*Worker
-	for _, path := range entries {
-		if filepath.Base(path) == "_template.md" {
-			continue
-		}
-		w, err := parseWorkerFile(path)
+	err := filepath.WalkDir(workersDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
-			return nil, fmt.Errorf("parsing %s: %w", path, err)
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if filepath.Ext(path) != ".md" || filepath.Base(path) == "_template.md" {
+			return nil
+		}
+
+		id, ok, err := workerIDFromPath(workersDir, path)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return nil
+		}
+
+		w, err := parseWorkerFile(path, id)
+		if err != nil {
+			return fmt.Errorf("parsing %s: %w", path, err)
+		}
+		if w.ID != id {
+			return fmt.Errorf("parsing %s: worker id %q must match file path %q", path, w.ID, id)
 		}
 		workers = append(workers, w)
+		return nil
+	})
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("scanning workers/: %w", err)
 	}
 	return workers, nil
+}
+
+func workerIDFromPath(workersDir, path string) (string, bool, error) {
+	rel, err := filepath.Rel(workersDir, path)
+	if err != nil {
+		return "", false, err
+	}
+	if filepath.Dir(rel) == "." {
+		return "", false, nil
+	}
+	withoutExt := strings.TrimSuffix(rel, filepath.Ext(rel))
+	parts := strings.Split(filepath.ToSlash(withoutExt), "/")
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return "", false, fmt.Errorf("worker file %s must live at workers/<namespace>/<worker>.md", path)
+	}
+	return parts[0] + ":" + parts[1], true, nil
 }
 
 // FindByID returns the worker with the given ID, or nil.
@@ -97,7 +133,7 @@ func LaunchArgs(w *Worker, workspaceRoot, cwd, prompt string) []string {
 }
 
 // parseWorkerFile reads a markdown file and extracts YAML frontmatter.
-func parseWorkerFile(path string) (*Worker, error) {
+func parseWorkerFile(path, defaultID string) (*Worker, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -113,10 +149,8 @@ func parseWorkerFile(path string) (*Worker, error) {
 		return nil, fmt.Errorf("parsing frontmatter: %w", err)
 	}
 
-	// fall back to filename stem as id if not set
 	if w.ID == "" {
-		base := filepath.Base(path)
-		w.ID = strings.TrimSuffix(base, filepath.Ext(base))
+		w.ID = defaultID
 	}
 
 	w.FilePath = path

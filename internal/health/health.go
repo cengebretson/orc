@@ -243,7 +243,18 @@ func checkDirWithCount(root, dir, pattern, label string) Result {
 		return Result{Name: dir + "/", Status: Missing, Detail: "missing — run `orc init`"}
 	}
 
-	matches, _ := filepath.Glob(filepath.Join(path, pattern))
+	var matches []string
+	_ = filepath.WalkDir(path, func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		matched, err := filepath.Match(pattern, filepath.Base(path))
+		if err != nil || !matched || filepath.Base(path) == "_template.md" {
+			return err
+		}
+		matches = append(matches, path)
+		return nil
+	})
 
 	switch len(matches) {
 	case 0:
@@ -297,7 +308,7 @@ func checkWorkflowRefs(root string) Result {
 			sc, _ := wfCfg.StageConfig(wfName, stageName)
 
 			// check stage file exists
-			stageFile := config.ResourceFileName(stageName)
+			stageFile := config.ResourcePath(stageName)
 			if _, err := os.Stat(filepath.Join(stagesDir, stageFile)); err != nil {
 				errs = append(errs, fmt.Sprintf("missing stage file: %s", stageFile))
 			}
@@ -313,7 +324,7 @@ func checkWorkflowRefs(root string) Result {
 			if sc.Loop == nil {
 				continue
 			}
-			stageFile := config.ResourceFileName(sc.Loop.Via)
+			stageFile := config.ResourcePath(sc.Loop.Via)
 			if _, err := os.Stat(filepath.Join(stagesDir, stageFile)); err != nil {
 				errs = append(errs, fmt.Sprintf("missing stage file: %s", stageFile))
 			}

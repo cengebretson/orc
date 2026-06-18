@@ -52,13 +52,13 @@ func TestCompute_FlagOverrideTakesPriority(t *testing.T) {
 		t.Fatal("fixture STORY-123 not found")
 	}
 
-	plan, err := runner.Compute(ws, featureDir, "fred-documentor")
+	plan, err := runner.Compute(ws, featureDir, "default:fred")
 	if err != nil {
 		t.Fatalf("Compute: %v", err)
 	}
 
-	if plan.Worker.ID != "fred-documentor" {
-		t.Errorf("Worker.ID = %q, want fred-documentor", plan.Worker.ID)
+	if plan.Worker.ID != "default:fred" {
+		t.Errorf("Worker.ID = %q, want default:fred", plan.Worker.ID)
 	}
 	if plan.WorkerReason != "flag override" {
 		t.Errorf("WorkerReason = %q, want \"flag override\"", plan.WorkerReason)
@@ -192,7 +192,7 @@ next_action:
   prompt: Start intake.
   cwd: .
 `,
-			wantWorker:   "fred-documentor",
+			wantWorker:   "default:fred",
 			wantReason:   "workflow default",
 			wantWorkflow: "default",
 			wantStage:    "intake",
@@ -210,8 +210,8 @@ next_action:
   prompt: Start intake.
   cwd: .
 `,
-			override:     "brian-qa",
-			wantWorker:   "brian-qa",
+			override:     "default:brian",
+			wantWorker:   "default:brian",
 			wantReason:   "flag override",
 			wantWorkflow: "default",
 			wantStage:    "intake",
@@ -224,13 +224,13 @@ ticket: TICKET-3
 slug: TICKET-3
 status: active
 stage:
-  worker: fred-documentor
+  worker: default:fred
   name: develop
 next_action:
   prompt: Continue development.
   cwd: .
 `,
-			wantWorker:   "fred-documentor",
+			wantWorker:   "default:fred",
 			wantReason:   "stage owner",
 			wantWorkflow: "default",
 			wantStage:    "develop",
@@ -248,7 +248,7 @@ next_action:
   prompt: Continue development.
   cwd: .
 `,
-			wantWorker:   "bob-developer",
+			wantWorker:   "default:bob",
 			wantReason:   "workflow default",
 			wantWorkflow: "default",
 			wantStage:    "develop",
@@ -266,7 +266,7 @@ next_action:
   prompt: Review the work.
   cwd: .
 `,
-			wantWorker:    "zach-reviewer",
+			wantWorker:    "default:zach",
 			wantReason:    "workflow default",
 			wantWorkflow:  "default",
 			wantStage:     "code-review",
@@ -316,22 +316,22 @@ workflows:
   default:
     stages:
       - name: intake
-        worker: fred-documentor
+        worker: default:fred
         advance: auto
       - name: develop
-        worker: bob-developer
+        worker: default:bob
         advance: manual
         loop:
           via: code-review
-          worker: zach-reviewer
+          worker: default:zach
           max: 3
           on_max: pause
       - name: qa-automation
-        worker: brian-qa
+        worker: default:brian
         advance: auto
 `)
-	for _, id := range []string{"bob-developer", "fred-documentor", "zach-reviewer", "brian-qa"} {
-		writeRunnerFile(t, filepath.Join(root, "workers", id+".md"), `---
+	for _, id := range []string{"default:bob", "default:fred", "default:zach", "default:brian"} {
+		writeRunnerFile(t, filepath.Join(root, "workers", strings.ReplaceAll(id, ":", "/")+".md"), `---
 id: `+id+`
 name: `+id+`
 engine: claude

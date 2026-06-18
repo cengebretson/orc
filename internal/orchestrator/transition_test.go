@@ -51,7 +51,7 @@ func TestAdvanceMovesToNextStage(t *testing.T) {
 	clearRepoValidationFields(t, featureDir)
 	if err := state.Update(featureDir, func(s *state.State) error {
 		s.Stage.Name = "intake"
-		s.Stage.Worker = "fred-documentor"
+		s.Stage.Worker = "default:fred"
 		return nil
 	}); err != nil {
 		t.Fatalf("Update setup: %v", err)

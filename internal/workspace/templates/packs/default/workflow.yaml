@@ -1,26 +1,26 @@
 workflows:
-  default:
+  "default:standard":
     description: General feature workflow — intake → develop → PR → QA
     stages:
-      - name: intake
-        worker: fred-documentor
+      - name: default:intake
+        worker: default:fred
         advance: auto
-      - name: develop
-        worker: bob-developer
+      - name: default:develop
+        worker: default:bob
         advance: manual
         loop:
-          via: code-review
-          worker: zach-reviewer
+          via: default:code-review
+          worker: default:zach
           max: 3
           on_max: pause    # pause for human review when loop limit is reached
-      - name: pr-open
-        worker: bob-developer
+      - name: default:pr-open
+        worker: default:bob
         advance: manual
         loop:
-          via: pr-repair
-          worker: bob-developer
+          via: default:pr-repair
+          worker: default:bob
           max: 3
           on_max: pause    # pause for human review when loop limit is reached
-      - name: qa-automation
-        worker: brian-qa
+      - name: default:qa-automation
+        worker: default:brian
         advance: auto

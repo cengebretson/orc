@@ -4,7 +4,7 @@ slug: PROJ-099-password-reset
 status: active
 workflow: default
 stage:
-  worker: bob-developer
+  worker: default:bob
   name: develop
 runtime:
   tmux:
@@ -14,15 +14,15 @@ runtime:
     task: "make sure fred did a good job on the SPEC.md before we go further"
     started_at: "2026-06-01T13:45:00-05:00"
 next_action:
-  worker: bob-developer
+  worker: default:bob
   prompt: Implement password reset flow per SPEC.md — email token generation and expiry logic are the priority
   cwd: .
 history:
   - at: "2026-06-01T09:00:00-05:00"
     stage: intake
-    worker: fred-documentor
+    worker: default:fred
     result: ticket context loaded, SPEC.md written
   - at: "2026-06-01T11:30:00-05:00"
     stage: develop
-    worker: bob-developer
+    worker: default:bob
     result: started

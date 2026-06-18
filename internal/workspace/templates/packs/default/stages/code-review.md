@@ -18,7 +18,7 @@ Before reviewing, count how many times `code-review` appears in `STATE.yaml` his
 
 ## Steps
 
-**Owner:** zach-reviewer agent  
+**Owner:** `default:zach` agent  
 **Inputs:** feature branch code in worktree, `PLAN.md`, `SPEC.md`, `develop/HANDOFF.md`,  
 `code-review/REVIEW.md` (from prior cycles)  
 **Outputs:** `code-review/REVIEW.md` (overwrite with updated findings)

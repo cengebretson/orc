@@ -127,8 +127,8 @@ workflows:
         worker: missing-worker
         advance: auto
 `)
-	writeDoctorFile(t, filepath.Join(root, "workers", "fred.md"), `---
-id: fred
+	writeDoctorFile(t, filepath.Join(root, "workers", "default", "fred.md"), `---
+id: default:fred
 name: Fred
 engine: claude
 ---

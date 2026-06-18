@@ -1,5 +1,5 @@
 ---
-id: bob-developer
+id: default:bob
 name: Bob (Developer)
 engine: codex
 model: gpt-5.5

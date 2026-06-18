@@ -8,5 +8,5 @@ stage:
 history:
   - at: "2026-06-05T10:00:00-05:00"
     stage: intake
-    worker: fred-documentor
+    worker: default:fred
     result: ticket loaded, alert noise inventory written

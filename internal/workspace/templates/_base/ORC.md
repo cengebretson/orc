@@ -22,7 +22,8 @@ Then mark the ticket active based on its current status:
 - `pending` or `ready` → `orc mark <ticket> start`
 - `paused` → `orc mark <ticket> resume`
 
-Read `stages/<stage>.md` for the current stage instructions.
+Read the current stage file. Namespaced stage IDs map to nested paths:
+`default:develop` is `stages/default/develop.md`.
 
 **End every session with exactly one of:**
 ```
@@ -62,7 +63,7 @@ Transition guards:
 - `resume` is allowed only from `paused`.
 - `next` is rejected while a ticket is still `pending`; start the session first.
 - `next --stage` must name a configured workflow or loop stage.
-- `next --worker` must name a worker from `workers/`.
+- `next --worker` must name a worker ID whose file exists under `workers/<pack>/`.
 - `done` is rejected from `pending`.
 - Invalid `orc.yaml` blocks `next`.
 

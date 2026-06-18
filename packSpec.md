@@ -82,19 +82,19 @@ qa:automation
 
 This keeps aliases, filesystem paths, and CLI arguments predictable.
 
-Runtime file materialization uses flat filenames:
+Runtime file materialization uses namespace folders:
 
 ```text
-<pack>:<stage>  -> stages/<pack>-<stage>.md
-<pack>:<worker> -> workers/<pack>-<worker>.md
+<pack>:<stage>  -> stages/<pack>/<stage>.md
+<pack>:<worker> -> workers/<pack>/<worker>.md
 ```
 
 Examples:
 
 ```text
-default:develop -> stages/default-develop.md
-hotfix:develop  -> stages/hotfix-develop.md
-default:bob     -> workers/default-bob.md
+default:develop -> stages/default/develop.md
+hotfix:develop  -> stages/hotfix/develop.md
+default:bob     -> workers/default/bob.md
 ```
 
 ### Workers
@@ -156,8 +156,10 @@ workflows:
 
 Compatibility decision:
 
-- Existing un-namespaced workspaces continue to work.
-- New pack-provided workflows should use namespaced IDs.
+- New workspaces use namespaced canonical IDs for workflows, stages, and workers.
+- Custom local resources use the same namespace rule even when no pack is
+  installed. For example, `workers/custom/chris.md` resolves to `custom:chris`.
+- Root-level runtime files such as `workers/chris.md` are not runnable workers.
 - Generated starter workspaces may expose friendly aliases such as `default`.
 
 ## Aliases
@@ -486,11 +488,11 @@ Workflows:
   hotfix:standard  used
 
 Stages:
-  hotfix:intake    stages/hotfix-intake.md    used by hotfix:standard
-  hotfix:develop   stages/hotfix-develop.md   used by hotfix:standard
+  hotfix:intake    stages/hotfix/intake.md    used by hotfix:standard
+  hotfix:develop   stages/hotfix/develop.md   used by hotfix:standard
 
 Workers:
-  hotfix:bob       workers/hotfix-bob.md      used by hotfix:standard
+  hotfix:bob       workers/hotfix/bob.md      used by hotfix:standard
 ```
 
 Useful flags:
@@ -651,7 +653,6 @@ Out of scope for first slice:
 - Remote pack install.
 - Pack registry.
 - Updating already-initialized workspaces.
-- Automatically migrating old un-namespaced workspaces.
 
 ## Workspace Ownership After Install
 
@@ -685,15 +686,19 @@ Orc also materializes runtime resources into the normal workspace folders:
 
 ```text
 stages/
-  default-intake.md
-  default-develop.md
-  hotfix-intake.md
-  hotfix-develop.md
+  default/
+    intake.md
+    develop.md
+  hotfix/
+    intake.md
+    develop.md
 
 workers/
-  default-bob.md
-  default-zach.md
-  hotfix-bob.md
+  default/
+    bob.md
+    zach.md
+  hotfix/
+    bob.md
 ```
 
 Runtime commands use the normal workspace surface as the source of truth:
@@ -701,6 +706,17 @@ Runtime commands use the normal workspace surface as the source of truth:
 - `orc.yaml`
 - `stages/`
 - `workers/`
+
+Custom resources can live under a workspace-owned namespace without being
+installed from a pack:
+
+```text
+workers/custom/chris.md  -> custom:chris
+stages/custom/plan.md    -> custom:plan
+```
+
+The namespace folder is required. A file such as `workers/chris.md` is treated as
+workspace documentation or a template-like file, not as a runnable worker.
 
 The `packs/` snapshots are not executed directly.
 
@@ -718,23 +734,16 @@ Rules:
 
 ## Compatibility Notes
 
-Existing workspaces use un-namespaced stage and worker names. Do not break them.
+No legacy migration is required while orc is still pre-adoption.
 
-Compatibility options:
+Rules:
 
-1. Keep supporting un-namespaced local resources forever.
-2. Treat un-namespaced names as workspace-local aliases.
-3. Migrate generated templates to namespaced IDs while preserving aliases for
-   friendly defaults.
-
-Recommended:
-
-- Existing un-namespaced workspaces continue to work.
-- New built-in packs use namespaced canonical IDs.
-- New generated workspaces include aliases so common commands remain readable.
-- The first implementation slice does not migrate the current built-in default
-  pack. Local pack inspection can land first without changing generated
-  workspace compatibility.
+- Built-in packs use namespaced canonical IDs.
+- Generated workspaces include aliases so common commands remain readable.
+- Runtime resource files must live under a namespace folder:
+  `stages/<namespace>/<stage>.md` and `workers/<namespace>/<worker>.md`.
+- A namespace does not imply an installed pack. `custom:*` is a valid local
+  namespace owned by the workspace.
 
 ## Open Questions
 

@@ -10,6 +10,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - `orc pack inspect <path>` validates and previews local workflow packs without installing them.
 - `orc init --pack <path>` can scaffold a workspace from one local workflow pack.
+- Generated workspaces now install the built-in default pack with aliases and a
+  consistent namespaced runtime layout under `stages/<pack>/` and `workers/<pack>/`.
 
 ## [0.4.0] - 2026-06-18
 

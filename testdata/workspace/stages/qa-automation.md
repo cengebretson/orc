@@ -9,7 +9,7 @@ Runs after the PR has been reviewed and the `pr-open` stage hands off here.
 
 ## Steps
 
-**Owner:** brian-qa agent  
+**Owner:** default:brian agent  
 **Inputs:** `develop/HANDOFF.md`, `TICKET.md`, QA repo worktree  
 **Outputs:** `qa-automation/SOURCE_CONTEXT.md`, `qa-automation/PLAN.md`, `qa-automation/RUNS.md`, `qa-automation/RESULT.md`
 

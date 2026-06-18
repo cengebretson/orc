@@ -1,5 +1,5 @@
 ---
-id: ada-architect
+id: default:ada
 name: Ada the Architect
 engine: claude
 model: claude-opus-4-8

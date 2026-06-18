@@ -1,5 +1,5 @@
 ---
-id: fred-documentor
+id: default:fred
 name: Fred (Document)
 engine: claude
 model: claude-sonnet-4-6
@@ -36,20 +36,3 @@ Ask before:
 - Writing to Jira, GitHub, or external systems
 - Creating or closing PRs
 - Replacing existing handoff or evidence files
-
-## Launch Template
-
-```bash
-claude --add-dir {{workspace}} "{{prompt}}"
-```
-
-## Prompt Template
-
-Continue {{ticket}} using:
-
-- Feature state: `features/{{slug}}/STATE.yaml`
-- Stage: `stages/{{stage}}.md`
-- Current stage: `{{stage}}`
-- Expected outputs: {{outputs}}
-
-Start from the workspace root: `{{workspace}}`.
