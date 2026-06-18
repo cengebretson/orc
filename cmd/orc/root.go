@@ -75,6 +75,19 @@ var packCmd = &cobra.Command{
 	Short: "Inspect and manage workflow packs",
 }
 
+var packListCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List installed packs and what they install",
+	RunE:  runPackList,
+}
+
+var packShowCmd = &cobra.Command{
+	Use:   "show <pack>",
+	Short: "Show one installed pack and what it installs",
+	Args:  cobra.ExactArgs(1),
+	RunE:  runPackShow,
+}
+
 var packInspectCmd = &cobra.Command{
 	Use:   "inspect <path>",
 	Short: "Validate and preview a local pack without installing it",
@@ -283,6 +296,8 @@ func init() {
 	jitCmd.ValidArgsFunction = ticketCompleter(nil, true)
 	doctorCmd.ValidArgsFunction = ticketCompleter(nil, false)
 
+	packCmd.AddCommand(packListCmd)
+	packCmd.AddCommand(packShowCmd)
 	packCmd.AddCommand(packInspectCmd)
 
 	rootCmd.AddCommand(initCmd)

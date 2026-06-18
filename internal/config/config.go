@@ -78,6 +78,18 @@ func (c *Config) DefaultWorkflow() string {
 	return c.Settings.DefaultWorkflow
 }
 
+// ResolveWorkflow returns the canonical workflow ID for a workflow or alias.
+// If the name is not an alias, it returns the input unchanged.
+func (c *Config) ResolveWorkflow(name string) string {
+	if c == nil {
+		return name
+	}
+	if target, ok := c.Aliases.Workflows[name]; ok {
+		return target
+	}
+	return name
+}
+
 // Names returns all workflow names, sorted.
 func (c *Config) Names() []string {
 	names := make([]string, 0, len(c.Workflows))

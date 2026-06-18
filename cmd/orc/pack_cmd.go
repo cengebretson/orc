@@ -5,10 +5,34 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 
 	"github.com/cengebretson/orc/internal/workspace"
 	"github.com/spf13/cobra"
 )
+
+func runPackList(cmd *cobra.Command, args []string) error {
+	packs, err := workspace.ListInstalledPacks(globalWorkspace)
+	if err != nil {
+		return err
+	}
+	printPackList(packs)
+	return nil
+}
+
+func runPackShow(cmd *cobra.Command, args []string) error {
+	packs, err := workspace.ListInstalledPacks(globalWorkspace)
+	if err != nil {
+		return err
+	}
+	for _, p := range packs {
+		if p.Name == args[0] {
+			printInstalledPack(p)
+			return nil
+		}
+	}
+	return fmt.Errorf("installed pack %q not found", args[0])
+}
 
 func runPackInspect(cmd *cobra.Command, args []string) error {
 	report, err := workspace.InspectPack(args[0])
@@ -52,6 +76,85 @@ func printPackInspection(report *workspace.PackInspection) {
 	for _, err := range report.Errors {
 		fmt.Printf("  - %s\n", err)
 	}
+}
+
+func printPackList(packs []workspace.InstalledPack) {
+	fmt.Println("Installed packs:")
+	if len(packs) == 0 {
+		fmt.Println("  none")
+		return
+	}
+	fmt.Println()
+	for _, p := range packs {
+		status := "inactive"
+		if p.Active {
+			status = "active"
+		}
+		fmt.Printf("  %-12s %s\n", p.Name, status)
+		fmt.Printf("    path: %s\n", p.Path)
+		if p.Inspection != nil {
+			if p.Inspection.Manifest.Description != "" {
+				fmt.Printf("    description: %s\n", p.Inspection.Manifest.Description)
+			}
+			printPackInventorySection("workflows", packIDs(p.Inspection.Manifest.Provides.Workflows), p.UsedWorkflows, p.Inspection.Manifest.Aliases.Workflows)
+			printPackInventorySection("stages", packIDs(p.Inspection.Manifest.Provides.Stages), nil, p.Inspection.Manifest.Aliases.Stages)
+			printPackInventorySection("workers", packIDs(p.Inspection.Manifest.Provides.Workers), nil, p.Inspection.Manifest.Aliases.Workers)
+		}
+		fmt.Println()
+	}
+}
+
+func printInstalledPack(p workspace.InstalledPack) {
+	fmt.Printf("Pack: %s\n", p.Name)
+	fmt.Printf("Installed: %s\n", p.Path)
+	status := "inactive"
+	if p.Active {
+		status = "active"
+	}
+	fmt.Printf("Status: %s\n\n", status)
+	if p.Inspection == nil {
+		return
+	}
+	fmt.Printf("Description: %s\n\n", p.Inspection.Manifest.Description)
+	printPackResources("Workflows", p.Inspection.Manifest.Provides.Workflows)
+	if len(p.UsedWorkflows) > 0 {
+		fmt.Printf("Active workflows: %s\n\n", strings.Join(p.UsedWorkflows, ", "))
+	} else {
+		fmt.Println("Active workflows: none")
+		fmt.Println()
+	}
+	printPackResources("Stages", p.Inspection.Manifest.Provides.Stages)
+	printPackResources("Workers", p.Inspection.Manifest.Provides.Workers)
+	printPackAliases(p.Inspection.Manifest.Aliases)
+}
+
+func printPackInventorySection(title string, ids []string, used []string, aliases map[string]string) {
+	if len(ids) == 0 && len(aliases) == 0 {
+		return
+	}
+	fmt.Printf("    %s: %s\n", title, strings.Join(ids, ", "))
+	if len(used) > 0 {
+		fmt.Printf("    active workflows: %s\n", strings.Join(used, ", "))
+	}
+	if len(aliases) == 0 {
+		return
+	}
+	keys := make([]string, 0, len(aliases))
+	for alias := range aliases {
+		keys = append(keys, alias)
+	}
+	sort.Strings(keys)
+	for _, alias := range keys {
+		fmt.Printf("    alias: %s -> %s\n", alias, aliases[alias])
+	}
+}
+
+func packIDs(resources []workspace.PackResource) []string {
+	ids := make([]string, 0, len(resources))
+	for _, r := range resources {
+		ids = append(ids, r.ID)
+	}
+	return ids
 }
 
 func printPackResources(title string, resources []workspace.PackResource) {

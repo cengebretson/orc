@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/cengebretson/orc/internal/state"
+	"github.com/cengebretson/orc/internal/workspace"
 )
 
 func TestRunStatusTicketPrintsDetail(t *testing.T) {
@@ -604,6 +605,64 @@ aliases:
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("pack inspect output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestRunPackListPrintsInstalledPacks(t *testing.T) {
+	resetCommandGlobals(t)
+	globalWorkspace = t.TempDir()
+	if err := workspace.Init(workspace.InitOptions{Root: globalWorkspace, Packs: []string{"default"}}); err != nil {
+		t.Fatalf("init workspace: %v", err)
+	}
+
+	out, err := captureStdout(func() error {
+		return runPackList(nil, nil)
+	})
+	if err != nil {
+		t.Fatalf("runPackList: %v\n%s", err, out)
+	}
+	for _, want := range []string{
+		"Installed packs:",
+		"default",
+		"active",
+		"path: packs/default",
+		"workflows: default:standard",
+		"active workflows: default:standard",
+		"alias: default -> default:standard",
+		"alias: bob -> default:bob",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("pack list output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestRunPackShowPrintsOneInstalledPack(t *testing.T) {
+	resetCommandGlobals(t)
+	globalWorkspace = t.TempDir()
+	if err := workspace.Init(workspace.InitOptions{Root: globalWorkspace, Packs: []string{"default"}}); err != nil {
+		t.Fatalf("init workspace: %v", err)
+	}
+
+	out, err := captureStdout(func() error {
+		return runPackShow(nil, []string{"default"})
+	})
+	if err != nil {
+		t.Fatalf("runPackShow: %v\n%s", err, out)
+	}
+	for _, want := range []string{
+		"Pack: default",
+		"Installed: packs/default",
+		"Status: active",
+		"Workflows:",
+		"default:standard",
+		"Active workflows: default:standard",
+		"Workers:",
+		"workflow default",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("pack show output missing %q:\n%s", want, out)
 		}
 	}
 }

@@ -394,88 +394,61 @@ aliases:
 
 ## Pack Commands
 
-Orc should expose pack discovery and inspection commands.
+Orc should expose workspace pack inventory and local pack inspection commands.
 
 ### `orc pack list`
 
-Lists packs. Outside a workspace, it shows packs available to install. Inside a
-workspace, it also shows installed packs and whether the current `orc.yaml`
-references their resources.
+Lists the pack snapshots installed in the current workspace under `packs/`.
+For each pack it shows the snapshot path, whether the workspace uses it, the
+workflow/stage/worker IDs it provides, and its aliases.
 
 Example:
 
 ```text
-Available packs:
-
-  default   built-in   General feature workflow
-  hotfix    built-in   Fast production fix workflow
-  planning  built-in   Spec and planning workflow
-  acme      local      Acme backend team workflow
-```
-
-Workspace example:
-
-```text
 Installed packs:
 
-  default   used     workflows: default, my-flow
-  hotfix    used     workflows: hotfix:standard
-  security  used     workflows: my-flow
-  planning  unused   no workflow references planning:* resources
+  default      active
+    path: packs/default
+    workflows: default:standard
+    active workflows: default:standard
+    aliases: default -> default:standard
 
-Available packs:
-
-  docs      built-in  Documentation-only workflow
-```
-
-Definitions:
-
-- Available: a built-in or user-installed pack source Orc can install.
-- Installed: a pack snapshot exists under `packs/<pack>/` in the workspace.
-- Used: at least one workflow in `orc.yaml` references a stage or worker from
-  that pack namespace.
-- Unused: the pack snapshot exists, but no current workflow references its
-  resources.
-
-Usage is derived from `orc.yaml`, not from the `packs/` snapshot alone.
-
-Useful flags:
-
-```bash
-orc pack list --json
-orc pack list --installed
-orc pack list --builtin
-orc pack list --available
+  hotfix       inactive
+    path: packs/hotfix
+    workflows: hotfix:standard
+    aliases: hotfix -> hotfix:standard
 ```
 
 ### `orc pack show <pack>`
 
-Shows what a pack installs. In a workspace, it also shows whether each installed
-resource is currently referenced by any workflow.
+Shows the installed snapshot for one pack in the current workspace.
 
 Example:
 
 ```text
 Pack: default
-Source: built-in
+Installed: packs/default
+Status: active
 Description: General feature workflow
 
 Workflows:
-  default:standard  General feature workflow
+  default:standard         workflow.yaml                General feature workflow
+
+Active workflows: default:standard
 
 Stages:
-  default:intake    stages/intake.md
-  default:develop   stages/develop.md
-  default:pr-open   stages/pr-open.md
+  default:intake           stages/intake.md             Gather ticket context
+  default:develop          stages/develop.md            Implement the change
+  default:pr-open          stages/pr-open.md            Open the pull request
 
 Workers:
-  default:bob       Bob the Developer        codex
-  default:zach      Zach the Reviewer        claude
+  default:bob              workers/bob.md               Implementation worker
+  default:zach             workers/zach.md              Code review worker
 
 Aliases:
-  workflow default  -> default:standard
-  stage develop     -> default:develop
-  worker bob        -> default:bob
+  stage    develop          -> default:develop
+  worker   bob              -> default:bob
+  workflow default          -> default:standard
 ```
 
 Workspace example:
@@ -485,21 +458,14 @@ Pack: hotfix
 Installed: packs/hotfix
 
 Workflows:
-  hotfix:standard  used
+  hotfix:standard  active workflows: hotfix:standard
 
 Stages:
-  hotfix:intake    stages/hotfix/intake.md    used by hotfix:standard
-  hotfix:develop   stages/hotfix/develop.md   used by hotfix:standard
+  hotfix:intake    stages/hotfix/intake.md
+  hotfix:develop   stages/hotfix/develop.md
 
 Workers:
-  hotfix:bob       workers/hotfix/bob.md      used by hotfix:standard
-```
-
-Useful flags:
-
-```bash
-orc pack show default --json
-orc pack show hotfix --workspace ~/my-workspace
+  hotfix:bob       workers/hotfix/bob.md
 ```
 
 ### `orc pack inspect <path>`
@@ -517,7 +483,7 @@ Output should include:
 - parsed manifest
 - workflows, stages, workers, aliases
 - validation errors
-- conflicts against a workspace when run with `--workspace`
+- path validation for the pack source
 
 ### Later: `orc pack install`
 
