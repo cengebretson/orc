@@ -37,7 +37,7 @@ Write only to `code-review/REVIEW.md`.
 
 `code-review/REVIEW.md` must include:
 
-- **Verdict:** `approved` | `needs changes` | `blocked`
+- **Verdict:** `approved` | `needs-changes` | `blocked`
 - **Summary:** one paragraph on overall quality
 - **Findings:** bulleted list — each item tagged `[bug]`, `[spec]`, `[style]`, `[risk]`, or `[minor]`
 - **Required before PR:** list any must-fix items if verdict is not `approved`

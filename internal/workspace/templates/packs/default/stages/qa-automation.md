@@ -10,11 +10,11 @@ Runs after the PR has been reviewed and the `pr-open` stage hands off here.
 ## Steps
 
 **Owner:** brian-qa agent  
-**Inputs:** `develop/HANDOFF.md`, `TICKET.md`, QA repo worktree  
+**Inputs:** `PLAN.md`, `develop/HANDOFF.md`, `TICKET.md`, QA repo worktree  
 **Outputs:** `qa-automation/SOURCE_CONTEXT.md`, `qa-automation/PLAN.md`, `qa-automation/RUNS.md`, `qa-automation/RESULT.md`
 
 **QA Planning**
-1. Read `develop/HANDOFF.md` and `TICKET.md`.
+1. Read `PLAN.md`, `develop/HANDOFF.md`, and `TICKET.md`.
 2. Write `qa-automation/SOURCE_CONTEXT.md` with repo context the QA agent will need.
 3. Draft `qa-automation/PLAN.md` with test cases, coverage goals, and tooling notes.
 
@@ -28,9 +28,10 @@ Runs after the PR has been reviewed and the `pr-open` stage hands off here.
 8. Read `qa-automation/RUNS.md` and CI results.
 9. Write `qa-automation/RESULT.md` with pass/fail summary and coverage notes.
 10. Update the ticket in the source system (see `TOOLS.md` for the MCP server to use).
-11. Run `orc archive <ticket>` to close out the feature.
+11. Run `orc mark <ticket> done --result "QA complete — tests passing"` to close
+    out the feature. Archive later with `orc archive <ticket>` when ready.
 
 ## Exit Criteria
 
 `qa-automation/RESULT.md` is complete with passing status, ticket is updated, and
-`orc archive` has been run.
+the ticket is marked `done`.

@@ -20,7 +20,7 @@ features/
     STATE.yaml          current stage, worker, status, next action
     TICKET.md           ticket description and acceptance criteria
     SPEC.md             context, scope, and open questions
-    PLAN.md             implementation approach and steps
+    PLAN.md             implementation approach, repo context, and steps
     DECISIONS.md        significant decisions and rationale
     develop/            outputs written by the develop stage
       HANDOFF.md        implementation summary and known risks

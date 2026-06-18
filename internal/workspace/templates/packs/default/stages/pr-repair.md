@@ -21,8 +21,8 @@ Repair a PR that has CI failures, review feedback, or merge conflicts.
 
 ## Cost Note
 
-Prefer bob-fast-fixer for lint, type, or small selector fixes. Use bob-developer
-for test failures or logic issues. Escalate to ada-architect only for design-level problems.
+Prefer bob-developer for lint, type, selector, test, and CI fixes. Escalate to
+ada-architect only for design-level problems.
 
 ## Exit Criteria
 

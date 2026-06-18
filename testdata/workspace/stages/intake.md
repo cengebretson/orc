@@ -22,7 +22,7 @@ orc work <ticket>
 1. Read `ROUTER.md` — the **Ticket System** section tells you where tickets
    live, how to fetch them, and any auth requirements. Use that.
 2. Fetch the ticket from the source system described in `ROUTER.md`.
-3. If the ticket cannot be found, run `orc mark <ticket> wait "<explanation>"` and stop.
+3. If the ticket cannot be found, run `orc mark <ticket> pause "<explanation>"` and stop.
 4. Populate `TICKET.md` with the ticket summary, description, and acceptance criteria.
 5. Draft `SPEC.md` with context, scope, and open questions.
 6. Draft `PLAN.md` with an initial approach and steps.
@@ -33,12 +33,12 @@ orc work <ticket>
 
 When done, run:
 ```
-orc mark <ticket> advance --stage develop --owner <worker-id> --result "Intake complete"
+orc mark <ticket> next --stage develop --worker <worker-id> --result "Intake complete"
 ```
 
 ## Error Handling
 
 If the ticket cannot be found or fetched:
-- Run `orc mark <ticket> wait "<description of what failed and what to check>"`
+- Run `orc mark <ticket> pause "<description of what failed and what to check>"`
 - Do not populate files with placeholder content
 - Stop — a human must resolve the issue before work continues

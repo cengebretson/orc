@@ -24,8 +24,49 @@ orc work <ticket>
 2. Fetch the ticket from the source system described in `ROUTER.md`.
 3. If the ticket cannot be found, run `orc mark <ticket> pause "<explanation>"` and stop.
 4. Populate `TICKET.md` with the ticket summary, description, and acceptance criteria.
-5. Draft `SPEC.md` with context, scope, and open questions.
-6. Draft `PLAN.md` with an initial approach and steps.
+5. Identify the target repo or repos for the work. Use `orc.yaml`, the ticket,
+   and `ROUTER.md`; if the correct repo is unclear, record the uncertainty in
+   `SPEC.md` rather than guessing.
+6. Check target repos for repo-local context that may affect the work, such as:
+   - `AGENTS.md`, `CLAUDE.md`, `README.md`
+   - `ARCHITECTURE.md`, `docs/architecture.md`
+   - `docs/domains/REGISTRY.md`
+   - `docs/domains/*/README.md`
+7. Read only the context docs that are relevant to the ticket. Do not run broad
+   analysis or update repo docs during intake.
+8. Draft `SPEC.md` with context, scope, open questions, and any repo constraints.
+9. Draft `PLAN.md` with an initial approach, steps, and a `Repo Context` section.
+
+## Repo Context
+
+In `PLAN.md`, include:
+
+```markdown
+## Repo Context
+
+Relevant docs:
+- `<path>` — why it matters
+
+Impacted areas:
+- `<area or domain>`
+
+Risks:
+- `<boundary, coupling, test, or docs risk>`
+
+Missing context:
+- `<important doc or owner that could not be found>`
+```
+
+If no relevant repo-local docs are found, write:
+
+```markdown
+## Repo Context
+
+Relevant docs: none found
+Impacted areas: inferred from ticket only
+Risks: none identified from repo-local docs
+Missing context: none
+```
 
 ## Exit Criteria
 

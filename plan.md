@@ -360,8 +360,8 @@ One soft follow-up remains under Cleanup above.
       `history[].owner` that `state.Load` silently dropped. Round-trip now covered
       by tests in both `state` and `workspace`.
 - [x] (same root cause) The embedded templates still instructed agents to run
-      `orc mark <ticket> advance --owner <id>` and `orc mark <ticket> wait|block` —
-      none of which exist. Fixed to `next --worker` / `pause` across stage files,
+      obsolete advance/wait-style commands that no longer exist. Fixed to
+      `next --worker` / `pause` across stage files,
       ORC.md, AGENTS.md sample worker, and feature README wording.
 
 ### `orc adhoc` — already implemented as `orc jit`

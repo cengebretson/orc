@@ -167,7 +167,7 @@ Every ticket has a context pack at `features/<ticket-slug>/`:
 | `STATE.yaml` | Durable state — status, stage, worker, next action, history |
 | `TICKET.md` | Ticket description and acceptance criteria |
 | `SPEC.md` | Context, scope, constraints, open questions |
-| `PLAN.md` | Implementation approach and steps |
+| `PLAN.md` | Implementation approach, repo context, and steps |
 | `DECISIONS.md` | Non-obvious choices — what, why, alternatives rejected |
 
 Read `STATE.yaml` and `TICKET.md` at the start of every session. Read `SPEC.md` and `PLAN.md` before any implementation work.
@@ -184,7 +184,7 @@ Each stage writes its outputs to a subfolder matching its name: `<stage-name>/`.
 |------|-----------|---------|
 | `TICKET.md` | intake | all stages |
 | `SPEC.md` | intake | develop, code-review |
-| `PLAN.md` | intake | develop |
+| `PLAN.md` | intake | develop, code-review, pr-open, qa-automation |
 | `DECISIONS.md` | any stage | any stage |
 | `develop/HANDOFF.md` | develop | code-review, pr-open, qa-automation |
 | `code-review/REVIEW.md` | code-review | develop, pr-open |

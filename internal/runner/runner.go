@@ -21,7 +21,7 @@ type Plan struct {
 	LaunchCommand  string   // shell string for --dry display
 	LaunchArgv     []string // for exec.Command
 	CWD            string
-	EndInstruction string // the orc advance/wait command the agent should run
+	EndInstruction string // the orc mark command the agent should run
 }
 
 // Compute resolves the next action plan for a ticket.

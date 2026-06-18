@@ -24,12 +24,16 @@ Before reviewing, count how many times `code-review` appears in `STATE.yaml` his
 **Outputs:** `code-review/REVIEW.md` (overwrite with updated findings)
 
 1. Read `SPEC.md` and `PLAN.md` to understand the intended design.
-2. Read `develop/HANDOFF.md` for the implementation summary and known risks.
-3. If a prior `code-review/REVIEW.md` exists, read it to understand what was previously flagged.
-4. Review the code changes in the worktree (`git diff main` or the feature branch).
-5. Check for: correctness, spec compliance, edge cases, security issues, test coverage.
-6. Write `code-review/REVIEW.md` with findings using tags: `[bug]` `[spec]` `[style]` `[risk]` `[minor]`
-7. Set the verdict line: `**verdict: approved**`, `**verdict: needs-changes**`, or `**verdict: blocked**`.
+2. If `PLAN.md` has a `Repo Context` section, use it to check documented
+   boundaries, impacted areas, and listed risks.
+3. Read `develop/HANDOFF.md` for the implementation summary and known risks.
+4. If a prior `code-review/REVIEW.md` exists, read it to understand what was previously flagged.
+5. Review the code changes in the worktree (`git diff main` or the feature branch).
+6. Check for: correctness, spec compliance, edge cases, security issues, test coverage.
+7. If changed paths cross documented repo boundaries or touch undocumented areas,
+   record that as a `[risk]` finding.
+8. Write `code-review/REVIEW.md` with findings using tags: `[bug]` `[spec]` `[style]` `[risk]` `[minor]`
+9. Set the verdict line: `**verdict: approved**`, `**verdict: needs-changes**`, or `**verdict: blocked**`.
    Valid values are defined in `code-review/REVIEW.md` — do not use custom verdicts.
 
 ## Exit Criteria

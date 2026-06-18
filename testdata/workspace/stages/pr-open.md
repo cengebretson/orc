@@ -34,7 +34,7 @@ PR is open and `pr-open/PR.md` has the URL.
 
 When done, run:
 ```
-orc mark <ticket> wait "PR open — waiting for human review"
+orc mark <ticket> pause "PR open — waiting for human review"
 ```
 
 If preflight checks fail:

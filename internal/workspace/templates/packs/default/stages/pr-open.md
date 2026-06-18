@@ -10,7 +10,7 @@ writes the PR description, opens the PR, and hands off for human review.
 ## Steps
 
 **Owner:** developer agent  
-**Inputs:** `develop/HANDOFF.md`, `code-review/REVIEW.md`, `TICKET.md`, feature worktree  
+**Inputs:** `PLAN.md`, `develop/HANDOFF.md`, `code-review/REVIEW.md`, `TICKET.md`, feature worktree  
 **Outputs:** Open PR, populated `pr-open/PR.md`
 
 **Preflight**
@@ -22,9 +22,11 @@ writes the PR description, opens the PR, and hands off for human review.
 
 **Open PR**
 6. Read `TICKET.md` for the ticket summary and acceptance criteria.
-7. Read `develop/HANDOFF.md` for the implementation summary.
+7. Read `PLAN.md` and `develop/HANDOFF.md` for the implementation summary,
+   repo context, and known risks.
 8. Write a PR title: concise, under 70 characters, describes what changed.
-9. Write a PR body: what changed and why (link ticket), how to test, migration or deployment notes.
+9. Write a PR body: what changed and why (link ticket), domain or repo-context
+   impact, how to test, migration or deployment notes.
 10. Open the PR via the source control MCP server (see `TOOLS.md`).
 11. Write the PR URL and status to `pr-open/PR.md`.
 

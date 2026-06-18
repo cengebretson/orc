@@ -29,12 +29,14 @@ without waiting for human approval — the reviewer will verify the fixes.
 **Outputs:** `develop/HANDOFF.md`, committed code on feature branch
 
 1. Read `SPEC.md` and `PLAN.md` for context.
-2. If rework pass: read `code-review/REVIEW.md` and address all findings before proceeding.
-3. Implement (or fix) the feature in the repo worktree.
-4. Write and run local tests for changed files.
-5. Write (or update) `develop/HANDOFF.md` with an implementation summary, test
-   instructions, and known risks.
-6. Commit all changes to the feature branch.
+2. If `PLAN.md` has a `Repo Context` section with relevant docs, read those
+   docs before implementation.
+3. If rework pass: read `code-review/REVIEW.md` and address all findings before proceeding.
+4. Implement (or fix) the feature in the repo worktree.
+5. Write and run local tests for changed files.
+6. Write (or update) `develop/HANDOFF.md` with an implementation summary, domain
+   or repo-context impact, test instructions, and known risks.
+7. Commit all changes to the feature branch.
 
 ## Exit Criteria
 

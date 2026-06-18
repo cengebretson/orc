@@ -21,8 +21,8 @@ Repair a PR that has CI failures, review feedback, or merge conflicts.
 
 ## Cost Note
 
-Prefer bob-fast-fixer for lint, type, or small selector fixes. Use bob-developer
-for test failures or logic issues. Escalate to ada-architect only for design-level problems.
+Prefer bob-developer for lint, type, selector, test, and CI fixes. Escalate to
+ada-architect only for design-level problems.
 
 ## Exit Criteria
 
@@ -30,7 +30,7 @@ CI is green and all blocking review comments are resolved.
 
 When done, run:
 ```
-orc mark <ticket> advance --stage pr-open --owner <worker-id> --result "PR repaired — CI green"
+orc mark <ticket> next --stage pr-open --worker <worker-id> --result "PR repaired — CI green"
 ```
 
 If the issue cannot be resolved:

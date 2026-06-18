@@ -6,6 +6,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Repo-context guidance in the default workflow so intake records relevant local docs in `PLAN.md` and downstream stages use that context.
+- Template lint coverage to catch stale workflow commands, missing worker references, and old review verdict spelling in embedded markdown.
+
+### Changed
+
+- Split the CLI command implementation into focused files by command area.
+- Extracted common CLI output formatting helpers for status, mark, and archive output.
+
+### Fixed
+
+- Updated default stage and worker docs to use current `orc mark` command names, `needs-changes` verdict spelling, and correct QA closeout behavior.
+
 ## [0.3.1] - 2026-06-17
 
 ### Added
