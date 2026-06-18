@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cengebretson/orc/internal/health"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/workspace"
 )
@@ -219,6 +220,77 @@ func TestInit_NonePackIsBaseOnly(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(dir, rel)); err == nil {
 			t.Errorf("--pack none should not install %s", rel)
 		}
+	}
+}
+
+func TestInit_LocalPackMaterializesRuntimeFiles(t *testing.T) {
+	packDir := writeLocalPack(t, "hotfix", `schema: 1
+name: hotfix
+description: Fast production fix workflow
+provides:
+  workflows:
+    - id: hotfix:standard
+      path: workflow.yaml
+  workers:
+    - id: hotfix:bob
+      path: workers/bob.md
+  stages:
+    - id: hotfix:develop
+      path: stages/develop.md
+`)
+	writePackFile(t, filepath.Join(packDir, "workflow.yaml"), `workflows:
+  "hotfix:standard":
+    description: Fast production fix workflow
+    stages:
+      - name: hotfix:develop
+        worker: hotfix:bob
+        advance: auto
+`)
+
+	dir := t.TempDir()
+	if err := workspace.Init(workspace.InitOptions{Root: dir, Packs: []string{packDir}}); err != nil {
+		t.Fatalf("Init local pack: %v", err)
+	}
+
+	for _, rel := range []string{
+		"packs/hotfix/pack.yaml",
+		"packs/hotfix/workflow.yaml",
+		"stages/hotfix-develop.md",
+		"workers/hotfix-bob.md",
+	} {
+		if _, err := os.Stat(filepath.Join(dir, rel)); err != nil {
+			t.Fatalf("missing %s: %v", rel, err)
+		}
+	}
+
+	orcYAML, err := os.ReadFile(filepath.Join(dir, "orc.yaml"))
+	if err != nil {
+		t.Fatalf("read orc.yaml: %v", err)
+	}
+	for _, want := range []string{
+		"default_workflow: hotfix:standard",
+		`"hotfix:standard":`,
+		"name: hotfix:develop",
+		"worker: hotfix:bob",
+	} {
+		if !strings.Contains(string(orcYAML), want) {
+			t.Fatalf("orc.yaml missing %q:\n%s", want, string(orcYAML))
+		}
+	}
+
+	report := health.Run(dir)
+	var workflowRefs *health.Result
+	for i := range report.Results {
+		if report.Results[i].Name == "workflow refs" {
+			workflowRefs = &report.Results[i]
+			break
+		}
+	}
+	if workflowRefs == nil {
+		t.Fatal("workflow refs result missing")
+	}
+	if workflowRefs.Status != health.OK {
+		t.Fatalf("workflow refs = %s, want OK: %s", workflowRefs.Status, workflowRefs.Detail)
 	}
 }
 

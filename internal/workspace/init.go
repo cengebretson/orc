@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cengebretson/orc/internal/config"
 	"gopkg.in/yaml.v3"
 )
 
@@ -152,6 +153,15 @@ func collectEntries(opts InitOptions) ([]fileEntry, error) {
 		return nil, err
 	}
 
+	if len(packs) == 1 && isLocalPackRef(packs[0]) {
+		return collectLocalPackEntries(baseOrcYAML, entries, packs[0])
+	}
+	for _, p := range packs {
+		if isLocalPackRef(p) {
+			return nil, fmt.Errorf("local filesystem packs cannot be combined with other packs yet")
+		}
+	}
+
 	// 2. Selected packs — only workers/ and stages/ are scaffolded; pack.yaml and
 	//    workflow.yaml are metadata consumed by the assembler.
 	var infos []PackInfo
@@ -204,6 +214,119 @@ func collectEntries(opts InitOptions) ([]fileEntry, error) {
 	entries = append(entries, fileEntry{dest: "orc.yaml", content: orcYAML})
 
 	return entries, nil
+}
+
+func isLocalPackRef(ref string) bool {
+	return ref == "." || filepath.IsAbs(ref) || strings.HasPrefix(ref, "."+string(filepath.Separator)) || strings.Contains(ref, string(filepath.Separator))
+}
+
+func collectLocalPackEntries(baseOrcYAML string, entries []fileEntry, packPath string) ([]fileEntry, error) {
+	report, err := InspectPack(packPath)
+	if err != nil {
+		return nil, err
+	}
+	if !report.OK() {
+		return nil, fmt.Errorf("pack validation failed:\n  %s", strings.Join(report.Errors, "\n  "))
+	}
+	manifest := report.Manifest
+	if len(manifest.Provides.Workflows) == 0 {
+		return nil, fmt.Errorf("local pack %q must provide at least one workflow", manifest.Name)
+	}
+	if len(manifest.Provides.Workflows) > 1 {
+		return nil, fmt.Errorf("local pack %q provides multiple workflows; --default-workflow is not implemented yet", manifest.Name)
+	}
+
+	snapshotEntries, err := collectPackSnapshotEntries(report.Source, manifest.Name)
+	if err != nil {
+		return nil, err
+	}
+	entries = append(entries, snapshotEntries...)
+
+	runtimeEntries, err := collectPackRuntimeEntries(report.Source, manifest)
+	if err != nil {
+		return nil, err
+	}
+	entries = append(entries, runtimeEntries...)
+
+	workflow, err := assembleLocalPackWorkflow(baseOrcYAML, report.Source, manifest)
+	if err != nil {
+		return nil, err
+	}
+	entries = append(entries, fileEntry{dest: "orc.yaml", content: workflow})
+	return entries, nil
+}
+
+func collectPackSnapshotEntries(source, name string) ([]fileEntry, error) {
+	var entries []fileEntry
+	err := filepath.WalkDir(source, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if d.Name() == ".DS_Store" {
+			return nil
+		}
+		content, err := os.ReadFile(p)
+		if err != nil {
+			return fmt.Errorf("reading pack file %s: %w", p, err)
+		}
+		rel, err := filepath.Rel(source, p)
+		if err != nil {
+			return err
+		}
+		dest := filepath.ToSlash(filepath.Join("packs", name, rel))
+		entries = append(entries, fileEntry{dest: dest, content: string(content)})
+		return nil
+	})
+	return entries, err
+}
+
+func collectPackRuntimeEntries(source string, manifest PackManifestV1) ([]fileEntry, error) {
+	var entries []fileEntry
+	for _, stage := range manifest.Provides.Stages {
+		content, err := os.ReadFile(filepath.Join(source, filepath.Clean(stage.Path)))
+		if err != nil {
+			return nil, fmt.Errorf("reading stage %s: %w", stage.Path, err)
+		}
+		entries = append(entries, fileEntry{
+			dest:    filepath.ToSlash(filepath.Join("stages", config.ResourceFileName(stage.ID))),
+			content: string(content),
+		})
+	}
+	for _, worker := range manifest.Provides.Workers {
+		content, err := os.ReadFile(filepath.Join(source, filepath.Clean(worker.Path)))
+		if err != nil {
+			return nil, fmt.Errorf("reading worker %s: %w", worker.Path, err)
+		}
+		entries = append(entries, fileEntry{
+			dest:    filepath.ToSlash(filepath.Join("workers", config.ResourceFileName(worker.ID))),
+			content: string(content),
+		})
+	}
+	return entries, nil
+}
+
+func assembleLocalPackWorkflow(base, source string, manifest PackManifestV1) (string, error) {
+	var b strings.Builder
+	b.WriteString(strings.TrimRight(base, "\n"))
+	b.WriteString("\n\nworkflows:\n")
+
+	seen := map[string]bool{}
+	for _, workflow := range manifest.Provides.Workflows {
+		if seen[workflow.Path] {
+			continue
+		}
+		seen[workflow.Path] = true
+		content, err := os.ReadFile(filepath.Join(source, filepath.Clean(workflow.Path)))
+		if err != nil {
+			return "", fmt.Errorf("reading workflow %s: %w", workflow.Path, err)
+		}
+		b.WriteString(stripWorkflowsHeader(string(content)))
+	}
+	out := setDefaultWorkflow(b.String(), manifest.Provides.Workflows[0].ID)
+	return out, nil
 }
 
 // assembleOrcYAML splices each selected pack's workflow.yaml under a single

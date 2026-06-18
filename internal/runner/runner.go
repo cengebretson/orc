@@ -135,7 +135,7 @@ func buildPrompt(s *state.State, nextStage, advanceMode string, loopDef *config.
 	if prompt == "" {
 		prompt = fmt.Sprintf(
 			"Continue %s — stage: %s\n\nFeature context: features/%s/STATE.yaml\nStage: stages/%s.md",
-			s.Ticket, s.Stage.Name, s.Slug, s.Stage.Name,
+			s.Ticket, s.Stage.Name, s.Slug, strings.TrimSuffix(config.ResourceFileName(s.Stage.Name), ".md"),
 		)
 	}
 

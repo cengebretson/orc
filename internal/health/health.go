@@ -297,8 +297,9 @@ func checkWorkflowRefs(root string) Result {
 			sc, _ := wfCfg.StageConfig(wfName, stageName)
 
 			// check stage file exists
-			if _, err := os.Stat(filepath.Join(stagesDir, stageName+".md")); err != nil {
-				errs = append(errs, fmt.Sprintf("missing stage file: %s.md", stageName))
+			stageFile := config.ResourceFileName(stageName)
+			if _, err := os.Stat(filepath.Join(stagesDir, stageFile)); err != nil {
+				errs = append(errs, fmt.Sprintf("missing stage file: %s", stageFile))
 			}
 			// check worker exists
 			if sc.Worker != "" && !knownWorkers[sc.Worker] {
@@ -312,8 +313,9 @@ func checkWorkflowRefs(root string) Result {
 			if sc.Loop == nil {
 				continue
 			}
-			if _, err := os.Stat(filepath.Join(stagesDir, sc.Loop.Via+".md")); err != nil {
-				errs = append(errs, fmt.Sprintf("missing stage file: %s.md", sc.Loop.Via))
+			stageFile := config.ResourceFileName(sc.Loop.Via)
+			if _, err := os.Stat(filepath.Join(stagesDir, stageFile)); err != nil {
+				errs = append(errs, fmt.Sprintf("missing stage file: %s", stageFile))
 			}
 			if sc.Loop.Worker != "" && !knownWorkers[sc.Loop.Worker] {
 				errs = append(errs, fmt.Sprintf("unknown worker: %s (loop stage: %s)", sc.Loop.Worker, sc.Loop.Via))
