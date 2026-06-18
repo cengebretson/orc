@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-06-18
+
 ### Added
 
 - `orc init` now prints the setup, `cd`, and `orc doctor` next steps after real and dry-run workspace scaffolds.
@@ -88,7 +90,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Bubble Tea TUI dashboard with health, workflow, stage, and portrait views.
 - `orc doctor --fix` to clear stale state locks.
 
-[Unreleased]: https://github.com/cengebretson/orc/compare/v0.3.3...HEAD
+[Unreleased]: https://github.com/cengebretson/orc/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/cengebretson/orc/compare/v0.3.3...v0.4.0
 [0.3.3]: https://github.com/cengebretson/orc/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/cengebretson/orc/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/cengebretson/orc/compare/v0.3.0...v0.3.1
