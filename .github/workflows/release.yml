@@ -33,20 +33,21 @@ jobs:
 
       - name: Extract changelog notes
         run: |
+          notes="${RUNNER_TEMP}/release-notes.md"
           awk -v ver="${GITHUB_REF_NAME#v}" '
             $0 ~ ("^## \\[" ver "\\]") { flag = 1; next }
             /^## \[/ && flag { flag = 0 }
             flag { print }
-          ' CHANGELOG.md > release-notes.md
-          if [ ! -s release-notes.md ]; then
+          ' CHANGELOG.md > "${notes}"
+          if [ ! -s "${notes}" ]; then
             echo "No changelog section found for ${GITHUB_REF_NAME}" >&2
             exit 1
           fi
-          cat release-notes.md
+          cat "${notes}"
 
       - uses: goreleaser/goreleaser-action@v6
         with:
           version: "~> v2"
-          args: release --clean --release-notes=release-notes.md
+          args: release --clean --release-notes=${{ runner.temp }}/release-notes.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
