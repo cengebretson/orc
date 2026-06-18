@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-06-17
+
 ### Fixed
 
 - Keep generated release notes outside the checkout so GoReleaser does not fail on a dirty worktree.
@@ -82,7 +84,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Bubble Tea TUI dashboard with health, workflow, stage, and portrait views.
 - `orc doctor --fix` to clear stale state locks.
 
-[Unreleased]: https://github.com/cengebretson/orc/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/cengebretson/orc/compare/v0.3.3...HEAD
+[0.3.3]: https://github.com/cengebretson/orc/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/cengebretson/orc/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/cengebretson/orc/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/cengebretson/orc/compare/v0.2.0...v0.3.0
