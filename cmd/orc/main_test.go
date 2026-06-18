@@ -566,6 +566,70 @@ func TestRunDeleteRefusesActiveTicket(t *testing.T) {
 	}
 }
 
+func TestRunPackInspectPrintsSummary(t *testing.T) {
+	resetCommandGlobals(t)
+	dir := writeCommandPack(t, "hotfix", `schema: 1
+name: hotfix
+description: Fast production fix workflow
+provides:
+  workflows:
+    - id: hotfix:standard
+      path: workflow.yaml
+      description: Fast hotfix workflow
+  workers:
+    - id: hotfix:bob
+      path: workers/bob.md
+  stages:
+    - id: hotfix:develop
+      path: stages/develop.md
+aliases:
+  workflows:
+    hotfix: hotfix:standard
+`)
+
+	out, err := captureStdout(func() error {
+		return runPackInspect(nil, []string{dir})
+	})
+	if err != nil {
+		t.Fatalf("runPackInspect: %v\n%s", err, out)
+	}
+	for _, want := range []string{
+		"Pack: hotfix",
+		"Fast production fix workflow",
+		"hotfix:standard",
+		"hotfix:develop",
+		"hotfix:bob",
+		"workflow hotfix",
+		"OK",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("pack inspect output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestRunPackInspectReturnsErrorForInvalidPack(t *testing.T) {
+	resetCommandGlobals(t)
+	dir := writeCommandPack(t, "bad", `schema: 1
+name: bad
+description: Broken pack
+provides:
+  workflows:
+    - id: bad:standard
+      path: missing.yaml
+`)
+
+	out, err := captureStdout(func() error {
+		return runPackInspect(nil, []string{dir})
+	})
+	if err == nil || !strings.Contains(err.Error(), "pack validation failed") {
+		t.Fatalf("runPackInspect err = %v, want validation failure\n%s", err, out)
+	}
+	if !strings.Contains(out, `workflow[0].path "missing.yaml"`) {
+		t.Fatalf("pack inspect output missing validation error:\n%s", out)
+	}
+}
+
 func fixtureWorkspace() string {
 	return "../../testdata/workspace"
 }
@@ -609,6 +673,7 @@ func resetCommandGlobals(t *testing.T) {
 	oldMarkStage := markStage
 	oldReportJSON := reportJSON
 	oldReportArchived := reportArchived
+	oldPackInspectJSON := packInspectJSON
 	t.Cleanup(func() {
 		globalWorkspace = oldWorkspace
 		doctorFix = oldDoctorFix
@@ -624,6 +689,7 @@ func resetCommandGlobals(t *testing.T) {
 		markStage = oldMarkStage
 		reportJSON = oldReportJSON
 		reportArchived = oldReportArchived
+		packInspectJSON = oldPackInspectJSON
 	})
 
 	globalWorkspace = "."
@@ -640,6 +706,36 @@ func resetCommandGlobals(t *testing.T) {
 	markStage = ""
 	reportJSON = false
 	reportArchived = false
+	packInspectJSON = false
+}
+
+func writeCommandPack(t *testing.T, name, manifest string) string {
+	t.Helper()
+	dir := filepath.Join(t.TempDir(), name)
+	for _, sub := range []string{"workers", "stages"} {
+		if err := os.MkdirAll(filepath.Join(dir, sub), 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", sub, err)
+		}
+	}
+	writeCommandFile(t, filepath.Join(dir, "pack.yaml"), manifest)
+	writeCommandFile(t, filepath.Join(dir, "workflow.yaml"), "workflows: {}\n")
+	writeCommandFile(t, filepath.Join(dir, "workers", "bob.md"), `---
+id: hotfix:bob
+name: Bob
+engine: codex
+---
+
+# Bob
+`)
+	writeCommandFile(t, filepath.Join(dir, "stages", "develop.md"), "# Develop\n")
+	return dir
+}
+
+func writeCommandFile(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("write %s: %v", path, err)
+	}
 }
 
 func captureStdout(fn func() error) (string, error) {

@@ -70,6 +70,20 @@ var (
 	initForce     bool
 )
 
+var packCmd = &cobra.Command{
+	Use:   "pack",
+	Short: "Inspect and manage workflow packs",
+}
+
+var packInspectCmd = &cobra.Command{
+	Use:   "inspect <path>",
+	Short: "Validate and preview a local pack without installing it",
+	Args:  cobra.ExactArgs(1),
+	RunE:  runPackInspect,
+}
+
+var packInspectJSON bool
+
 var doctorCmd = &cobra.Command{
 	Use:   "doctor [ticket]",
 	Short: "Check workspace and local tool readiness, or validate a ticket's state when a ticket ID is given",
@@ -238,6 +252,7 @@ func init() {
 	initCmd.Flags().BoolVar(&initListPacks, "list-packs", false, "List available packs and exit")
 	initCmd.Flags().BoolVar(&initDryRun, "dry-run", false, "Print what would be created without writing files")
 	initCmd.Flags().BoolVar(&initForce, "force", false, "Overwrite existing generated files")
+	packInspectCmd.Flags().BoolVar(&packInspectJSON, "json", false, "Output as JSON")
 
 	doctorCmd.Flags().BoolVar(&doctorFix, "fix", false, "Remove provably-stale state locks (dead PID or old without a valid PID); live locks are never touched")
 	nextCmd.Flags().BoolVar(&nextJSON, "json", false, "Output as JSON")
@@ -268,7 +283,10 @@ func init() {
 	jitCmd.ValidArgsFunction = ticketCompleter(nil, true)
 	doctorCmd.ValidArgsFunction = ticketCompleter(nil, false)
 
+	packCmd.AddCommand(packInspectCmd)
+
 	rootCmd.AddCommand(initCmd)
+	rootCmd.AddCommand(packCmd)
 	rootCmd.AddCommand(doctorCmd)
 	rootCmd.AddCommand(nextCmd)
 	rootCmd.AddCommand(statusCmd)
