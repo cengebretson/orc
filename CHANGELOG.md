@@ -6,6 +6,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `orc init` now prints the setup, `cd`, and `orc doctor` next steps after real and dry-run workspace scaffolds.
+
 ## [0.3.3] - 2026-06-17
 
 ### Fixed

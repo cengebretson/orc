@@ -291,6 +291,8 @@ func printDryRun(root string, entries []fileEntry) error {
 		}
 	}
 
+	printSetupNextSteps(root, true)
+
 	return nil
 }
 
@@ -334,12 +336,24 @@ func writeEntries(root string, entries []fileEntry, force bool) error {
 	if skipped > 0 {
 		fmt.Println("Use --force to overwrite existing files.")
 	}
-	fmt.Printf("\nWorkspace ready at: %s\n\n", root)
-	fmt.Println("Next step: run setup with your agent of choice:")
-	fmt.Println(`  claude "Read SETUP.md and follow the setup instructions"`)
-	fmt.Println(`  codex  "Read SETUP.md and follow the setup instructions"`)
+	printSetupNextSteps(root, false)
 
 	return nil
+}
+
+func printSetupNextSteps(root string, dryRun bool) {
+	if dryRun {
+		fmt.Printf("\nWould create workspace at: %s\n\n", root)
+		fmt.Println("Would run next:")
+	} else {
+		fmt.Printf("\nWorkspace ready at: %s\n\n", root)
+		fmt.Println("Next:")
+	}
+	fmt.Printf("  cd %s\n", root)
+	fmt.Println(`  claude "Read SETUP.md and follow the setup instructions"`)
+	fmt.Println("  # or:")
+	fmt.Println(`  codex "Read SETUP.md and follow the setup instructions"`)
+	fmt.Println("  orc doctor")
 }
 
 func writeGitignore(root string, force bool) {

@@ -1,6 +1,7 @@
 package workspace_test
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -58,6 +59,55 @@ func TestInit_DryRunWritesNothing(t *testing.T) {
 	}
 }
 
+func TestInit_PrintsNextSteps(t *testing.T) {
+	dir := t.TempDir()
+
+	out := captureStdout(t, func() {
+		if err := workspace.Init(workspace.InitOptions{Root: dir}); err != nil {
+			t.Fatalf("Init: %v", err)
+		}
+	})
+
+	for _, want := range []string{
+		"Workspace ready at: " + dir,
+		"Next:",
+		"  cd " + dir,
+		`  claude "Read SETUP.md and follow the setup instructions"`,
+		"  # or:",
+		`  codex "Read SETUP.md and follow the setup instructions"`,
+		"  orc doctor",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("init output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestInit_DryRunPrintsNextSteps(t *testing.T) {
+	dir := t.TempDir()
+
+	out := captureStdout(t, func() {
+		if err := workspace.Init(workspace.InitOptions{Root: dir, DryRun: true}); err != nil {
+			t.Fatalf("Init dry-run: %v", err)
+		}
+	})
+
+	for _, want := range []string{
+		"Dry run",
+		"Would create workspace at: " + dir,
+		"Would run next:",
+		"  cd " + dir,
+		`  claude "Read SETUP.md and follow the setup instructions"`,
+		"  # or:",
+		`  codex "Read SETUP.md and follow the setup instructions"`,
+		"  orc doctor",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("dry-run output missing %q:\n%s", want, out)
+		}
+	}
+}
+
 func TestInit_SkipsExistingWithoutForce(t *testing.T) {
 	dir := t.TempDir()
 
@@ -81,6 +131,35 @@ func TestInit_SkipsExistingWithoutForce(t *testing.T) {
 	if string(data) != "custom" {
 		t.Error("Init without --force overwrote an existing file")
 	}
+}
+
+func captureStdout(t *testing.T, fn func()) string {
+	t.Helper()
+
+	orig := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe stdout: %v", err)
+	}
+	os.Stdout = w
+	defer func() {
+		os.Stdout = orig
+	}()
+
+	fn()
+
+	if err := w.Close(); err != nil {
+		t.Fatalf("close stdout writer: %v", err)
+	}
+
+	out, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatalf("read stdout: %v", err)
+	}
+	if err := r.Close(); err != nil {
+		t.Fatalf("close stdout reader: %v", err)
+	}
+	return string(out)
 }
 
 func TestInit_ForceOverwrites(t *testing.T) {
