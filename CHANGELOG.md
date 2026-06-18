@@ -6,6 +6,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Keep generated release notes outside the checkout so GoReleaser does not fail on a dirty worktree.
+
 ## [0.3.2] - 2026-06-17
 
 ### Added
