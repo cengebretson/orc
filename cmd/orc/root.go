@@ -64,10 +64,11 @@ var initCmd = &cobra.Command{
 }
 
 var (
-	initPacks     []string
-	initListPacks bool
-	initDryRun    bool
-	initForce     bool
+	initPacks           []string
+	initListPacks       bool
+	initSkipDefaultPack bool
+	initDryRun          bool
+	initForce           bool
 )
 
 var packCmd = &cobra.Command{
@@ -261,7 +262,8 @@ var helpAllCmd = &cobra.Command{
 func init() {
 	rootCmd.PersistentFlags().StringVar(&globalWorkspace, "workspace", ".", "Workspace root (default: current directory)")
 
-	initCmd.Flags().StringSliceVar(&initPacks, "pack", nil, "Pack(s) to install: a named bundle of workflow + workers + stages. Repeatable. Omit for 'default'; use 'none' for a base-only workspace")
+	initCmd.Flags().StringSliceVar(&initPacks, "pack", nil, "Pack(s) to install: a named bundle of workflow + workers + stages. Repeatable. Omit for 'default'")
+	initCmd.Flags().BoolVar(&initSkipDefaultPack, "skip-default-pack", false, "Create the base workspace without installing the default pack")
 	initCmd.Flags().BoolVar(&initListPacks, "list-packs", false, "List available packs and exit")
 	initCmd.Flags().BoolVar(&initDryRun, "dry-run", false, "Print what would be created without writing files")
 	initCmd.Flags().BoolVar(&initForce, "force", false, "Overwrite existing generated files")

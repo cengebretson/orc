@@ -131,7 +131,7 @@ Claude / Codex sections):
 - If you installed a pack (e.g. `orc init --pack default`), `workers/<pack>/`
   already contains its persona workers — `fred`, `bob`, `zach`, `brian`, and
   others — edit those rather than creating new ones.
-- If `workers/` only has `_template.md` (e.g. `orc init --pack none`), copy it
+- If `workers/` only has `_template.md` (e.g. `orc init --skip-default-pack`), copy it
   once per `worker:` id in `orc.yaml` using the namespaced path format, such as
   `workers/custom/chris.md` for worker ID `custom:chris`.
 

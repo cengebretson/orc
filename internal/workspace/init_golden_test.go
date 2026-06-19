@@ -16,7 +16,7 @@ import (
 
 // These golden tests pin the EXACT output of `orc init` — every file it writes
 // and the bytes of each — for the default-pack install and the base-only
-// (--pack none) install. The existing presence checks only assert that
+// (--skip-default-pack) install. The existing presence checks only assert that
 // expected files exist; they would stay green even if a migration silently
 // changed orc.yaml's assembled workflow, altered a worker body, or leaked the
 // sample workers into the base case. These tests turn "output stays
@@ -105,13 +105,14 @@ func TestInit_GoldenDefaultPack(t *testing.T) {
 	checkGolden(t, "init_default.manifest", manifest(t, dir))
 }
 
-// TestInit_GoldenNonePack pins the base-only install (--pack none): the
+// TestInit_GoldenSkipDefaultPack pins the base-only install
+// (--skip-default-pack): the
 // structural scaffold with an empty workflows: block and no pack workers or
 // stage files.
-func TestInit_GoldenNonePack(t *testing.T) {
+func TestInit_GoldenSkipDefaultPack(t *testing.T) {
 	dir := t.TempDir()
-	if err := workspace.Init(workspace.InitOptions{Root: dir, Packs: []string{"none"}}); err != nil {
+	if err := workspace.Init(workspace.InitOptions{Root: dir, SkipDefaultPack: true}); err != nil {
 		t.Fatalf("Init: %v", err)
 	}
-	checkGolden(t, "init_none.manifest", manifest(t, dir))
+	checkGolden(t, "init_skip_default_pack.manifest", manifest(t, dir))
 }

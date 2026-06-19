@@ -603,6 +603,8 @@ Scope:
 - Apply non-conflicting suggested aliases.
 - Fail on conflicts with `_base` or generated files unless content is identical.
 - Print what the pack contributed during `--dry-run`.
+- `orc init --skip-default-pack` creates the base scaffold without installing
+  the built-in default pack.
 
 Out of scope:
 

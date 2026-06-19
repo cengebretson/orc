@@ -30,18 +30,19 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Pack — prompt if not explicitly set and running interactively.
-	if !cmd.Flags().Changed("pack") && interactive {
-		ans := strings.TrimSpace(promptLine("Which pack? [default] (or 'none' for a base-only workspace): "))
+	if !cmd.Flags().Changed("pack") && interactive && !initSkipDefaultPack {
+		ans := strings.TrimSpace(promptLine("Which pack? [default] (press Enter for default; use --skip-default-pack for base only): "))
 		if ans != "" {
 			initPacks = []string{ans}
 		}
 	}
 
 	opts := workspace.InitOptions{
-		Root:   globalWorkspace,
-		Packs:  initPacks,
-		DryRun: initDryRun,
-		Force:  initForce,
+		Root:            globalWorkspace,
+		Packs:           initPacks,
+		SkipDefaultPack: initSkipDefaultPack,
+		DryRun:          initDryRun,
+		Force:           initForce,
 	}
 
 	return workspace.Init(opts)
@@ -61,7 +62,7 @@ func printPacks() error {
 		fmt.Printf("  %-12s engines: %s\n", "", strings.Join(p.Engines, ", "))
 	}
 	fmt.Println()
-	fmt.Println("Install with: orc init --pack <name>   (repeatable; omit for 'default', 'none' for base only)")
+	fmt.Println("Install with: orc init --pack <name>   (repeatable; omit for 'default', or pass --skip-default-pack for base only)")
 	return nil
 }
 

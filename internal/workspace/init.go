@@ -23,10 +23,11 @@ const (
 )
 
 type InitOptions struct {
-	Root   string
-	Packs  []string // packs to install; empty = ["default"]; ["none"] = base only
-	DryRun bool
-	Force  bool
+	Root            string
+	Packs           []string // packs to install; empty = ["default"]
+	SkipDefaultPack bool
+	DryRun          bool
+	Force           bool
 }
 
 // PackInfo is the metadata declared in a pack's pack.yaml.
@@ -71,20 +72,15 @@ func Init(opts InitOptions) error {
 	return writeEntries(root, entries, opts.Force)
 }
 
-// resolvePacks applies the default and the "none" sentinel. An empty selection
-// means the default pack; ["none"] means base only (no pack), and cannot be
-// combined with real packs.
-func resolvePacks(requested []string) ([]string, error) {
+// resolvePacks applies the default pack unless the caller explicitly skips it.
+// The default install is empty Packs plus SkipDefaultPack=false; base-only is
+// empty Packs plus SkipDefaultPack=true.
+func resolvePacks(requested []string, skipDefaultPack bool) ([]string, error) {
 	if len(requested) == 0 {
-		return []string{"default"}, nil
-	}
-	for _, p := range requested {
-		if p == "none" {
-			if len(requested) > 1 {
-				return nil, fmt.Errorf("--pack none cannot be combined with other packs")
-			}
+		if skipDefaultPack {
 			return nil, nil
 		}
+		return []string{"default"}, nil
 	}
 	return requested, nil
 }
@@ -150,7 +146,7 @@ func ListPacks() ([]PackInfo, error) {
 }
 
 func collectEntries(opts InitOptions) ([]fileEntry, error) {
-	packs, err := resolvePacks(opts.Packs)
+	packs, err := resolvePacks(opts.Packs, opts.SkipDefaultPack)
 	if err != nil {
 		return nil, err
 	}

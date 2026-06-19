@@ -207,10 +207,10 @@ func TestInit_DefaultPackInstallsWorkers(t *testing.T) {
 	}
 }
 
-func TestInit_NonePackIsBaseOnly(t *testing.T) {
+func TestInit_SkipDefaultPackIsBaseOnly(t *testing.T) {
 	dir := t.TempDir()
 
-	if err := workspace.Init(workspace.InitOptions{Root: dir, Packs: []string{"none"}}); err != nil {
+	if err := workspace.Init(workspace.InitOptions{Root: dir, SkipDefaultPack: true}); err != nil {
 		t.Fatalf("Init: %v", err)
 	}
 
@@ -221,7 +221,7 @@ func TestInit_NonePackIsBaseOnly(t *testing.T) {
 	// pack content absent
 	for _, rel := range []string{"workers/default/bob.md", "stages/default/develop.md", "packs/default/pack.yaml"} {
 		if _, err := os.Stat(filepath.Join(dir, rel)); err == nil {
-			t.Errorf("--pack none should not install %s", rel)
+			t.Errorf("--skip-default-pack should not install %s", rel)
 		}
 	}
 }
