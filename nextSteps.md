@@ -87,10 +87,10 @@ Proposed commands:
 
 ```bash
 orc pack list
-orc pack install github.com/example/orc-packs/backend-team
 orc pack install ./packs/backend-team
-orc init --pack backend-team
-orc init --pack ./packs/backend-team
+orc pack install default
+orc pack show backend-team
+orc init --skip-default-pack
 ```
 
 Pack shape:
@@ -115,13 +115,20 @@ Why:
 
 Acceptance criteria:
 
-- `orc init --pack ./path` installs a local pack.
-- `orc pack install <git-url-or-github-path>` installs a named pack into a user
-  cache directory.
-- `orc init --list-packs` shows built-in and installed packs.
+- `orc init` installs the built-in default pack unless `--skip-default-pack` is
+  passed.
+- `orc init --pack ./path` scaffolds a workspace from one local pack.
+- `orc pack install ./path` installs a local pack into an existing workspace.
+- `orc pack install default` installs a built-in pack into an existing
+  base-only workspace.
+- `orc pack list` and `orc pack show <pack>` show installed snapshots,
+  provenance, and active workflows.
 - Pack validation catches missing `pack.yaml`, missing workflow files, duplicate
   worker IDs, and unknown stage references.
-- Installed packs never overwrite user files unless `--force` is provided.
+- Installed packs refuse canonical ID conflicts, alias conflicts, already
+  installed packs, and runtime file overwrites.
+- Remote pack installs, update, and uninstall are deferred until their safety
+  rules are clear.
 
 ## Priority 4: Add User Profiles
 
@@ -209,7 +216,7 @@ Acceptance criteria:
 1. Add post-init next-step output.
 2. Add external local pack support with `orc init --pack ./path`.
 3. Add pack validation and installed pack registry.
-4. Add `orc pack install/list`.
+4. Add local and built-in `orc pack install/list/show`.
 5. Add `orc setup`.
 6. Add profiles.
 7. Add Homebrew/release distribution improvements.

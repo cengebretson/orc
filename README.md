@@ -104,13 +104,20 @@ orc init
 ```
 
 Run it and answer two questions: workspace path (default: current directory)
-and which pack to install. A pack is a bundle of a workflow plus the workers
-and stage files it uses; `default` is assumed, and `none` gives a base-only
-workspace you wire up yourself. Or skip the prompts with flags:
+and which starter pack to install. A pack is a bundle of a workflow plus the
+workers and stage files it uses. `default` is assumed. Use
+`--skip-default-pack` for a base-only workspace you will wire up yourself or
+extend with `orc pack install`.
 
 ```bash
 orc init --list-packs                              # see available packs
 orc init --workspace ~/my-workspace --pack default
+orc init --workspace ~/bare-workspace --skip-default-pack
+cd ~/bare-workspace
+orc pack install default                           # install later into the current workspace
+orc pack install ./packs/hotfix                    # install a local pack
+orc pack list                                      # show installed packs and active workflows
+orc pack show default                              # inspect one installed pack
 ```
 
 ### 2. Run setup
@@ -174,14 +181,14 @@ orc tui
 ```mermaid
 flowchart TD
     W(["orc work"])
-    W --> intake["intake<br/>fred-documentor"]
-    intake -->|auto| develop["develop<br/>bob-developer"]
-    develop -->|manual approval| PO["pr-open<br/>bob-developer"]
-    develop -.->|review loop| CR["code-review<br/>zach-reviewer"]
+    W --> intake["default:intake<br/>default:fred"]
+    intake -->|auto| develop["default:develop<br/>default:bob"]
+    develop -->|manual approval| PO["default:pr-open<br/>default:bob"]
+    develop -.->|review loop| CR["default:code-review<br/>default:zach"]
     CR -.->|approved| PO
     CR -.->|changes needed| develop
-    PO -->|manual approval| QA["qa-automation<br/>brian-qa"]
-    PO -.->|CI/review fixes| PR["pr-repair<br/>bob-developer"]
+    PO -->|manual approval| QA["default:qa-automation<br/>default:brian"]
+    PO -.->|CI/review fixes| PR["default:pr-repair<br/>default:bob"]
     PR -.-> PO
     QA -->|auto| D(["done"])
     D -.->|optional| A(["orc archive"])
@@ -240,13 +247,13 @@ When a session is paused (`orc mark <ticket> pause`), the reason is recorded in 
 `orc jit` runs a one-off agent task that doesn't belong in the pipeline — a spot check, a secondary review, an exploratory investigation — without touching the stage or status.
 
 ```bash
-orc jit STORY-123 --worker zach-reviewer "make sure the auth middleware handles token expiry correctly"
+orc jit STORY-123 --worker default:zach "make sure the auth middleware handles token expiry correctly"
 ```
 
 The agent gets the same orientation prompt as `orc next` (reads `STATE.yaml`, `TICKET.md`, `SPEC.md`), then does the task; output lands in `features/<slug>/jit/<timestamp>/`. `runtime.jit` is written before launch so the task shows up in `orc status` and the TUI:
 
 ```
-STORY-123   active   default/develop + jit   bob-developer
+STORY-123   active   default:standard/default:develop + jit   default:bob
 ```
 
 When done, the agent runs `orc mark STORY-123 jit "<summary>"`, which appends history and clears `runtime.jit`. Only one jit task runs at a time — clear it first to start another. Use `--dry` to preview and `--tmux` to send the task to the ticket's existing tmux session.
@@ -309,10 +316,16 @@ Or use the Claude Desktop settings UI. Requires a GitHub PAT with `repo` and `pu
 
 - `orc init` — scaffold a new workspace
   - `--workspace <path>` — scaffold at a specific path
-  - `--pack <name>` — install a pack (workflow + workers + stages); repeatable. Omit for `default`, or `none` for a base-only workspace
+  - `--pack <name-or-path>` — install one starter pack during scaffold; omit for built-in `default`
+  - `--skip-default-pack` — create the base workspace without installing the default pack
   - `--list-packs` — list available packs and exit
   - `--dry-run` — preview without writing
   - `--force` — overwrite existing files
+- `orc pack` — inspect and manage workflow packs
+  - `orc pack inspect <path>` — validate and preview a local pack without installing it
+  - `orc pack install <pack>` — install a built-in pack name or local pack path into the current workspace
+  - `orc pack list` — show installed packs, install source, and active workflows
+  - `orc pack show <pack>` — show one installed pack snapshot
 - `orc doctor` — check workspace health plus `orc.yaml`, local tools, worker engines, tmux, and state locks
   - `orc doctor <ticket>` — validate a ticket's `STATE.yaml`: workflow, stage, worker, next action, repos, and worktrees
   - `--fix` — remove provably-stale state locks (dead PID or old without a valid PID); live locks are never touched

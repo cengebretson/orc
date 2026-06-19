@@ -213,13 +213,13 @@ Rules:
 - Pack installs may suggest aliases.
 - Orc must not silently overwrite an existing alias with a different target.
 - If two packs suggest the same alias for the same target, it is allowed.
-- If two packs suggest the same alias for different targets, init fails with an
+- If two packs suggest the same alias for different targets, install fails with an
   actionable error.
 - Canonical workflow, stage, and worker IDs are namespaced. Packs may share a
   friendly alias only when it resolves to the same canonical target.
 - If stdin is an interactive TTY, Orc may offer to rename or skip conflicting
   aliases.
-- Non-interactive init never prompts. It fails unless the user passes explicit
+- Non-interactive install never prompts. It fails unless the user passes explicit
   conflict-resolution flags in a future version.
 
 ## Installing Multiple Packs
@@ -227,7 +227,9 @@ Rules:
 A workspace may install multiple packs:
 
 ```bash
-orc init --pack default --pack hotfix --pack planning
+orc init
+orc pack install ./packs/hotfix
+orc pack install ./packs/planning
 ```
 
 The result is one workspace containing all provided workflows, workers, and
@@ -235,11 +237,11 @@ stages.
 
 Collision rules:
 
-- If two packs claim the same canonical workflow, stage, or worker ID, init
+- If two packs claim the same canonical workflow, stage, or worker ID, install
   fails.
-- If two packs suggest the same alias for different canonical targets, init
+- If two packs suggest the same alias for different canonical targets, install
   fails.
-- If two packs suggest the same alias for the same canonical target, init may
+- If two packs suggest the same alias for the same canonical target, install may
   keep it.
 
 Users can then run:
@@ -276,27 +278,17 @@ default workflow selection.
 
 Rules:
 
-- If init installs exactly one workflow, Orc may set `settings.default_workflow`
-  to that workflow.
-- If init installs multiple workflows, the user must choose the default workflow
-  explicitly.
+- If initialization or the first pack install adds exactly one workflow to an
+  otherwise workflow-free workspace, Orc may set `settings.default_workflow` to
+  that workflow.
+- Later pack installs preserve the current default workflow.
 - Pack order must not decide the default workflow.
 - Suggested workflow aliases may make names friendlier, but they do not choose
   the workspace default when multiple workflows are installed.
 - A pack may not decide the workspace default on its own.
-
-Proposed flag:
-
-```bash
-orc init --pack default --pack hotfix --default-workflow default
-```
-
-If multiple workflows are installed and no default is provided, init fails with
-an actionable error:
-
-```text
-multiple workflows installed; choose one with --default-workflow
-```
+The first installed workflow may seed `settings.default_workflow` when the
+workspace has no workflows. Later installs preserve the existing default; users
+change it by editing `orc.yaml`.
 
 ## Conflict Rules
 
@@ -573,9 +565,10 @@ Decided implementation order:
 
 1. `orc pack inspect <path>`
 2. `orc init --pack <path>` for one external pack
-3. multiple pack composition
+3. `orc init --skip-default-pack`
 4. workspace-aware `orc pack list`
 5. `orc pack show`
+6. `orc pack install <pack>` for built-in and local packs
 
 ### Slice 1: Inspect Local Packs
 
@@ -627,28 +620,33 @@ Out of scope:
 - Remote pack install.
 - Updating already-initialized workspaces.
 
-### Slice 3: Compose Multiple Packs
+### Slice 3: Install Packs Into Existing Workspaces
 
 Target:
 
 ```bash
-orc init --pack ./packs/default --pack ./packs/hotfix
+orc pack install default
+orc pack install ./packs/hotfix
 ```
 
 Scope:
 
-- Load pack metadata from embedded packs and filesystem paths.
-- Allow multiple packs in one init.
+- Load pack metadata from embedded packs or filesystem paths.
+- Copy pack snapshots into `packs/<name>/`.
+- Materialize runtime files into `stages/<namespace>/` and
+  `workers/<namespace>/`.
+- Merge workflows and non-conflicting aliases into `orc.yaml`.
+- Record install provenance in `packs/<name>/.orc-pack.yaml`.
 - Detect workflow, worker, stage, and alias conflicts.
-- Fail the init when two packs claim the same canonical ID or alias.
-- Print what each pack contributed during `--dry-run`.
-- Keep generated workspace files self-contained.
+- Fail install when two packs claim the same canonical ID or conflicting alias.
+- Refuse already-installed packs and runtime file overwrites.
 
 Out of scope for first slice:
 
 - Remote pack install.
 - Pack registry.
-- Updating already-initialized workspaces.
+- Updating installed packs.
+- Uninstalling installed packs.
 
 ## Workspace Ownership After Install
 

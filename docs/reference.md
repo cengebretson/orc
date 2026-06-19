@@ -30,18 +30,31 @@ my-workspace/
 
   workers/
     _template.md     worker definition template
-    # the `default` pack also adds persona workers:
-    # fred-the-documentor.md (intake), bob-the-developer.md, zach-the-reviewer.md, …
+    default/
+      fred.md        intake and documentation worker
+      bob.md         implementation worker
+      zach.md        code review worker
+      brian.md       QA automation worker
+      ada.md         architecture worker
 
   stages/
-    intake.md        load ticket context — runs first for every ticket
-    develop.md       implementation
-    code-review.md   review implementation before opening PR
-    pr-open.md       preflight checks, open PR, handoff for review
-    pr-repair.md     fix CI failures, review feedback, conflicts
-    qa-automation.md implement and run automated tests
-    # provided by the installed pack (default shown); plain markdown —
-    # no frontmatter, flow control lives in orc.yaml
+    default/
+      intake.md        load ticket context — runs first for every ticket
+      develop.md       implementation
+      code-review.md   review implementation before opening PR
+      pr-open.md       preflight checks, open PR, handoff for review
+      pr-repair.md     fix CI failures, review feedback, conflicts
+      qa-automation.md implement and run automated tests
+    # provided by installed packs; plain markdown — no frontmatter,
+    # flow control lives in orc.yaml
+
+  packs/
+    default/
+      pack.yaml        pack manifest
+      .orc-pack.yaml   install provenance
+      workflow.yaml    pack workflow definitions
+      stages/          source stage docs copied into stages/default/
+      workers/         source worker docs copied into workers/default/
 
   orc.yaml           workspace config — repos, workflows, loop stages, settings
   ORC.md             agent state contract — read at session start
@@ -111,7 +124,7 @@ configuration reference.
 
 ```yaml
 settings:
-  default_workflow: default
+  default_workflow: default:standard
   auto_archive: false
   auto_tmux: false       # wrap every orc next launch in a tmux session automatically
   auto_next: false       # orc work immediately launches the first stage (same as --next)
@@ -124,30 +137,30 @@ repos:
     purpose: Application code, APIs, tests
 
 workflows:
-  default:
+  default:standard:
     description: General feature workflow — intake → develop → PR → QA
     stages:
-      - name: intake
-        worker: fred-documentor
+      - name: default:intake
+        worker: default:fred
         advance: auto
-      - name: develop
-        worker: bob-developer
+      - name: default:develop
+        worker: default:bob
         advance: manual
         loop:
-          via: code-review
-          worker: zach-reviewer
+          via: default:code-review
+          worker: default:zach
           max: 3
           on_max: pause
-      - name: pr-open
-        worker: bob-developer
+      - name: default:pr-open
+        worker: default:bob
         advance: manual
         loop:
-          via: pr-repair
-          worker: bob-developer
+          via: default:pr-repair
+          worker: default:bob
           max: 3
           on_max: pause
-      - name: qa-automation
-        worker: brian-qa
+      - name: default:qa-automation
+        worker: default:brian
         advance: auto
 ```
 
@@ -155,6 +168,26 @@ workflows:
 If it is not set, `orc work` returns an error. `advance: auto` tells agents to
 run `orc mark <ticket> next` when a stage is complete; `advance: manual` tells agents to
 run `orc mark <ticket> pause` so a human can review before continuing.
+
+## Packs
+
+`orc init` installs the built-in `default` pack unless you pass
+`--skip-default-pack`. A pack supplies workflow definitions, stage docs, worker
+docs, and suggested aliases.
+
+Use `orc pack install` to add packs after initialization:
+
+```bash
+orc pack install default
+orc pack install ./packs/hotfix
+```
+
+Install copies a snapshot to `packs/<name>/`, writes provenance to
+`packs/<name>/.orc-pack.yaml`, materializes runtime files into `stages/` and
+`workers/`, and merges non-conflicting workflow and alias entries into
+`orc.yaml`. `orc pack list` shows installed packs and which workflows are active;
+`orc pack show <pack>` shows one installed snapshot. Pack update and uninstall
+are intentionally deferred.
 
 ## STATE.yaml
 
@@ -166,14 +199,14 @@ schema_version: 1
 ticket: STORY-123
 slug: STORY-123-add-login
 status: active
-workflow: default
+workflow: default:standard
 
 stage:
-  worker: bob-developer
-  name: develop
+  worker: default:bob
+  name: default:develop
 
 next_action:
-  worker: bob-developer
+  worker: default:bob
   prompt: Implement the login feature per SPEC.md and PLAN.md.
   cwd: worktrees/my-app/STORY-123-add-login
 
@@ -182,22 +215,22 @@ runtime:
     session: STORY-123-add-login
 
   jit:                          # present while a jit task is running, absent otherwise
-    worker: zach-the-reviewer
+    worker: default:zach
     task: "check the auth middleware handles token expiry"
     started_at: "2026-06-01T13:45:00-05:00"
 
 history:
   - at: "2026-05-28 09:00"
-    stage: intake
-    worker: fred-documentor
+    stage: default:intake
+    worker: default:fred
     result: ticket context loaded, SPEC.md and PLAN.md written
   - at: "2026-05-29 14:22"
-    stage: develop
-    worker: bob-developer
+    stage: default:develop
+    worker: default:bob
     result: paused — need product decision on refresh token TTL
   - at: "2026-05-30 09:10"
-    stage: develop
-    worker: bob-developer
+    stage: default:develop
+    worker: default:bob
     result: resumed after human clarified TTL should be 7 days
 ```
 
@@ -235,7 +268,7 @@ and how to launch them. The body gives the agent behavioral guidance.
 
 ```markdown
 ---
-id: bob-developer
+id: default:bob
 name: Bob the Developer
 engine: codex
 model: gpt-5.5

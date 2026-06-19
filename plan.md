@@ -89,7 +89,7 @@ define the workspace contract and are identical everywhere: `AGENTS.md`,
 `features/_template/`, `workers/_template.md`, `.gitignore`.
 
 **Policy** is the pack — the three entangled things that must travel together:
-a workflow block, every worker its stages route to (`worker: bob-developer`),
+a workflow block, every worker its stages route to (`worker: default:bob`),
 and every stage file those stages read (`stages/develop.md`). A pack is exactly
 the closure of "a workflow + its workers + its stage files." Shipping less than
 the full triple produces broken half-installs (a stage pointing at a worker or
@@ -126,17 +126,28 @@ description: General feature workflow — intake → develop → PR → QA
 schema: 1                     # worker/workflow frontmatter schema version
 engines: [claude, codex]      # declares cross-engine support (hard requirement)
 provides:
-  workflow: default
-  workers: [bob-developer, zach-reviewer, brian-qa, fred-documentor, ada-architect]
-  stages:  [intake, develop, code-review, pr-open, pr-repair, qa-automation]
+  workflows:
+    - id: default:standard
+      path: workflow.yaml
+  workers:
+    - id: default:bob
+      path: workers/bob.md
+    - id: default:zach
+      path: workers/zach.md
+  stages:
+    - id: default:develop
+      path: stages/develop.md
 ```
 
 #### CLI surface
 
 ```
 orc init                      # assumes --pack default (interactive: prompts "Which pack? [default]")
-orc init --pack go-backend    # repeatable: --pack go-backend --pack playwright-qa
-orc init --pack none          # _base/ only — empty workflows:, author your own
+orc init --skip-default-pack  # _base/ only — empty workflows:, author your own
+orc pack install go-backend   # add a built-in pack to an existing workspace
+orc pack install ./some-dir   # add a local pack to an existing workspace
+orc pack list                 # show installed packs, provenance, and active workflows
+orc pack show default         # inspect one installed pack snapshot
 orc init --list-packs         # name + description + engines, read from each pack.yaml
 ```
 
@@ -145,8 +156,8 @@ the interactive prompt). This also fixes a latent bug in today's no-flag init:
 the base scaffold currently writes an `orc.yaml` whose `default` workflow routes
 to workers it does not install (closure-broken out of the box). Because a pack
 ships workflow + workers + stages as one closed set, the assumed default is
-always runnable. `--pack none` is the explicit opt-out for authoring from a
-clean base.
+always runnable. `--skip-default-pack` is the explicit opt-out for authoring
+from a clean base or installing packs later with `orc pack install`.
 
 `--with-sample-workers` is **removed**, not aliased. It is a 0.x flag with no
 external contract to honor, and `--pack default` fully subsumes it. Removal also
@@ -164,11 +175,9 @@ prompt/opts wiring in main.go, `TestInit_WithSampleWorkers`, and the README /
 
 The one real change is to `internal/workspace/init.go`:
 
-- **`collectEntries`** (currently a flat `WalkDir` that copies bytes 1:1 with a
-  single `sample/` special case, init.go:48-74): walk `_base/` always; walk
-  `packs/<name>/{workers,stages}/` only for selected packs, flattening into
-  `workers/` and `stages/` (generalizes the existing `sample/` flatten at
-  init.go:67-69).
+- **`collectEntries`** walks `_base/` always; selected packs are snapshotted
+  into `packs/<name>/` and materialized into `workers/<name>/` and
+  `stages/<name>/`.
 - **`orc.yaml` stops being copied verbatim** — it is now assembled. Start from
   `_base/orc.yaml` (empty `workflows:`), splice each selected pack's
   `workflow.yaml` block under `workflows:`, set `settings.default_workflow` to
@@ -186,13 +195,9 @@ The one real change is to `internal/workspace/init.go`:
     files, packs own `workers/` + `workflow.yaml` + `stages/`, so a pack can
     never shadow `RULES.md` etc. (Pack-level overrides of base files are the
     Future-ideas `overrides/` layer, deliberately out of v1.)
-  - **Pack vs pack:** duplicate worker `id` → **hard error**; duplicate workflow
-    name → **hard error**; duplicate stage file (e.g. two packs both shipping
-    `stages/develop.md`) → **content-equal dedups silently, divergent content is
-    a hard error** naming both packs and the file. Stage names are generic and
-    reuse is expected, so erroring on identical files would kill mixability;
-    erroring only on divergence catches the real "runs with someone else's
-    policy" case.
+  - **Pack vs pack:** duplicate canonical workflow, worker, or stage IDs are a
+    hard error. Duplicate aliases are allowed only when they point to the same
+    canonical target.
   - **Ordered `--pack a --pack b` last-wins is rejected** — invisible precedence
     is a footgun; force explicit resolution instead. An opt-in override flag can
     come later, not as the default.
@@ -203,10 +208,11 @@ The one real change is to `internal/workspace/init.go`:
     worker's `engine` is not in the pack's declared `engines`).
 
 Explicitly **not** in scope: network, registry, remote fetch. Packs stay
-`//go:embed`-ed; `orc init --pack go-backend` is fully offline. The directory
-format (`pack.yaml` + `workers/` + `workflow.yaml` + `stages/`) is `tar`-able so
-`orc init --pack ./some-dir/` or a remote registry is an additive change to
-*where packs are read from*, not a format reshape.
+`//go:embed`-ed; `orc init --pack go-backend` and `orc pack install go-backend`
+are fully offline. The directory format (`pack.yaml` + `workers/` +
+`workflow.yaml` + `stages/`) is `tar`-able so `orc pack install ./some-dir/` or
+a remote registry is an additive change to *where packs are read from*, not a
+format reshape.
 
 #### Migration (one pass)
 

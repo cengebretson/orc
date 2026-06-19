@@ -118,7 +118,9 @@ This section makes the workflow match the user's process and ensures every
 
 **Review the workflow with the user:**
 - Show them the `workflows:` block in `orc.yaml` (the default flow is
-  `intake → develop → pr-open → qa-automation`).
+  `default:intake → default:develop → default:pr-open → default:qa-automation`).
+- If they are using packs, run `orc pack list` or `orc pack show <pack>` to show
+  what each installed pack provides.
 - Ask whether these stages and their order match how they work. Add, remove, or
   reorder stages as needed. Each stage references a worker by `id`.
 

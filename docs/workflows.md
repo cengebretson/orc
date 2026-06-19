@@ -11,7 +11,7 @@ generic state transitions and safety rules around that policy.
 
 ```yaml
 settings:
-  default_workflow: default
+  default_workflow: default:standard
   auto_archive: false
   auto_tmux: false
   auto_next: false
@@ -24,25 +24,25 @@ repos:
     purpose: Application code, APIs, tests
 
 workflows:
-  default:
+  default:standard:
     description: General feature workflow — intake → develop → PR → QA
     stages:
-      - name: intake
-        worker: fred-documentor
+      - name: default:intake
+        worker: default:fred
         advance: auto
-      - name: develop
-        worker: bob-developer
+      - name: default:develop
+        worker: default:bob
         advance: manual
         loop:
-          via: code-review
-          worker: zach-reviewer
+          via: default:code-review
+          worker: default:zach
           max: 3
           on_max: pause
-      - name: pr-open
-        worker: bob-developer
+      - name: default:pr-open
+        worker: default:bob
         advance: manual
-      - name: qa-automation
-        worker: brian-qa
+      - name: default:qa-automation
+        worker: default:brian
         advance: auto
 ```
 
@@ -85,8 +85,8 @@ Each workflow stage supports:
 
 | Field | Required | Meaning |
 |-------|----------|---------|
-| `name` | Yes | Stage identifier. Also names the stage instruction file in `stages/<name>.md`. |
-| `worker` | Yes | Worker ID from `workers/*.md` that owns the stage by default. |
+| `name` | Yes | Stage identifier. Canonical pack stages use `<pack>:<stage>` and map to `stages/<pack>/<stage>.md`. |
+| `worker` | Yes | Worker ID from `workers/<namespace>/*.md` that owns the stage by default. |
 | `advance` | Yes | Completion mode. Valid values are `auto` and `manual`. |
 | `loop` | No | Optional repair/review loop attached to this stage. |
 
@@ -105,12 +105,12 @@ The loop stage is not part of the normal stage order. It is entered only when th
 owning stage sends the ticket there.
 
 ```yaml
-- name: develop
-  worker: bob-developer
+- name: default:develop
+  worker: default:bob
   advance: manual
   loop:
-    via: code-review
-    worker: zach-reviewer
+    via: default:code-review
+    worker: default:zach
     max: 3
     on_max: pause
 ```
