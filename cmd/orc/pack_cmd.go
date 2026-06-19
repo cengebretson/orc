@@ -56,6 +56,13 @@ func runPackInspect(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+func runPackInstall(cmd *cobra.Command, args []string) error {
+	return workspace.InstallPack(workspace.PackInstallOptions{
+		Root: globalWorkspace,
+		Pack: args[0],
+	})
+}
+
 func printPackInspection(report *workspace.PackInspection) {
 	p := report.Manifest
 	fmt.Printf("Pack: %s\n", p.Name)

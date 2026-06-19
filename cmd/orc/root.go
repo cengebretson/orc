@@ -96,6 +96,13 @@ var packInspectCmd = &cobra.Command{
 	RunE:  runPackInspect,
 }
 
+var packInstallCmd = &cobra.Command{
+	Use:   "install <pack>",
+	Short: "Install a pack into the current workspace",
+	Args:  cobra.ExactArgs(1),
+	RunE:  runPackInstall,
+}
+
 var packInspectJSON bool
 
 var doctorCmd = &cobra.Command{
@@ -301,6 +308,7 @@ func init() {
 	packCmd.AddCommand(packListCmd)
 	packCmd.AddCommand(packShowCmd)
 	packCmd.AddCommand(packInspectCmd)
+	packCmd.AddCommand(packInstallCmd)
 
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(packCmd)

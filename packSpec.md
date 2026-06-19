@@ -499,23 +499,37 @@ Output should include:
 - validation errors
 - path validation for the pack source
 
-### Later: `orc pack install`
+### `orc pack install <pack>`
 
-Remote or cached installs are useful, but should come after local pack support.
+Installs one pack into an existing workspace.
 
-Possible shape:
+Examples:
 
 ```bash
-orc pack install github.com/acme/orc-packs/backend-team
-orc pack install ./packs/backend-team
-orc pack uninstall acme
+orc pack install default
+orc pack install ./packs/hotfix
 ```
 
-Installed packs should live outside workspaces, probably under:
+Behavior:
 
-```text
-~/.config/orc/packs/
-```
+- Validates the pack source before writing files.
+- Copies the pack snapshot into `packs/<name>/`.
+- Writes install provenance to `packs/<name>/.orc-pack.yaml`.
+- Materializes runtime files into `stages/<namespace>/` and
+  `workers/<namespace>/`.
+- Merges the pack workflow and non-conflicting aliases into `orc.yaml`.
+- If the workspace has no workflows yet, sets `settings.default_workflow` to
+  the installed pack's single workflow.
+- Refuses to install if the pack is already installed.
+- Refuses canonical ID collisions, conflicting aliases, and runtime file
+  overwrites.
+
+Out of scope:
+
+- Updating an installed pack.
+- Uninstalling a pack.
+- Remote pack sources.
+- Interactive conflict resolution.
 
 ## TUI Impact
 

@@ -609,6 +609,59 @@ aliases:
 	}
 }
 
+func TestRunPackInstallInstallsLocalPack(t *testing.T) {
+	resetCommandGlobals(t)
+	globalWorkspace = t.TempDir()
+	if err := workspace.Init(workspace.InitOptions{Root: globalWorkspace, SkipDefaultPack: true}); err != nil {
+		t.Fatalf("init workspace: %v", err)
+	}
+	dir := writeCommandPack(t, "hotfix", `schema: 1
+name: hotfix
+description: Fast production fix workflow
+provides:
+  workflows:
+    - id: hotfix:standard
+      path: workflow.yaml
+  workers:
+    - id: hotfix:bob
+      path: workers/bob.md
+  stages:
+    - id: hotfix:develop
+      path: stages/develop.md
+aliases:
+  workflows:
+    hotfix: hotfix:standard
+`)
+	writeCommandFile(t, filepath.Join(dir, "workflow.yaml"), `workflows:
+  "hotfix:standard":
+    description: Fast production fix workflow
+    stages:
+      - name: hotfix:develop
+        worker: hotfix:bob
+        advance: auto
+`)
+
+	out, err := captureStdout(func() error {
+		return runPackInstall(nil, []string{dir})
+	})
+	if err != nil {
+		t.Fatalf("runPackInstall: %v\n%s", err, out)
+	}
+	for _, want := range []string{
+		"create packs/hotfix/pack.yaml",
+		"create stages/hotfix/develop.md",
+		"create workers/hotfix/bob.md",
+		"Pack installed.",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("pack install output missing %q:\n%s", want, out)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(globalWorkspace, "packs", "hotfix", ".orc-pack.yaml")); err != nil {
+		t.Fatalf("missing install provenance: %v", err)
+	}
+}
+
 func TestRunPackListPrintsInstalledPacks(t *testing.T) {
 	resetCommandGlobals(t)
 	globalWorkspace = t.TempDir()
