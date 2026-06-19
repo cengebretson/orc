@@ -172,8 +172,20 @@ run `orc mark <ticket> pause` so a human can review before continuing.
 ## Packs
 
 `orc init` installs the built-in `default` pack unless you pass
-`--skip-default-pack`. A pack supplies workflow definitions, stage docs, worker
-docs, and suggested aliases.
+`--skip-default-pack`. A pack is a reusable bundle of workflow definitions,
+stage docs, worker docs, and suggested aliases.
+
+There are three pack forms:
+
+- Embedded pack: shipped inside the `orc` binary. Discover with `orc pack available`.
+- Installed pack: a snapshot copied into `packs/<name>/` inside a workspace.
+- Local path pack: a pack directory on disk, usually used with `orc pack inspect`
+  before `orc pack install`.
+
+`orc pack inspect <path>` validates a local pack without installing it. `orc
+pack list` shows installed snapshots, the source they came from, and which
+workflows are active. `orc pack show <pack>` shows one installed snapshot in
+detail.
 
 Use `orc pack install` to add packs after initialization:
 
@@ -185,9 +197,9 @@ orc pack install ./packs/hotfix
 Install copies a snapshot to `packs/<name>/`, writes provenance to
 `packs/<name>/.orc-pack.yaml`, materializes runtime files into `stages/` and
 `workers/`, and merges non-conflicting workflow and alias entries into
-`orc.yaml`. `orc pack list` shows installed packs and which workflows are active;
-`orc pack show <pack>` shows one installed snapshot. Pack update and uninstall
-are intentionally deferred.
+`orc.yaml`. The installed snapshot is provenance, while the workspace owns the
+final `orc.yaml`, local edits, runtime state, and feature folders. Pack update
+and uninstall are intentionally deferred.
 
 ## STATE.yaml
 

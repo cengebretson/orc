@@ -120,13 +120,17 @@ orc init
 ```
 
 Run it and answer two questions: workspace path (default: current directory)
-and which starter pack to install. A pack is a bundle of a workflow plus the
-workers and stage files it uses. `default` is assumed. Use
-`--skip-default-pack` for a base-only workspace you will wire up yourself or
-extend with `orc pack install`.
+and which starter pack to install. A pack is a reusable bundle of workflows,
+stages, workers, and aliases. `default` is assumed.
+
+`orc init` installs the chosen pack into `packs/<name>/`, copies its runtime
+workers and stages into `workers/` and `stages/`, and merges its workflow
+definitions into `orc.yaml`. Use `--skip-default-pack` for a base-only workspace
+you will wire up yourself or extend later with `orc pack install`.
 
 ```bash
 orc pack available                                # see built-in packs
+orc pack inspect ./packs/hotfix                   # validate a local pack before install
 orc init --workspace ~/my-workspace
 orc init --workspace ~/bare-workspace --skip-default-pack
 cd ~/bare-workspace
