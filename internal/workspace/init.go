@@ -47,6 +47,12 @@ type fileEntry struct {
 	content string
 }
 
+type packInstallInfo struct {
+	SourceType  string `yaml:"source_type"`
+	SourceRef   string `yaml:"source_ref"`
+	ResolvedRef string `yaml:"resolved_ref,omitempty"`
+}
+
 func Init(opts InitOptions) error {
 	root, err := filepath.Abs(opts.Root)
 	if err != nil {
@@ -202,6 +208,11 @@ func collectEntries(opts InitOptions) ([]fileEntry, error) {
 		if err != nil {
 			return nil, err
 		}
+		packEntries = append(packEntries, packProvenanceEntry(name, packInstallInfo{
+			SourceType:  "builtin",
+			SourceRef:   name,
+			ResolvedRef: name,
+		}))
 		entries = append(entries, packEntries...)
 	}
 	if err := validatePackComposition(packs, manifests); err != nil {
@@ -426,6 +437,11 @@ func collectLocalPackEntries(baseOrcYAML string, entries []fileEntry, packPath s
 		return nil, err
 	}
 	entries = append(entries, snapshotEntries...)
+	entries = append(entries, packProvenanceEntry(manifest.Name, packInstallInfo{
+		SourceType:  "local-path",
+		SourceRef:   packPath,
+		ResolvedRef: report.Source,
+	}))
 
 	runtimeEntries, err := collectPackRuntimeEntries(report.Source, manifest)
 	if err != nil {
@@ -439,6 +455,17 @@ func collectLocalPackEntries(baseOrcYAML string, entries []fileEntry, packPath s
 	}
 	entries = append(entries, fileEntry{dest: "orc.yaml", content: workflow})
 	return entries, nil
+}
+
+func packProvenanceEntry(name string, info packInstallInfo) fileEntry {
+	data, err := yaml.Marshal(info)
+	if err != nil {
+		return fileEntry{dest: filepath.ToSlash(filepath.Join("packs", name, ".orc-pack.yaml")), content: fmt.Sprintf("source_type: %s\nsource_ref: %s\n", info.SourceType, info.SourceRef)}
+	}
+	return fileEntry{
+		dest:    filepath.ToSlash(filepath.Join("packs", name, ".orc-pack.yaml")),
+		content: string(data),
+	}
 }
 
 func collectPackSnapshotEntries(source, name string) ([]fileEntry, error) {

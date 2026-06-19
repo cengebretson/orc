@@ -92,6 +92,9 @@ func printPackList(packs []workspace.InstalledPack) {
 		}
 		fmt.Printf("  %-12s %s\n", p.Name, status)
 		fmt.Printf("    path: %s\n", p.Path)
+		if p.Install != nil {
+			fmt.Printf("    source: %s (%s)\n", p.Install.SourceType, p.Install.SourceRef)
+		}
 		if p.Inspection != nil {
 			if p.Inspection.Manifest.Description != "" {
 				fmt.Printf("    description: %s\n", p.Inspection.Manifest.Description)
@@ -112,6 +115,9 @@ func printInstalledPack(p workspace.InstalledPack) {
 		status = "active"
 	}
 	fmt.Printf("Status: %s\n\n", status)
+	if p.Install != nil {
+		fmt.Printf("Source: %s (%s)\n\n", p.Install.SourceType, p.Install.SourceRef)
+	}
 	if p.Inspection == nil {
 		return
 	}

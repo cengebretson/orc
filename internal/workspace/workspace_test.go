@@ -33,6 +33,7 @@ func TestInit_CreatesExpectedFiles(t *testing.T) {
 		"orc.yaml",
 		"ORC.md",
 		"packs/default/pack.yaml",
+		"packs/default/.orc-pack.yaml",
 		"packs/default/workflow.yaml",
 		"stages/default/intake.md",
 		"stages/default/develop.md",
@@ -263,6 +264,7 @@ aliases:
 
 	for _, rel := range []string{
 		"packs/hotfix/pack.yaml",
+		"packs/hotfix/.orc-pack.yaml",
 		"packs/hotfix/workflow.yaml",
 		"stages/hotfix/develop.md",
 		"workers/hotfix/bob.md",

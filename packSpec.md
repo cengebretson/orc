@@ -635,6 +635,7 @@ my-workspace/
   packs/
     default/
       pack.yaml
+      .orc-pack.yaml
       workflow.yaml
       stages/
       workers/
@@ -647,6 +648,8 @@ my-workspace/
 
 The `packs/` directory stores the installed pack snapshots. These snapshots are
 for inspection, debugging, future diff/update support, and `orc pack show`.
+Each snapshot also carries `.orc-pack.yaml`, which records install provenance
+for `orc pack list` and future update/uninstall commands.
 
 Orc also materializes runtime resources into the normal workspace folders:
 
