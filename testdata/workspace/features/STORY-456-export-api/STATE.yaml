@@ -2,10 +2,10 @@ schema_version: 1
 ticket: STORY-456
 slug: STORY-456-export-api
 status: ready
-workflow: default
+workflow: default:standard
 stage:
   worker: default:fred
-  name: qa-automation
+  name: default:qa-automation
 repos:
   app:
     main: ../../projects/my-app
@@ -17,14 +17,14 @@ next_action:
   cwd: "."
 history:
   - at: "2026-05-27T10:00:00-05:00"
-    stage: intake
+    stage: default:intake
     worker: default:fred
     result: ticket loaded, spec written
   - at: "2026-05-28T11:30:00-05:00"
-    stage: develop
+    stage: default:develop
     worker: default:bob
     result: implementation complete, PR opened
   - at: "2026-05-29T15:50:00-05:00"
-    stage: code-review
+    stage: default:code-review
     worker: default:bob
     result: review passed, QA handoff written

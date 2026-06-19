@@ -15,7 +15,8 @@ Also read:
 orc mark <ticket> start
 orc status <ticket> --json
 ```
-Read `stages/<stage>.md` for the current stage instructions.
+Read `stages/<pack>/<stage>.md` for namespaced stage IDs. For example,
+`default:develop` is `stages/default/develop.md`.
 
 **End every session with exactly one of:**
 ```

@@ -160,6 +160,55 @@ workflows:
 	}
 }
 
+func TestLoad_WorkflowAliasAccessors(t *testing.T) {
+	dir := t.TempDir()
+	writeOrcYAML(t, dir, `
+aliases:
+  workflows:
+    default: default:standard
+workflows:
+  default:standard:
+    description: Namespaced default workflow
+    stages:
+      - name: default:intake
+        worker: default:fred
+        advance: auto
+      - name: default:develop
+        worker: default:bob
+        advance: manual
+        loop:
+          via: default:code-review
+          worker: default:zach
+          max: 3
+`)
+
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if got := cfg.WorkflowDescription("default"); got != "Namespaced default workflow" {
+		t.Fatalf("WorkflowDescription(default) = %q", got)
+	}
+	if got := cfg.StageNames("default"); len(got) != 2 || got[0] != "default:intake" || got[1] != "default:develop" {
+		t.Fatalf("StageNames(default) = %v", got)
+	}
+	if got := cfg.NextStage("default", "default:intake"); got != "default:develop" {
+		t.Fatalf("NextStage(default, default:intake) = %q", got)
+	}
+	sc, ok := cfg.StageConfig("default", "default:code-review")
+	if !ok || sc.Worker != "default:zach" {
+		t.Fatalf("StageConfig alias loop = %+v, %v", sc, ok)
+	}
+	if !cfg.IsLoopStage("default", "default:code-review") {
+		t.Fatal("IsLoopStage alias = false")
+	}
+	owner, ok := cfg.OwnerStage("default", "default:code-review")
+	if !ok || owner != "default:develop" {
+		t.Fatalf("OwnerStage alias = %q, %v", owner, ok)
+	}
+}
+
 func TestLoad_NextStage(t *testing.T) {
 	dir := t.TempDir()
 	writeOrcYAML(t, dir, `

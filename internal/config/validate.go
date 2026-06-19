@@ -44,7 +44,7 @@ func Validate(cfg *Config, workerIDs []string) ValidationErrors {
 
 	var errs ValidationErrors
 	if len(cfg.Workflows) > 0 {
-		defaultWorkflow := cfg.DefaultWorkflow()
+		defaultWorkflow := cfg.ResolveWorkflow(cfg.DefaultWorkflow())
 		if defaultWorkflow == "" {
 			errs = append(errs, ValidationError{
 				Path:    "settings.default_workflow",

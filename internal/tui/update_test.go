@@ -476,6 +476,33 @@ func TestHandleKeyStageViewerLeftRight(t *testing.T) {
 	}
 }
 
+func TestHandleKeyStageViewerUsesNamespacedStagePath(t *testing.T) {
+	m := testModel(t)
+	m.root = t.TempDir()
+	m.workflows = []workflowChain{{
+		name:  "default:standard",
+		steps: []routeStep{{name: "default:develop", advance: "auto"}},
+	}}
+	m.sectionItems["workflows"] = []sectionItem{{label: "default:standard", path: ""}}
+
+	stagePath := filepath.Join(m.root, "stages", "default", "develop.md")
+	if err := os.MkdirAll(filepath.Dir(stagePath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(stagePath, []byte("# namespaced stage"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	m, _ = press(t, m, "tab", "tab", "enter") // drill into workflows/default:standard
+	m, _ = press(t, m, "enter")               // open default:develop
+	if m.view != viewFile {
+		t.Fatalf("view = %v, want viewFile", m.view)
+	}
+	if body := ansi.Strip(m.viewport.View()); !strings.Contains(body, "namespaced stage") {
+		t.Fatalf("stage viewer did not open namespaced stage file:\n%s", body)
+	}
+}
+
 func TestHandleKeyAttachTmux(t *testing.T) {
 	m := testModel(t)
 	// no live session → no command

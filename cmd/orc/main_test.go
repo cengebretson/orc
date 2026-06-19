@@ -28,7 +28,7 @@ func TestRunStatusTicketPrintsDetail(t *testing.T) {
 
 	for _, want := range []string{
 		"Ticket:   STORY-123",
-		"Stage:     default · develop",
+		"Stage:     default:standard · default:develop",
 		"Worker:  Bob (Developer) (codex)",
 		"Run `orc next` to launch.",
 		"⚠  state has problems — run `orc doctor STORY-123` for details",

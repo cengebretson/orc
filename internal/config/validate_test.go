@@ -40,6 +40,23 @@ func TestValidate_DefaultWorkflowMustExist(t *testing.T) {
 	assertValidationError(t, config.Validate(cfg, []string{"fred"}), "settings.default_workflow", `workflow "missing" not found`)
 }
 
+func TestValidate_DefaultWorkflowMayUseAlias(t *testing.T) {
+	cfg := &config.Config{
+		Settings: config.Settings{DefaultWorkflow: "default"},
+		Aliases: config.Aliases{
+			Workflows: map[string]string{"default": "default:standard"},
+		},
+		Workflows: map[string]config.WorkflowDef{
+			"default:standard": {Stages: []config.StageDef{{Name: "default:intake", Worker: "default:fred", Advance: "auto"}}},
+		},
+	}
+
+	errs := config.Validate(cfg, []string{"default:fred"})
+	if len(errs) != 0 {
+		t.Fatalf("Validate returned errors: %v", errs)
+	}
+}
+
 func TestValidate_DefaultWorkflowRequiredWhenWorkflowsExist(t *testing.T) {
 	cfg := &config.Config{
 		Workflows: map[string]config.WorkflowDef{"default": {Stages: []config.StageDef{{Name: "intake", Worker: "fred", Advance: "auto"}}}},

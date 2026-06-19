@@ -13,7 +13,7 @@
 #   theme: catppuccin-mocha       # TUI color theme (default: catppuccin-mocha)
 
 settings:
-  default_workflow: default
+  default_workflow: default:standard
   quotes:
     - "Mmm... human burgers!"
     - "Do we get fries with that?"
@@ -39,42 +39,61 @@ repos:
     purpose: Application code, APIs, tests
 
 workflows:
-  default:
+  "default:standard":
     description: General feature workflow — intake → develop → PR → QA
     stages:
-      - name: intake
+      - name: default:intake
         worker: default:fred
         advance: auto
-      - name: develop
+      - name: default:develop
         worker: default:bob
         advance: manual
         loop:
-          via: code-review
+          via: default:code-review
           worker: default:zach
           max: 3
           on_max: pause
-      - name: pr-open
+      - name: default:pr-open
         worker: default:bob
         advance: manual
         loop:
-          via: pr-repair
+          via: default:pr-repair
           worker: default:bob
           max: 3
           on_max: pause
-      - name: qa-automation
+      - name: default:qa-automation
         worker: default:brian
         advance: auto
 
-  hotfix:
+  "hotfix:standard":
     description: Fast-track urgent fixes — intake → patch → deploy
     stages:
-      - name: intake
+      - name: hotfix:intake
         worker: default:fred
         advance: auto
-      - name: patch
+      - name: hotfix:patch
         worker: default:bob
         advance: manual
-      - name: deploy
+      - name: hotfix:deploy
         worker: default:bob
         advance: auto
 
+aliases:
+  workflows:
+    default: default:standard
+    hotfix: hotfix:standard
+  stages:
+    intake: default:intake
+    develop: default:develop
+    code-review: default:code-review
+    pr-open: default:pr-open
+    pr-repair: default:pr-repair
+    qa-automation: default:qa-automation
+    patch: hotfix:patch
+    deploy: hotfix:deploy
+  workers:
+    ada: default:ada
+    bob: default:bob
+    brian: default:brian
+    fred: default:fred
+    zach: default:zach

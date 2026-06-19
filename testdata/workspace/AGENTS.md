@@ -25,7 +25,8 @@ At the start of every ticket session, before doing any work:
 2. Run `orc mark <ticket> start` to mark the ticket in_progress
 3. Run `orc status <ticket> --json` to read current state — note `stage.name`
 4. Read `features/<ticket-slug>/STATE.yaml` for full feature context
-5. Read `stages/<stage>.md` for the current stage instructions
+5. Read `stages/<pack>/<stage>.md` for namespaced stage IDs. For example,
+   `default:develop` is `stages/default/develop.md`.
 
 At the end of every session, run exactly one of:
 - `orc mark <ticket> next --worker <who> --result "<what was done>"` — stage complete
@@ -48,4 +49,3 @@ Everything the agent needs to pick up and continue is in `features/<ticket-slug>
 Run repo-specific commands with the selected repo or worktree as `cwd`.
 Do not run package, test, or git commands from the workspace root unless
 the workflow explicitly says to.
-

@@ -15,17 +15,20 @@ func TestBuildResolvesWorkerWorkflowNextAndRuntime(t *testing.T) {
 settings:
   default_workflow: default
 workflows:
-  default:
+  default:standard:
     stages:
-      - name: develop
+      - name: default:develop
         worker: default:bob
         loop:
-          via: code-review
+          via: default:code-review
           worker: default:zach
           max: 3
-      - name: qa
+      - name: default:qa
         worker: default:brian
         advance: manual
+aliases:
+  workflows:
+    default: default:standard
 `)
 	writeFile(t, filepath.Join(root, "workers", "default", "zach.md"), `---
 id: default:zach
@@ -38,8 +41,8 @@ model: gpt-5
 		Ticket:      "TICKET-1",
 		Slug:        "TICKET-1",
 		Status:      "active",
-		Stage:       state.Stage{Name: "code-review"},
-		StageCounts: map[string]int{"code-review": 2},
+		Stage:       state.Stage{Name: "default:code-review"},
+		StageCounts: map[string]int{"default:code-review": 2},
 		Runtime: state.Runtime{
 			Tmux: &state.TmuxRuntime{Session: "TICKET-1"},
 		},
@@ -66,7 +69,7 @@ model: gpt-5
 	if summary.StageLoopLabel != " (2/3)" {
 		t.Fatalf("StageLoopLabel = %q, want (2/3)", summary.StageLoopLabel)
 	}
-	if summary.TmuxAttachHint != "TICKET-1:code-review" || !summary.TmuxLive {
+	if summary.TmuxAttachHint != "TICKET-1:default:code-review" || !summary.TmuxLive {
 		t.Fatalf("tmux = live:%v hint:%q", summary.TmuxLive, summary.TmuxAttachHint)
 	}
 }

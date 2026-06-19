@@ -50,7 +50,7 @@ func TestAdvanceMovesToNextStage(t *testing.T) {
 	featureDir := filepath.Join(root, "features", "STORY-123-add-user-auth")
 	clearRepoValidationFields(t, featureDir)
 	if err := state.Update(featureDir, func(s *state.State) error {
-		s.Stage.Name = "intake"
+		s.Stage.Name = "default:intake"
 		s.Stage.Worker = "default:fred"
 		return nil
 	}); err != nil {
@@ -68,16 +68,16 @@ func TestAdvanceMovesToNextStage(t *testing.T) {
 	if result.Outcome != AdvanceOutcomeAdvanced {
 		t.Fatalf("Outcome = %q, want %q", result.Outcome, AdvanceOutcomeAdvanced)
 	}
-	if result.Previous != "intake" || result.Next != "develop" {
-		t.Fatalf("transition = %s -> %s, want intake -> develop", result.Previous, result.Next)
+	if result.Previous != "default:intake" || result.Next != "default:develop" {
+		t.Fatalf("transition = %s -> %s, want default:intake -> default:develop", result.Previous, result.Next)
 	}
 
 	s, err := state.Load(featureDir)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if s.Status != "pending" || s.Stage.Name != "develop" {
-		t.Fatalf("state status/stage = %s/%s, want pending/develop", s.Status, s.Stage.Name)
+	if s.Status != "pending" || s.Stage.Name != "default:develop" {
+		t.Fatalf("state status/stage = %s/%s, want pending/default:develop", s.Status, s.Stage.Name)
 	}
 }
 
@@ -143,8 +143,8 @@ func TestAdvancePausesWhenLoopLimitReached(t *testing.T) {
 	clearRepoValidationFields(t, featureDir)
 	if err := state.Update(featureDir, func(s *state.State) error {
 		s.Status = "active"
-		s.Stage.Name = "develop"
-		s.StageCounts = map[string]int{"code-review": 3}
+		s.Stage.Name = "default:develop"
+		s.StageCounts = map[string]int{"default:code-review": 3}
 		return nil
 	}); err != nil {
 		t.Fatalf("Update setup: %v", err)
@@ -153,7 +153,7 @@ func TestAdvancePausesWhenLoopLimitReached(t *testing.T) {
 	result, err := Advance(AdvanceOptions{
 		Root:       root,
 		FeatureDir: featureDir,
-		Stage:      "code-review",
+		Stage:      "default:code-review",
 	})
 	if err != nil {
 		t.Fatalf("Advance: %v", err)
@@ -161,7 +161,7 @@ func TestAdvancePausesWhenLoopLimitReached(t *testing.T) {
 	if result.Outcome != AdvanceOutcomePaused {
 		t.Fatalf("Outcome = %q, want %q", result.Outcome, AdvanceOutcomePaused)
 	}
-	if result.Reason != "loop limit reached (3/3 for code-review)" {
+	if result.Reason != "loop limit reached (3/3 for default:code-review)" {
 		t.Fatalf("Reason = %q", result.Reason)
 	}
 

@@ -110,6 +110,26 @@ func TestBuild_PromptContainsTicket(t *testing.T) {
 	}
 }
 
+func TestBuild_PromptUsesNamespacedStagePath(t *testing.T) {
+	ws := fixtureWorkspace()
+	featureDir := fixtureFeatureDir(ws, "STORY-123")
+	if featureDir == "" {
+		t.Fatal("fixture STORY-123 not found")
+	}
+
+	ctx, err := resume.Build(ws, featureDir)
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	if !strings.Contains(ctx.Prompt, "`stages/default/develop.md`") {
+		t.Errorf("prompt missing namespaced stage path:\n%s", ctx.Prompt)
+	}
+	if strings.Contains(ctx.Prompt, "`stages/default:develop.md`") {
+		t.Errorf("prompt contains unresolved stage ID path:\n%s", ctx.Prompt)
+	}
+}
+
 func TestBuild_ErrorOnMissingFeatureDir(t *testing.T) {
 	ws := fixtureWorkspace()
 	_, err := resume.Build(ws, "/nonexistent/feature/dir")

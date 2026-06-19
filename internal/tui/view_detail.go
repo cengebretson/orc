@@ -472,16 +472,11 @@ func renderWorkflowDetail(name string, chains []workflowChain, allWorkers []*wor
 	// ticket count per stage for this workflow
 	stageCounts := map[string]int{}
 	for _, row := range features {
-		s := row.s
-		if s == nil {
+		if row.s == nil {
 			continue
 		}
-		wf := s.Workflow
-		if wf == "" {
-			wf = "default"
-		}
-		if wf == name {
-			stageCounts[s.Stage.Name]++
+		if row.workflow == name {
+			stageCounts[row.s.Stage.Name]++
 		}
 	}
 

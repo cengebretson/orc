@@ -35,21 +35,3 @@ ticket.
 Write to `qa-automation/` in the feature folder.  
 Write test files in the QA repo worktree.  
 Ask before updating external systems (Jira, GitHub, etc.) — see `TOOLS.md`.
-
-## Launch Template
-
-```bash
-claude --add-dir {{workspace}} "{{prompt}}"
-```
-
-## Prompt Template
-
-Continue {{ticket}} using:
-
-- Feature state: `features/{{slug}}/STATE.yaml`
-- Stage: resolve `{{stage}}` under `stages/` by replacing `:` with `/`
-  (for example, `default:qa-automation` is `stages/default/qa-automation.md`)
-- Implementation handoff: `features/{{slug}}/develop/HANDOFF.md`
-- Expected outputs: {{outputs}}
-
-Start from the workspace root: `{{workspace}}`.

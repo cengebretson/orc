@@ -35,24 +35,6 @@ Ask before:
 
 - Installing dependencies
 - Rewriting Git history
-- Writing to Jira, GitHub, SharePoint, or CI state
+- Writing to the ticket system, source control, or CI state
 - Starting background agents
 - Running broad test suites
-
-## Launch Template
-
-```bash
-codex --model {{model}} --cd {{cwd}} "{{prompt}}"
-```
-
-## Prompt Template
-
-Continue {{ticket}} using:
-
-- Feature state: `features/{{slug}}/STATE.yaml`
-- Stage: resolve `{{stage}}` under `stages/` by replacing `:` with `/`
-  (for example, `default:develop` is `stages/default/develop.md`)
-- Current stage: `{{stage}}`
-- Expected outputs: {{outputs}}
-
-Run repo commands with cwd set to `{{cwd}}`.

@@ -102,18 +102,18 @@ func (c *Config) Names() []string {
 
 // Stages returns the ordered StageDefs for the named workflow.
 func (c *Config) Stages(name string) []StageDef {
-	return c.Workflows[name].Stages
+	return c.Workflows[c.ResolveWorkflow(name)].Stages
 }
 
 // WorkflowDescription returns the human-readable description for the named
 // workflow, or "" if none is set.
 func (c *Config) WorkflowDescription(name string) string {
-	return c.Workflows[name].Description
+	return c.Workflows[c.ResolveWorkflow(name)].Description
 }
 
 // StageNames returns just the stage names for the named workflow.
 func (c *Config) StageNames(name string) []string {
-	stages := c.Workflows[name].Stages
+	stages := c.Workflows[c.ResolveWorkflow(name)].Stages
 	names := make([]string, len(stages))
 	for i, s := range stages {
 		names[i] = s.Name
@@ -124,7 +124,7 @@ func (c *Config) StageNames(name string) []string {
 // NextStage returns the stage that follows current in the named workflow.
 // Returns "" if current is the last stage or not found.
 func (c *Config) NextStage(workflowName, current string) string {
-	stages := c.Workflows[workflowName].Stages
+	stages := c.Workflows[c.ResolveWorkflow(workflowName)].Stages
 	for i, s := range stages {
 		if s.Name == current && i+1 < len(stages) {
 			return stages[i+1].Name
@@ -136,13 +136,14 @@ func (c *Config) NextStage(workflowName, current string) string {
 // StageConfig returns the StageDef for a named stage in a named workflow.
 // Also resolves loop stages (stages referenced via Loop.Via on any pipeline stage).
 func (c *Config) StageConfig(workflowName, stageName string) (StageDef, bool) {
-	for _, s := range c.Workflows[workflowName].Stages {
+	stages := c.Workflows[c.ResolveWorkflow(workflowName)].Stages
+	for _, s := range stages {
 		if s.Name == stageName {
 			return s, true
 		}
 	}
 	// Check if it's a loop stage — return a synthetic StageDef with the loop's worker.
-	for _, s := range c.Workflows[workflowName].Stages {
+	for _, s := range stages {
 		if s.Loop != nil && s.Loop.Via == stageName {
 			return StageDef{Name: stageName, Worker: s.Loop.Worker}, true
 		}
@@ -152,7 +153,7 @@ func (c *Config) StageConfig(workflowName, stageName string) (StageDef, bool) {
 
 // LoopConfig returns the LoopDef for a stage, if it has one.
 func (c *Config) LoopConfig(workflowName, stageName string) (*LoopDef, bool) {
-	for _, s := range c.Workflows[workflowName].Stages {
+	for _, s := range c.Workflows[c.ResolveWorkflow(workflowName)].Stages {
 		if s.Name == stageName && s.Loop != nil {
 			return s.Loop, true
 		}
@@ -162,7 +163,7 @@ func (c *Config) LoopConfig(workflowName, stageName string) (*LoopDef, bool) {
 
 // IsLoopStage returns true if stageName is a loop stage (referenced via Loop.Via) in the workflow.
 func (c *Config) IsLoopStage(workflowName, stageName string) bool {
-	for _, s := range c.Workflows[workflowName].Stages {
+	for _, s := range c.Workflows[c.ResolveWorkflow(workflowName)].Stages {
 		if s.Loop != nil && s.Loop.Via == stageName {
 			return true
 		}
@@ -172,7 +173,7 @@ func (c *Config) IsLoopStage(workflowName, stageName string) bool {
 
 // OwnerStage returns the pipeline stage that owns the given loop stage.
 func (c *Config) OwnerStage(workflowName, loopStageName string) (string, bool) {
-	for _, s := range c.Workflows[workflowName].Stages {
+	for _, s := range c.Workflows[c.ResolveWorkflow(workflowName)].Stages {
 		if s.Loop != nil && s.Loop.Via == loopStageName {
 			return s.Name, true
 		}

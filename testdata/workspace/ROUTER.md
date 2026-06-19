@@ -72,5 +72,6 @@ Authentication: <e.g. GITHUB_TOKEN env var, Linear API key in ~/.config/linear>
 
 ## Stages
 
-Stage definitions live in `stages/<name>.md`. Flow control (order, worker per
-stage, advance mode, repair loops) is declared in `orc.yaml`.
+Stage definitions live in `stages/<pack>/<stage>.md` for namespaced stage IDs
+such as `default:develop`. Flow control (order, worker per stage, advance mode,
+repair loops) is declared in `orc.yaml`.

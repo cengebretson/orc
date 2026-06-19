@@ -2,6 +2,6 @@ schema_version: 1
 ticket: FEAT-001
 slug: FEAT-001-dark-mode
 status: pending
-workflow: default
+workflow: default:standard
 stage:
-  name: intake
+  name: default:intake

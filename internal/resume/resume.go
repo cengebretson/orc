@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cengebretson/orc/internal/config"
 	"github.com/cengebretson/orc/internal/state"
 )
 
@@ -90,7 +91,7 @@ func buildPrompt(root, featureDir string, s *state.State, ctx *Context) string {
 	if ctx.HasDecisions {
 		fmt.Fprintf(&b, "- `features/%s/DECISIONS.md` — decisions made so far\n", s.Slug)
 	}
-	fmt.Fprintf(&b, "- `stages/%s.md` — stage instructions\n", s.Stage.Name)
+	fmt.Fprintf(&b, "- `stages/%s` — stage instructions\n", config.ResourcePath(s.Stage.Name))
 	b.WriteString("\n")
 
 	// End-of-session instruction.

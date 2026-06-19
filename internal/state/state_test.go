@@ -32,8 +32,8 @@ func TestLoad(t *testing.T) {
 	if s.Status != "active" {
 		t.Errorf("status = %q, want active", s.Status)
 	}
-	if s.Stage.Name != "develop" {
-		t.Errorf("stage.name = %q, want develop", s.Stage.Name)
+	if s.Stage.Name != "default:develop" {
+		t.Errorf("stage.name = %q, want default:develop", s.Stage.Name)
 	}
 	if s.Stage.Worker != "default:bob" {
 		t.Errorf("stage.worker = %q, want default:bob", s.Stage.Worker)

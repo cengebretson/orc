@@ -2,10 +2,10 @@ schema_version: 1
 ticket: PROJ-099
 slug: PROJ-099-password-reset
 status: active
-workflow: default
+workflow: default:standard
 stage:
   worker: default:bob
-  name: develop
+  name: default:develop
 runtime:
   tmux:
     session: PROJ-099-password-reset
@@ -19,10 +19,10 @@ next_action:
   cwd: .
 history:
   - at: "2026-06-01T09:00:00-05:00"
-    stage: intake
+    stage: default:intake
     worker: default:fred
     result: ticket context loaded, SPEC.md written
   - at: "2026-06-01T11:30:00-05:00"
-    stage: develop
+    stage: default:develop
     worker: default:bob
     result: started

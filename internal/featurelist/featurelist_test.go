@@ -14,14 +14,17 @@ func TestCollectResolvesWorkerAndTmuxState(t *testing.T) {
 settings:
   default_workflow: default
 workflows:
-  default:
+  default:standard:
     stages:
-      - name: develop
+      - name: default:develop
         worker: default:bob
         loop:
-          via: code-review
+          via: default:code-review
           worker: default:bob
           max: 3
+aliases:
+  workflows:
+    default: default:standard
 `)
 	writeFile(t, filepath.Join(root, "workers", "default", "bob.md"), `---
 id: default:bob
@@ -34,9 +37,9 @@ ticket: TICKET-1
 slug: TICKET-1
 status: active
 stage:
-  name: code-review
+  name: default:code-review
 stage_counts:
-  code-review: 2
+  default:code-review: 2
 runtime:
   tmux:
     session: TICKET-1

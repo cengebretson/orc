@@ -115,7 +115,7 @@ model: <chosen model>
 ---
 
 Fetches ticket context and populates the feature folder.
-Reads ROUTER.md for ticket system details, then stages/intake.md for steps.
+Reads ROUTER.md for ticket system details, then stages/default/intake.md for steps.
 ```
 
 - Update `TOOLS.md` — in the Claude section, list the MCP server names the user provided
@@ -148,7 +148,7 @@ model: <chosen model or omit for default>
 ---
 
 Fetches ticket context and populates the feature folder.
-Reads ROUTER.md for ticket system details, then stages/intake.md for steps.
+Reads ROUTER.md for ticket system details, then stages/default/intake.md for steps.
 ```
 
 - Update `TOOLS.md` — in the Codex section, list any tools or MCP servers the user provided

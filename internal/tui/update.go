@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/cengebretson/orc/internal/config"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -450,7 +451,7 @@ func (m Model) handleWorkflowDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		stageName, advance, stepNum, total := wfDetailSelectedStage(m.wfDetailName, m.wfDetailCursor, m.workflows)
 		if stageName != "" {
-			stagePath := filepath.Join(m.root, "stages", stageName+".md")
+			stagePath := filepath.Join(m.root, "stages", config.ResourcePath(stageName))
 			title := stageViewerTitle(stageName, advance, stepNum, total, m.workflows)
 			m.openViewer(fileRenderer(stagePath), title, m.wfDetailName, viewWorkflowDetail)
 		}
@@ -570,7 +571,7 @@ func (m *Model) loadViewerStage() {
 	if stageName == "" {
 		return
 	}
-	stagePath := filepath.Join(m.root, "stages", stageName+".md")
+	stagePath := filepath.Join(m.root, "stages", config.ResourcePath(stageName))
 	m.viewerRender = fileRenderer(stagePath)
 	m.viewport.SetContent(m.viewerRender(m.viewport.Width))
 	m.viewport.SetYOffset(0)
