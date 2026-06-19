@@ -11,6 +11,11 @@ The shared sections only need to be completed once — whichever agent runs firs
 handles them. Each agent then completes its own section. Check the Status block
 to see what still needs to be done before starting.
 
+If this workspace was created with the default pack, the starter workflow,
+stages, and workers already exist under `orc.yaml`, `stages/default/`, and
+`workers/default/`. Setup should customize those resources or add namespaced
+custom resources; it should not create root-level worker files.
+
 ---
 
 ## Status
@@ -28,6 +33,7 @@ codex:  pending
 
 1. Read the Status block above.
 2. Skim `orc.yaml`, `ROUTER.md`, and `TOOLS.md` so you know what you are filling in.
+   If packs are installed, run `orc pack list` to see what the workspace already has.
 3. If `shared: pending` — complete the Shared sections first, then mark `shared: complete`.
 4. If `shared: complete` — skip to your own agent section (Claude or Codex).
 5. Complete your agent section and mark it `complete` in the Status block.
@@ -118,9 +124,12 @@ This section makes the workflow match the user's process and ensures every
 
 **Review the workflow with the user:**
 - Show them the `workflows:` block in `orc.yaml` (the default flow is
-  `default:intake → default:develop → default:pr-open → default:qa-automation`).
+  `default:intake → default:develop → default:pr-open → default:qa-automation`,
+  with review/repair loops through `default:code-review` and `default:pr-repair`).
 - If they are using packs, run `orc pack list` or `orc pack show <pack>` to show
   what each installed pack provides.
+- Explain that `aliases:` may provide friendly names like `develop`, but files
+  still live at namespaced paths such as `stages/default/develop.md`.
 - Ask whether these stages and their order match how they work. Add, remove, or
   reorder stages as needed. Each stage references a worker by `id`.
 
@@ -137,6 +146,9 @@ Claude / Codex sections):
 - If `workers/` only has `_template.md` (e.g. `orc init --skip-default-pack`), copy it
   once per `worker:` id in `orc.yaml` using the namespaced path format, such as
   `workers/custom/chris.md` for worker ID `custom:chris`.
+- Do not create root-level files such as `workers/chris.md`; runnable workers
+  must use `workers/<namespace>/<name>.md` with a matching `<namespace>:<name>`
+  frontmatter `id`.
 
 ---
 
@@ -162,7 +174,9 @@ Claude / Codex sections):
 > 1. Do you want to use Claude in this workspace? (yes / no / already configured)
 > 2. If yes — which Claude model should Claude-run workers use?
 >    (claude-opus-4-8 / claude-sonnet-4-6 / claude-haiku-4-5-20251001)
-> 3. Which MCP servers from ~/.claude/mcp.json should workers use? (names only —
+> 3. Which worker roles should Claude run, or should the existing worker engine
+>    assignments stay as-is?
+> 4. Which MCP servers from ~/.claude/mcp.json should workers use? (names only —
 >    they are already installed at the user level)
 
 - If **no** — mark `claude: complete` and skip this section.
@@ -185,7 +199,9 @@ Claude / Codex sections):
 **Ask the user (all at once):**
 > 1. Do you want to use Codex in this workspace? (yes / no / already configured)
 > 2. If yes — which Codex model should Codex-run workers use? (or default)
-> 3. Which MCP servers or tools configured for Codex should workers use? (names only)
+> 3. Which worker roles should Codex run, or should the existing worker engine
+>    assignments stay as-is?
+> 4. Which MCP servers or tools configured for Codex should workers use? (names only)
 
 - If **no** — mark `codex: complete` and skip this section.
 - If **already configured** — verify each Codex worker has `engine: codex` and a
@@ -211,4 +227,5 @@ When your section is complete:
    (missing workers, unresolved files, an incomplete SETUP), fix them and run it
    again. Do not declare setup done until `orc doctor` is clean — then show the
    user the result.
-3. If both agents are configured, tell the user they can now run `orc work <ticket>`
+3. Once at least one engine has runnable workers, tell the user they can now run
+   `orc work <ticket>`
