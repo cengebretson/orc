@@ -8,6 +8,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Release archives now publish `checksums.txt`, and the README documents shell
+  completion generation.
 - `orc pack inspect <path>` validates and previews local workflow packs without installing them.
 - `orc init --pack <path>` can scaffold a workspace from one local workflow pack.
 - `orc init --skip-default-pack` creates the base scaffold without installing the default pack.
@@ -15,6 +17,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `orc pack list` and `orc pack show <pack>` report install provenance and active workflows.
 - Generated workspaces now install the built-in default pack with aliases and a
   consistent namespaced runtime layout under `stages/<pack>/` and `workers/<pack>/`.
+
+### Changed
+
+- Makefile Go targets now use repo-local cache directories by default, avoiding
+  home-cache permission failures in sandboxed runs.
 
 ## [0.4.0] - 2026-06-18
 

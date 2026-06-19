@@ -57,8 +57,11 @@ a file and run a shell command. No SDK dependency, no lock-in.
 
 ## Install
 
-Download a binary from the [releases page](https://github.com/cengebretson/orc/releases),
-or install with Go:
+Download a binary archive from the
+[releases page](https://github.com/cengebretson/orc/releases), verify it with
+the release `checksums.txt`, and put `orc` somewhere on your `PATH`.
+
+Or install with Go:
 
 ```bash
 go install github.com/cengebretson/orc/cmd/orc@latest
@@ -71,6 +74,19 @@ git clone git@github.com:cengebretson/orc.git
 cd orc
 make build
 ```
+
+## Shell completions
+
+`orc` can generate shell completions:
+
+```bash
+orc completion bash
+orc completion fish
+orc completion zsh
+```
+
+Follow the printed instructions for your shell to install the generated
+completion script.
 
 ## Dependencies
 

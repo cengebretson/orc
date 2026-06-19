@@ -37,10 +37,9 @@ var version = "dev"
 var globalWorkspace string
 
 var rootCmd = &cobra.Command{
-	Use:               "orc",
-	Short:             "orc — agentic workspace orchestrator",
-	Long:              banner,
-	CompletionOptions: cobra.CompletionOptions{HiddenDefaultCmd: true},
+	Use:   "orc",
+	Short: "orc — agentic workspace orchestrator",
+	Long:  banner,
 	// Runs after flag/arg validation, so usage still prints for misuse
 	// but not for errors returned by the command itself.
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {

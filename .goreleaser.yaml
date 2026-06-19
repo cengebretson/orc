@@ -16,6 +16,9 @@ archives:
   - formats: [tar.gz]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 
+checksum:
+  name_template: "checksums.txt"
+
 # Release notes come from CHANGELOG.md via --release-notes in the Release workflow.
 changelog:
   disable: true

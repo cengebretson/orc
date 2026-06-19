@@ -2,24 +2,27 @@
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS = -ldflags "-X main.version=$(VERSION)"
+MISE_CACHE_DIR ?= $(CURDIR)/.cache/mise
+GOCACHE ?= $(CURDIR)/.cache/go-build
+GO_ENV = MISE_CACHE_DIR=$(MISE_CACHE_DIR) GOCACHE=$(GOCACHE)
 
 build:
-	go build $(LDFLAGS) -o orc ./cmd/orc/...
+	$(GO_ENV) go build $(LDFLAGS) -o orc ./cmd/orc/...
 
 install:
-	go install $(LDFLAGS) ./cmd/orc/...
+	$(GO_ENV) go install $(LDFLAGS) ./cmd/orc/...
 
 clean:
 	rm -f orc
 
 test:
-	go test ./...
+	$(GO_ENV) go test ./...
 
 lint:
-	golangci-lint run ./...
+	$(GO_ENV) golangci-lint run ./...
 
 tidy:
-	go mod tidy
+	$(GO_ENV) go mod tidy
 
 fmt:
 	gofmt -l -w ./cmd ./internal
