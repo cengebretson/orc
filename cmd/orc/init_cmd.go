@@ -62,7 +62,7 @@ func printPacks() error {
 		fmt.Printf("  %-12s engines: %s\n", "", strings.Join(p.Engines, ", "))
 	}
 	fmt.Println()
-	fmt.Println("Install with: orc init --pack <name>   (repeatable; omit for 'default', or pass --skip-default-pack for base only)")
+	fmt.Println("Install with: orc init --pack <name>   (omit for 'default', or pass --skip-default-pack for base only)")
 	return nil
 }
 

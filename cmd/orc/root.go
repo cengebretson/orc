@@ -269,7 +269,7 @@ var helpAllCmd = &cobra.Command{
 func init() {
 	rootCmd.PersistentFlags().StringVar(&globalWorkspace, "workspace", ".", "Workspace root (default: current directory)")
 
-	initCmd.Flags().StringSliceVar(&initPacks, "pack", nil, "Pack(s) to install: a named bundle of workflow + workers + stages. Repeatable. Omit for 'default'")
+	initCmd.Flags().StringSliceVar(&initPacks, "pack", nil, "Built-in pack to install during scaffold. Omit for 'default'")
 	initCmd.Flags().BoolVar(&initSkipDefaultPack, "skip-default-pack", false, "Create the base workspace without installing the default pack")
 	initCmd.Flags().BoolVar(&initListPacks, "list-packs", false, "List available packs and exit")
 	initCmd.Flags().BoolVar(&initDryRun, "dry-run", false, "Print what would be created without writing files")

@@ -24,7 +24,7 @@ const (
 
 type InitOptions struct {
 	Root            string
-	Packs           []string // packs to install; empty = ["default"]
+	Packs           []string // built-in pack to install; empty = ["default"]
 	SkipDefaultPack bool
 	DryRun          bool
 	Force           bool
@@ -76,11 +76,20 @@ func Init(opts InitOptions) error {
 // The default install is empty Packs plus SkipDefaultPack=false; base-only is
 // empty Packs plus SkipDefaultPack=true.
 func resolvePacks(requested []string, skipDefaultPack bool) ([]string, error) {
+	if skipDefaultPack && len(requested) > 0 {
+		return nil, fmt.Errorf("--skip-default-pack cannot be combined with --pack")
+	}
 	if len(requested) == 0 {
 		if skipDefaultPack {
 			return nil, nil
 		}
 		return []string{"default"}, nil
+	}
+	if len(requested) > 1 {
+		return nil, fmt.Errorf("orc init installs at most one built-in pack; use `orc pack install` after init to add more packs")
+	}
+	if isLocalPackRef(requested[0]) {
+		return nil, fmt.Errorf("orc init does not install local packs; run `orc init --skip-default-pack` and then `orc pack install %s`", requested[0])
 	}
 	return requested, nil
 }
@@ -183,14 +192,6 @@ func collectEntries(opts InitOptions) ([]fileEntry, error) {
 		return nil, err
 	}
 
-	if len(packs) == 1 && isLocalPackRef(packs[0]) {
-		return collectLocalPackEntries(baseOrcYAML, entries, packs[0])
-	}
-	for _, p := range packs {
-		if isLocalPackRef(p) {
-			return nil, fmt.Errorf("local filesystem packs cannot be combined with other packs yet")
-		}
-	}
 	// 2. Selected embedded packs are snapshotted under packs/<name>/ and their
 	//    runtime resources are materialized under workers/<name>/ and stages/<name>/.
 	var manifests []PackManifestV1
@@ -425,47 +426,6 @@ func isLocalPackRef(ref string) bool {
 	return ref == "." || filepath.IsAbs(ref) || strings.HasPrefix(ref, "."+string(filepath.Separator)) || strings.Contains(ref, string(filepath.Separator))
 }
 
-func collectLocalPackEntries(baseOrcYAML string, entries []fileEntry, packPath string) ([]fileEntry, error) {
-	report, err := InspectPack(packPath)
-	if err != nil {
-		return nil, err
-	}
-	if !report.OK() {
-		return nil, fmt.Errorf("pack validation failed:\n  %s", strings.Join(report.Errors, "\n  "))
-	}
-	manifest := report.Manifest
-	if len(manifest.Provides.Workflows) == 0 {
-		return nil, fmt.Errorf("local pack %q must provide at least one workflow", manifest.Name)
-	}
-	if len(manifest.Provides.Workflows) > 1 {
-		return nil, fmt.Errorf("local pack %q provides multiple workflows; --default-workflow is not implemented yet", manifest.Name)
-	}
-
-	snapshotEntries, err := collectPackSnapshotEntries(report.Source, manifest.Name)
-	if err != nil {
-		return nil, err
-	}
-	entries = append(entries, snapshotEntries...)
-	entries = append(entries, packProvenanceEntry(manifest.Name, packInstallInfo{
-		SourceType:  "local-path",
-		SourceRef:   packPath,
-		ResolvedRef: report.Source,
-	}))
-
-	runtimeEntries, err := collectPackRuntimeEntries(report.Source, manifest)
-	if err != nil {
-		return nil, err
-	}
-	entries = append(entries, runtimeEntries...)
-
-	workflow, err := assembleLocalPackWorkflow(baseOrcYAML, report.Source, manifest)
-	if err != nil {
-		return nil, err
-	}
-	entries = append(entries, fileEntry{dest: "orc.yaml", content: workflow})
-	return entries, nil
-}
-
 func packProvenanceEntry(name string, info packInstallInfo) fileEntry {
 	data, err := yaml.Marshal(info)
 	if err != nil {
@@ -529,28 +489,6 @@ func collectPackRuntimeEntries(source string, manifest PackManifestV1) ([]fileEn
 	return entries, nil
 }
 
-func assembleLocalPackWorkflow(base, source string, manifest PackManifestV1) (string, error) {
-	var b strings.Builder
-	b.WriteString(strings.TrimRight(base, "\n"))
-	b.WriteString("\n\nworkflows:\n")
-
-	seen := map[string]bool{}
-	for _, workflow := range manifest.Provides.Workflows {
-		if seen[workflow.Path] {
-			continue
-		}
-		seen[workflow.Path] = true
-		content, err := os.ReadFile(filepath.Join(source, filepath.Clean(workflow.Path)))
-		if err != nil {
-			return "", fmt.Errorf("reading workflow %s: %w", workflow.Path, err)
-		}
-		b.WriteString(stripWorkflowsHeader(string(content)))
-	}
-	appendPackAliases(&b, []PackAliases{manifest.Aliases})
-	out := setDefaultWorkflow(b.String(), manifest.Provides.Workflows[0].ID)
-	return out, nil
-}
-
 // stripWorkflowsHeader drops the leading "workflows:" line from a pack's
 // workflow.yaml, leaving the indented workflow entries.
 func stripWorkflowsHeader(s string) string {
@@ -567,7 +505,11 @@ func setDefaultWorkflow(s, wf string) string {
 	lines := strings.Split(s, "\n")
 	for i, ln := range lines {
 		if idx := strings.Index(ln, "default_workflow:"); idx >= 0 && strings.TrimSpace(ln[:idx]) == "" {
-			lines[i] = ln[:idx] + "default_workflow: " + wf
+			comment := ""
+			if commentIdx := strings.Index(ln[idx:], "#"); commentIdx >= 0 {
+				comment = " " + strings.TrimSpace(ln[idx+commentIdx:])
+			}
+			lines[i] = ln[:idx] + "default_workflow: " + wf + comment
 			break
 		}
 	}

@@ -5,6 +5,8 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
+	"strings"
 
 	"github.com/cengebretson/orc/internal/config"
 	"gopkg.in/yaml.v3"
@@ -193,35 +195,39 @@ func mergePackIntoOrcYAML(root string, source installPackSource) (string, error)
 	if err != nil {
 		return "", err
 	}
+	data, err := os.ReadFile(filepath.Join(root, config.Filename))
+	if err != nil {
+		return "", fmt.Errorf("reading %s: %w", config.Filename, err)
+	}
 	workflowConfig, err := readPackWorkflowConfig(source)
 	if err != nil {
 		return "", err
 	}
-	if cfg.Workflows == nil {
-		cfg.Workflows = map[string]config.WorkflowDef{}
-	}
 	existingWorkflowCount := len(cfg.Workflows)
-	for name, workflow := range workflowConfig.Workflows {
-		cfg.Workflows[name] = workflow
-	}
-	mergeConfigAliases(&cfg.Aliases, source.Manifest.Aliases)
-	if existingWorkflowCount == 0 && len(source.Manifest.Provides.Workflows) == 1 {
-		cfg.Settings.DefaultWorkflow = source.Manifest.Provides.Workflows[0].ID
-	}
 
-	data, err := yaml.Marshal(cfg)
-	if err != nil {
-		return "", fmt.Errorf("marshaling %s: %w", config.Filename, err)
+	out := string(data)
+	if strings.TrimSpace(workflowConfig.Entries) != "" {
+		out = insertTopLevelSectionEntries(out, "workflows", workflowConfig.Entries)
 	}
-	return string(data), nil
+	out = mergeAliasesIntoOrcYAML(out, source.Manifest.Aliases)
+	if existingWorkflowCount == 0 && len(source.Manifest.Provides.Workflows) == 1 {
+		out = setDefaultWorkflow(out, source.Manifest.Provides.Workflows[0].ID)
+	}
+	return out, nil
 }
 
 type workflowFileConfig struct {
 	Workflows map[string]config.WorkflowDef `yaml:"workflows"`
+	Entries   string                        `yaml:"-"`
 }
 
 func readPackWorkflowConfig(source installPackSource) (workflowFileConfig, error) {
 	merged := workflowFileConfig{Workflows: map[string]config.WorkflowDef{}}
+	declared := map[string]struct{}{}
+	for _, workflow := range source.Manifest.Provides.Workflows {
+		declared[workflow.ID] = struct{}{}
+	}
+	seenPath := map[string]bool{}
 	for _, workflow := range source.Manifest.Provides.Workflows {
 		var data []byte
 		var err error
@@ -237,32 +243,200 @@ func readPackWorkflowConfig(source installPackSource) (workflowFileConfig, error
 		if err := yaml.Unmarshal(data, &parsed); err != nil {
 			return workflowFileConfig{}, fmt.Errorf("parsing workflow %s: %w", workflow.Path, err)
 		}
-		for name, workflow := range parsed.Workflows {
-			merged.Workflows[name] = workflow
+		if _, ok := parsed.Workflows[workflow.ID]; !ok {
+			return workflowFileConfig{}, fmt.Errorf("workflow %s does not define declared workflow %q", workflow.Path, workflow.ID)
+		}
+		for name, workflowDef := range parsed.Workflows {
+			if _, ok := declared[name]; !ok {
+				return workflowFileConfig{}, fmt.Errorf("workflow %s defines undeclared workflow %q", workflow.Path, name)
+			}
+			merged.Workflows[name] = workflowDef
+		}
+		if !seenPath[workflow.Path] {
+			seenPath[workflow.Path] = true
+			merged.Entries += stripWorkflowsHeader(string(data))
 		}
 	}
 	return merged, nil
 }
 
-func mergeConfigAliases(dst *config.Aliases, src PackAliases) {
-	if len(src.Workflows) > 0 && dst.Workflows == nil {
-		dst.Workflows = map[string]string{}
+func insertTopLevelSectionEntries(content, section, entries string) string {
+	content = strings.TrimRight(content, "\n")
+	entries = strings.TrimRight(entries, "\n")
+	if entries == "" {
+		return content + "\n"
 	}
-	for alias, target := range src.Workflows {
-		dst.Workflows[alias] = target
+
+	lines := strings.Split(content, "\n")
+	start := topLevelSectionLine(lines, section)
+	if start == -1 {
+		return content + "\n\n" + section + ":\n" + entries + "\n"
 	}
-	if len(src.Stages) > 0 && dst.Stages == nil {
-		dst.Stages = map[string]string{}
+	inlineEmpty := inlineEmptySection(lines[start], section)
+	if inlineEmpty {
+		lines[start] = section + ":"
 	}
-	for alias, target := range src.Stages {
-		dst.Stages[alias] = target
+
+	insert := start + 1
+	if !inlineEmpty {
+		insert = len(lines)
+		for i := start + 1; i < len(lines); i++ {
+			line := lines[i]
+			if strings.TrimSpace(line) == "" {
+				continue
+			}
+			if !strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "\t") {
+				insert = i
+				break
+			}
+		}
 	}
-	if len(src.Workers) > 0 && dst.Workers == nil {
-		dst.Workers = map[string]string{}
+
+	next := append([]string{}, lines[:insert]...)
+	next = append(next, strings.Split(entries, "\n")...)
+	next = append(next, lines[insert:]...)
+	return strings.Join(next, "\n") + "\n"
+}
+
+func mergeAliasesIntoOrcYAML(content string, aliases PackAliases) string {
+	groups := []struct {
+		name   string
+		values map[string]string
+	}{
+		{name: "workflows", values: aliases.Workflows},
+		{name: "stages", values: aliases.Stages},
+		{name: "workers", values: aliases.Workers},
 	}
-	for alias, target := range src.Workers {
-		dst.Workers[alias] = target
+	for _, group := range groups {
+		if len(group.values) == 0 {
+			continue
+		}
+		content = insertAliasGroupEntries(content, group.name, renderAliasPairs(group.values))
 	}
+	return content
+}
+
+func insertAliasGroupEntries(content, group, entries string) string {
+	content = strings.TrimRight(content, "\n")
+	lines := strings.Split(content, "\n")
+	aliasesLine := topLevelSectionLine(lines, "aliases")
+	if aliasesLine == -1 {
+		return content + "\n\naliases:\n  " + group + ":\n" + indentLines(entries, 4) + "\n"
+	}
+	aliasesInlineEmpty := inlineEmptySection(lines[aliasesLine], "aliases")
+	if aliasesInlineEmpty {
+		lines[aliasesLine] = "aliases:"
+	}
+
+	groupLine := nestedSectionLine(lines, aliasesLine, group)
+	if groupLine == -1 {
+		insert := sectionEndLine(lines, aliasesLine)
+		if aliasesInlineEmpty {
+			insert = aliasesLine + 1
+		}
+		next := append([]string{}, lines[:insert]...)
+		next = append(next, "  "+group+":")
+		next = append(next, strings.Split(indentLines(entries, 4), "\n")...)
+		next = append(next, lines[insert:]...)
+		return strings.Join(next, "\n") + "\n"
+	}
+	groupInlineEmpty := inlineEmptySection(strings.TrimSpace(lines[groupLine]), group)
+	if groupInlineEmpty {
+		lines[groupLine] = "  " + group + ":"
+	}
+
+	insert := nestedSectionEndLine(lines, groupLine)
+	if groupInlineEmpty {
+		insert = groupLine + 1
+	}
+	next := append([]string{}, lines[:insert]...)
+	next = append(next, strings.Split(indentLines(entries, 4), "\n")...)
+	next = append(next, lines[insert:]...)
+	return strings.Join(next, "\n") + "\n"
+}
+
+func renderAliasPairs(aliases map[string]string) string {
+	keys := make([]string, 0, len(aliases))
+	for key := range aliases {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	var b strings.Builder
+	for _, key := range keys {
+		fmt.Fprintf(&b, "%s: %s\n", key, aliases[key])
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
+func indentLines(s string, spaces int) string {
+	if s == "" {
+		return s
+	}
+	prefix := strings.Repeat(" ", spaces)
+	lines := strings.Split(strings.TrimRight(s, "\n"), "\n")
+	for i, line := range lines {
+		lines[i] = prefix + line
+	}
+	return strings.Join(lines, "\n")
+}
+
+func topLevelSectionLine(lines []string, section string) int {
+	needle := section + ":"
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t") {
+			continue
+		}
+		if trimmed == needle || strings.HasPrefix(trimmed, needle+" ") || strings.HasPrefix(trimmed, needle+" #") {
+			return i
+		}
+	}
+	return -1
+}
+
+func inlineEmptySection(line, section string) bool {
+	trimmed := strings.TrimSpace(line)
+	needle := section + ":"
+	return strings.HasPrefix(trimmed, needle) && strings.TrimSpace(strings.TrimPrefix(trimmed, needle)) == "{}"
+}
+
+func sectionEndLine(lines []string, start int) int {
+	for i := start + 1; i < len(lines); i++ {
+		line := lines[i]
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		if !strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "\t") {
+			return i
+		}
+	}
+	return len(lines)
+}
+
+func nestedSectionLine(lines []string, parent int, section string) int {
+	needle := section + ":"
+	end := sectionEndLine(lines, parent)
+	for i := parent + 1; i < end; i++ {
+		line := lines[i]
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(line, "  ") && !strings.HasPrefix(line, "    ") && (trimmed == needle || strings.HasPrefix(trimmed, needle+" ") || strings.HasPrefix(trimmed, needle+" #")) {
+			return i
+		}
+	}
+	return -1
+}
+
+func nestedSectionEndLine(lines []string, start int) int {
+	for i := start + 1; i < len(lines); i++ {
+		line := lines[i]
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		if !strings.HasPrefix(line, "    ") {
+			return i
+		}
+	}
+	return len(lines)
 }
 
 func runtimeEntriesForManifest(manifest PackManifestV1) []string {
@@ -289,18 +463,59 @@ func writePackInstallEntries(root string, entries []fileEntry) error {
 		}
 	}
 
+	var created []string
 	for _, e := range entries {
 		dest := filepath.Join(root, e.dest)
 		if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+			rollbackPackInstall(root, created)
 			return fmt.Errorf("creating directory for %s: %w", e.dest, err)
 		}
+		if e.dest == config.Filename {
+			if err := writeFileAtomic(dest, []byte(e.content), 0o644); err != nil {
+				rollbackPackInstall(root, created)
+				return fmt.Errorf("writing %s: %w", e.dest, err)
+			}
+			fmt.Printf("  update %s\n", e.dest)
+			continue
+		}
 		if err := os.WriteFile(dest, []byte(e.content), 0o644); err != nil {
+			rollbackPackInstall(root, created)
 			return fmt.Errorf("writing %s: %w", e.dest, err)
 		}
+		created = append(created, e.dest)
 		fmt.Printf("  create %s\n", e.dest)
 	}
 	fmt.Printf("\nPack installed. %d files updated.\n", len(entries))
 	return nil
+}
+
+func writeFileAtomic(dest string, data []byte, perm os.FileMode) error {
+	tmp, err := os.CreateTemp(filepath.Dir(dest), "."+filepath.Base(dest)+".tmp-*")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	defer func() {
+		_ = os.Remove(tmpName)
+	}()
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Chmod(perm); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmpName, dest)
+}
+
+func rollbackPackInstall(root string, created []string) {
+	for i := len(created) - 1; i >= 0; i-- {
+		_ = os.Remove(filepath.Join(root, created[i]))
+	}
 }
 
 func joinLines(lines []string) string {

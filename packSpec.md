@@ -564,11 +564,10 @@ small enough to validate the model without taking on the full pack lifecycle.
 Decided implementation order:
 
 1. `orc pack inspect <path>`
-2. `orc init --pack <path>` for one external pack
-3. `orc init --skip-default-pack`
-4. workspace-aware `orc pack list`
-5. `orc pack show`
-6. `orc pack install <pack>` for built-in and local packs
+2. `orc init --skip-default-pack`
+3. workspace-aware `orc pack list`
+4. `orc pack show`
+5. `orc pack install <pack>` for built-in and local packs
 
 ### Slice 1: Inspect Local Packs
 
@@ -594,28 +593,27 @@ Out of scope:
 - Migrating the current built-in default pack or generated workspace templates to
   namespaced resource IDs.
 
-### Slice 2: Init With One External Pack
+### Slice 2: Base-Only Init
 
 Target:
 
 ```bash
-orc init --pack ./packs/hotfix
+orc init --skip-default-pack
 ```
 
 Scope:
 
-- Load one external pack from a filesystem path.
-- Copy its resources into the generated workspace.
-- Merge its workflow into `orc.yaml`.
-- Apply non-conflicting suggested aliases.
-- Fail on conflicts with `_base` or generated files unless content is identical.
-- Print what the pack contributed during `--dry-run`.
 - `orc init --skip-default-pack` creates the base scaffold without installing
   the built-in default pack.
+- `orc init` installs the built-in default pack unless this flag is present.
+- `orc init --pack <name>` may select one built-in starter pack.
+- Local and additional packs are installed after initialization with
+  `orc pack install`.
 
 Out of scope:
 
-- Multiple external packs in one init.
+- Local filesystem packs during `orc init`.
+- Multiple packs in one init.
 - Pack registry.
 - Remote pack install.
 - Updating already-initialized workspaces.

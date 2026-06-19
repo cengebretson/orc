@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cengebretson/orc/internal/health"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/workspace"
 )
@@ -226,7 +225,7 @@ func TestInit_SkipDefaultPackIsBaseOnly(t *testing.T) {
 	}
 }
 
-func TestInit_LocalPackMaterializesRuntimeFiles(t *testing.T) {
+func TestInit_RejectsLocalPack(t *testing.T) {
 	packDir := writeLocalPack(t, "hotfix", `schema: 1
 name: hotfix
 description: Fast production fix workflow
@@ -247,62 +246,15 @@ aliases:
     bob: hotfix:bob
   stages:
     develop: hotfix:develop
-`)
-	writePackFile(t, filepath.Join(packDir, "workflow.yaml"), `workflows:
-  "hotfix:standard":
-    description: Fast production fix workflow
-    stages:
-      - name: hotfix:develop
-        worker: hotfix:bob
-        advance: auto
-`)
+	`)
 
 	dir := t.TempDir()
-	if err := workspace.Init(workspace.InitOptions{Root: dir, Packs: []string{packDir}}); err != nil {
-		t.Fatalf("Init local pack: %v", err)
+	err := workspace.Init(workspace.InitOptions{Root: dir, Packs: []string{packDir}})
+	if err == nil {
+		t.Fatal("Init returned nil error")
 	}
-
-	for _, rel := range []string{
-		"packs/hotfix/pack.yaml",
-		"packs/hotfix/.orc-pack.yaml",
-		"packs/hotfix/workflow.yaml",
-		"stages/hotfix/develop.md",
-		"workers/hotfix/bob.md",
-	} {
-		if _, err := os.Stat(filepath.Join(dir, rel)); err != nil {
-			t.Fatalf("missing %s: %v", rel, err)
-		}
-	}
-
-	orcYAML, err := os.ReadFile(filepath.Join(dir, "orc.yaml"))
-	if err != nil {
-		t.Fatalf("read orc.yaml: %v", err)
-	}
-	for _, want := range []string{
-		"default_workflow: hotfix:standard",
-		`"hotfix:standard":`,
-		"name: hotfix:develop",
-		"worker: hotfix:bob",
-		"aliases:",
-	} {
-		if !strings.Contains(string(orcYAML), want) {
-			t.Fatalf("orc.yaml missing %q:\n%s", want, string(orcYAML))
-		}
-	}
-
-	report := health.Run(dir)
-	var workflowRefs *health.Result
-	for i := range report.Results {
-		if report.Results[i].Name == "workflow refs" {
-			workflowRefs = &report.Results[i]
-			break
-		}
-	}
-	if workflowRefs == nil {
-		t.Fatal("workflow refs result missing")
-	}
-	if workflowRefs.Status != health.OK {
-		t.Fatalf("workflow refs = %s, want OK: %s", workflowRefs.Status, workflowRefs.Detail)
+	if !strings.Contains(err.Error(), "orc init does not install local packs") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -363,7 +315,7 @@ aliases:
 	}
 	for _, want := range []string{
 		"default_workflow: hotfix:standard",
-		`hotfix:standard:`,
+		`"hotfix:standard":`,
 		"name: hotfix:develop",
 		"worker: hotfix:bob",
 		"aliases:",
@@ -371,6 +323,116 @@ aliases:
 		if !strings.Contains(string(orcYAML), want) {
 			t.Fatalf("orc.yaml missing %q:\n%s", want, string(orcYAML))
 		}
+	}
+}
+
+func TestPackInstall_PreservesOrcYAMLShape(t *testing.T) {
+	packDir := writeLocalPack(t, "hotfix", `schema: 1
+name: hotfix
+description: Fast production fix workflow
+provides:
+  workflows:
+    - id: hotfix:standard
+      path: workflow.yaml
+  workers:
+    - id: hotfix:bob
+      path: workers/bob.md
+  stages:
+    - id: hotfix:develop
+      path: stages/develop.md
+aliases:
+  workflows:
+    hotfix: hotfix:standard
+`)
+	writePackFile(t, filepath.Join(packDir, "workflow.yaml"), `workflows:
+  "hotfix:standard":
+    description: Fast production fix workflow
+    stages:
+      - name: hotfix:develop
+        worker: hotfix:bob
+        advance: auto
+`)
+
+	dir := t.TempDir()
+	if err := workspace.Init(workspace.InitOptions{Root: dir, SkipDefaultPack: true}); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	writeOrcYAML(t, dir, `# keep this workspace comment
+settings:
+  default_workflow: default # keep this inline comment
+  quotes:
+    - custom
+
+repos: []
+
+workflows: {}
+
+aliases: {}
+`)
+
+	if err := workspace.InstallPack(workspace.PackInstallOptions{Root: dir, Pack: packDir}); err != nil {
+		t.Fatalf("InstallPack: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, "orc.yaml"))
+	if err != nil {
+		t.Fatalf("read orc.yaml: %v", err)
+	}
+	orcYAML := string(data)
+	for _, want := range []string{
+		"# keep this workspace comment",
+		"default_workflow: hotfix:standard # keep this inline comment",
+		"repos: []",
+		"workflows:\n  \"hotfix:standard\":",
+		"aliases:\n  workflows:",
+		`"hotfix:standard":`,
+		"hotfix: hotfix:standard",
+	} {
+		if !strings.Contains(orcYAML, want) {
+			t.Fatalf("orc.yaml missing %q:\n%s", want, orcYAML)
+		}
+	}
+	for _, unwanted := range []string{"auto_archive: false", `theme: ""`, "tui_refresh: 0"} {
+		if strings.Contains(orcYAML, unwanted) {
+			t.Fatalf("orc.yaml contains generated zero value %q:\n%s", unwanted, orcYAML)
+		}
+	}
+}
+
+func TestPackInstall_RejectsWorkflowManifestMismatch(t *testing.T) {
+	packDir := writeLocalPack(t, "hotfix", `schema: 1
+name: hotfix
+description: Fast production fix workflow
+provides:
+  workflows:
+    - id: hotfix:standard
+      path: workflow.yaml
+  workers:
+    - id: hotfix:bob
+      path: workers/bob.md
+  stages:
+    - id: hotfix:develop
+      path: stages/develop.md
+`)
+	writePackFile(t, filepath.Join(packDir, "workflow.yaml"), `workflows:
+  "hotfix:other":
+    description: Wrong workflow
+    stages:
+      - name: hotfix:develop
+        worker: hotfix:bob
+        advance: auto
+`)
+
+	dir := t.TempDir()
+	if err := workspace.Init(workspace.InitOptions{Root: dir, SkipDefaultPack: true}); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	err := workspace.InstallPack(workspace.PackInstallOptions{Root: dir, Pack: packDir})
+	if err == nil {
+		t.Fatal("InstallPack returned nil error")
+	}
+	if !strings.Contains(err.Error(), `workflow workflow.yaml does not define declared workflow "hotfix:standard"`) {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

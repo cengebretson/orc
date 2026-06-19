@@ -316,7 +316,7 @@ Or use the Claude Desktop settings UI. Requires a GitHub PAT with `repo` and `pu
 
 - `orc init` — scaffold a new workspace
   - `--workspace <path>` — scaffold at a specific path
-  - `--pack <name-or-path>` — install one starter pack during scaffold; omit for built-in `default`
+  - `--pack <name>` — install one built-in starter pack during scaffold; omit for built-in `default`
   - `--skip-default-pack` — create the base workspace without installing the default pack
   - `--list-packs` — list available packs and exit
   - `--dry-run` — preview without writing
