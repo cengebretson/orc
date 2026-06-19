@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -246,6 +247,43 @@ func TestRunDoctorFixRemovesStaleLock(t *testing.T) {
 	}
 	if _, err := os.Stat(lockPath); !os.IsNotExist(err) {
 		t.Fatalf("lock should be gone, stat err = %v", err)
+	}
+}
+
+func TestRunDoctorSystemPrintsInstallReport(t *testing.T) {
+	resetCommandGlobals(t)
+	doctorSystem = true
+	version = "1.2.3"
+	doctorLookPath = func(name string) (string, error) {
+		switch name {
+		case "orc":
+			return "/usr/local/bin/orc", nil
+		case "tmux", "chafa", "claude", "codex", "cursor":
+			return "", os.ErrNotExist
+		default:
+			return "", os.ErrNotExist
+		}
+	}
+
+	out, err := captureStdout(func() error {
+		return runDoctor(nil, nil)
+	})
+	if err != nil {
+		t.Fatalf("runDoctor --system: %v", err)
+	}
+	for _, want := range []string{
+		"System",
+		"1.2.3",
+		"orc",
+		"tmux",
+		"chafa",
+		"claude",
+		"codex",
+		"cursor",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("system doctor output missing %q:\n%s", want, out)
+		}
 	}
 }
 
@@ -902,7 +940,10 @@ func resetCommandGlobals(t *testing.T) {
 	t.Helper()
 
 	oldWorkspace := globalWorkspace
+	oldVersion := version
 	oldDoctorFix := doctorFix
+	oldDoctorSystem := doctorSystem
+	oldDoctorLookPath := doctorLookPath
 	oldStatusJSON := statusJSON
 	oldNextDry := nextDry
 	oldNextWorker := nextWorker
@@ -918,7 +959,10 @@ func resetCommandGlobals(t *testing.T) {
 	oldPackInspectJSON := packInspectJSON
 	t.Cleanup(func() {
 		globalWorkspace = oldWorkspace
+		version = oldVersion
 		doctorFix = oldDoctorFix
+		doctorSystem = oldDoctorSystem
+		doctorLookPath = oldDoctorLookPath
 		statusJSON = oldStatusJSON
 		nextDry = oldNextDry
 		nextWorker = oldNextWorker
@@ -935,7 +979,10 @@ func resetCommandGlobals(t *testing.T) {
 	})
 
 	globalWorkspace = "."
+	version = "dev"
 	doctorFix = false
+	doctorSystem = false
+	doctorLookPath = exec.LookPath
 	statusJSON = false
 	nextDry = false
 	nextWorker = ""

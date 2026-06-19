@@ -155,12 +155,16 @@ updates `ROUTER.md` with the right ticket system retrieval instructions.
 
 ```bash
 orc doctor
+orc doctor --system
 ```
 
 `orc doctor` checks workspace files plus local readiness: configured worker
 engines on your `PATH`, tmux availability, and any `STATE.yaml.lock` files
 that could affect ticket updates. Add `--fix` to remove provably-stale locks
 (dead PID, or old without a valid PID) — live locks are never touched.
+
+`orc doctor --system` checks install-level readiness outside a workspace:
+`orc` on `PATH`, the build version, tmux, chafa, and the supported agent CLIs.
 
 ### 4. Start working on a ticket
 
@@ -342,6 +346,7 @@ Or use the Claude Desktop settings UI. Requires a GitHub PAT with `repo` and `pu
   - `orc pack list` — show installed packs, install source, and active workflows
   - `orc pack show <pack>` — show one installed pack snapshot
 - `orc doctor` — check workspace health plus `orc.yaml`, local tools, worker engines, tmux, and state locks
+- `orc doctor --system` — check install readiness outside a workspace
   - `orc doctor <ticket>` — validate a ticket's `STATE.yaml`: workflow, stage, worker, next action, repos, and worktrees
   - `--fix` — remove provably-stale state locks (dead PID or old without a valid PID); live locks are never touched
 - `orc status` — show all features and their current workflow/stage

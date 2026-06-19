@@ -117,6 +117,7 @@ var doctorCmd = &cobra.Command{
 }
 
 var doctorFix bool
+var doctorSystem bool
 
 var nextCmd = &cobra.Command{
 	Use:   "next <ticket>",
@@ -279,6 +280,7 @@ func init() {
 	packInspectCmd.Flags().BoolVar(&packInspectJSON, "json", false, "Output as JSON")
 
 	doctorCmd.Flags().BoolVar(&doctorFix, "fix", false, "Remove provably-stale state locks (dead PID or old without a valid PID); live locks are never touched")
+	doctorCmd.Flags().BoolVar(&doctorSystem, "system", false, "Check Orc install readiness outside a workspace")
 	nextCmd.Flags().BoolVar(&nextJSON, "json", false, "Output as JSON")
 	nextCmd.Flags().BoolVar(&nextDry, "dry", false, "Print the launch command without executing it")
 	nextCmd.Flags().StringVar(&nextWorker, "worker", "", "Override the workflow's default worker (worker ID)")

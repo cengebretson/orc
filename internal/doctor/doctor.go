@@ -43,6 +43,7 @@ type Check struct {
 
 type Report struct {
 	Root   string
+	Label  string
 	Checks []Check
 }
 
@@ -61,6 +62,8 @@ type Options struct {
 	// valid PID) instead of only reporting them. Live or ambiguous locks
 	// are never touched.
 	Fix bool
+	// Version is the Orc build version shown by system checks.
+	Version string
 }
 
 func Run(root string) *Report {
@@ -72,7 +75,7 @@ func RunWithOptions(root string, opts Options) *Report {
 		opts.LookPath = exec.LookPath
 	}
 
-	report := &Report{Root: root}
+	report := &Report{Root: root, Label: "Workspace"}
 	appendHealth(report, health.Run(root))
 	appendConfigChecks(report, root)
 	appendStateLockChecks(report, root, opts.Fix)
@@ -80,8 +83,24 @@ func RunWithOptions(root string, opts Options) *Report {
 	return report
 }
 
+func RunSystemWithOptions(opts Options) *Report {
+	if opts.LookPath == nil {
+		opts.LookPath = exec.LookPath
+	}
+
+	report := &Report{Label: "System"}
+	appendSystemChecks(report, opts)
+	return report
+}
+
 func Print(r *Report) {
-	fmt.Printf("Workspace: %s\n\n", r.Root)
+	switch r.Label {
+	case "System":
+		fmt.Println("System")
+		fmt.Println()
+	default:
+		fmt.Printf("Workspace: %s\n\n", r.Root)
+	}
 	var currentGroup string
 	for _, c := range r.Checks {
 		if c.Group != currentGroup {
@@ -171,6 +190,31 @@ func appendToolChecks(report *Report, root string, lookPath func(string) (string
 		required := engine != "cursor"
 		report.Checks = append(report.Checks, executableCheck("tools", engine, engine, lookPath, !required))
 	}
+}
+
+func appendSystemChecks(report *Report, opts Options) {
+	report.Checks = append(report.Checks, Check{
+		Group:  "install",
+		Name:   "version",
+		Status: OK,
+		Detail: versionOrDefault(opts.Version),
+	})
+	report.Checks = append(report.Checks, executableCheck("install", "orc", "orc", opts.LookPath, false))
+
+	report.Checks = append(report.Checks,
+		executableCheck("tools", "tmux", "tmux", opts.LookPath, true),
+		executableCheck("tools", "chafa", "chafa", opts.LookPath, true),
+	)
+	for _, engine := range []string{"claude", "codex", "cursor"} {
+		report.Checks = append(report.Checks, executableCheck("tools", engine, engine, opts.LookPath, true))
+	}
+}
+
+func versionOrDefault(v string) string {
+	if strings.TrimSpace(v) == "" {
+		return "dev"
+	}
+	return v
 }
 
 func appendStateLockChecks(report *Report, root string, fix bool) {

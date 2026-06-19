@@ -77,6 +77,45 @@ func TestRunWithOptionsMissingTmuxWarns(t *testing.T) {
 	}
 }
 
+func TestRunSystemWithOptionsReportsInstallReadiness(t *testing.T) {
+	report := doctor.RunSystemWithOptions(doctor.Options{
+		Version: "1.2.3",
+		LookPath: func(name string) (string, error) {
+			switch name {
+			case "orc":
+				return "/usr/local/bin/orc", nil
+			case "tmux", "chafa", "claude", "codex", "cursor":
+				return "", errors.New("missing")
+			default:
+				return "", errors.New("unexpected lookup")
+			}
+		},
+	})
+
+	if report.Label != "System" {
+		t.Fatalf("report label = %q, want System", report.Label)
+	}
+
+	if check := findCheck(report, "install", "version"); check == nil || check.Detail != "1.2.3" || check.Status != doctor.OK {
+		t.Fatalf("version check = %#v, want ok version 1.2.3", check)
+	}
+	if check := findCheck(report, "install", "orc"); check == nil || check.Status != doctor.OK {
+		t.Fatalf("orc check = %#v, want ok", check)
+	}
+	for _, name := range []string{"tmux", "chafa", "claude", "codex", "cursor"} {
+		check := findCheck(report, "tools", name)
+		if check == nil {
+			t.Fatalf("%s check not found", name)
+		}
+		if check.Status != doctor.Warning {
+			t.Fatalf("%s status = %v, want Warning", name, check.Status)
+		}
+	}
+	if !report.OK() {
+		t.Fatal("system report should remain OK when only optional tools are missing")
+	}
+}
+
 func TestRunWithOptionsReportsNoStateLocks(t *testing.T) {
 	report := doctor.RunWithOptions(fixtureWorkspace(), doctor.Options{
 		LookPath: func(name string) (string, error) {

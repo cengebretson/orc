@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os/exec"
 
 	"github.com/cengebretson/orc/internal/doctor"
 	"github.com/cengebretson/orc/internal/state"
@@ -10,7 +11,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var doctorLookPath = exec.LookPath
+
 func runDoctor(cmd *cobra.Command, args []string) error {
+	if doctorSystem {
+		report := doctor.RunSystemWithOptions(doctor.Options{Fix: doctorFix, Version: version, LookPath: doctorLookPath})
+		doctor.Print(report)
+		if !report.OK() {
+			return fmt.Errorf("doctor found problems")
+		}
+		return nil
+	}
+
 	root, err := resolveRoot(globalWorkspace)
 	if err != nil {
 		return err
