@@ -215,6 +215,8 @@ Rules:
 - If two packs suggest the same alias for the same target, it is allowed.
 - If two packs suggest the same alias for different targets, init fails with an
   actionable error.
+- Canonical workflow, stage, and worker IDs are namespaced. Packs may share a
+  friendly alias only when it resolves to the same canonical target.
 - If stdin is an interactive TTY, Orc may offer to rename or skip conflicting
   aliases.
 - Non-interactive init never prompts. It fails unless the user passes explicit
@@ -230,6 +232,15 @@ orc init --pack default --pack hotfix --pack planning
 
 The result is one workspace containing all provided workflows, workers, and
 stages.
+
+Collision rules:
+
+- If two packs claim the same canonical workflow, stage, or worker ID, init
+  fails.
+- If two packs suggest the same alias for different canonical targets, init
+  fails.
+- If two packs suggest the same alias for the same canonical target, init may
+  keep it.
 
 Users can then run:
 
@@ -260,6 +271,8 @@ workflows:
 ### Default Workflow Selection
 
 The workspace owns `settings.default_workflow`.
+When multiple packs are installed, `orc.yaml` is the source of truth for the
+default workflow selection.
 
 Rules:
 
@@ -270,6 +283,7 @@ Rules:
 - Pack order must not decide the default workflow.
 - Suggested workflow aliases may make names friendlier, but they do not choose
   the workspace default when multiple workflows are installed.
+- A pack may not decide the workspace default on its own.
 
 Proposed flag:
 
