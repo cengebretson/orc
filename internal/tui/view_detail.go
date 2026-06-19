@@ -71,16 +71,19 @@ func (m Model) renderDetailBody() string {
 	if workflowLabel == "" {
 		workflowLabel = summary.Workflow
 	}
+	workflowValue := labelWithDimID(workflowLabel, summary.Workflow)
 	stageLabel := m.detail.stageLabel
 	if stageLabel == "" {
 		stageLabel = summary.Stage
 	}
+	stageValue := labelWithDimID(stageLabel+summary.StageLoopLabel, summary.Stage)
+	workerValue := labelWithDimID(workerLabel, summary.WorkerID)
 	fields := []struct{ label, value string }{
 		{" Ticket  ", s.Ticket},
 		{" Status  ", statusStyle(s.Status).Render(statusIcon(s.Status) + " " + s.Status)},
-		{" Workflow", workflowLabel},
-		{" Stage   ", stageLabel + summary.StageLoopLabel},
-		{" Worker  ", workerLabel},
+		{" Workflow", workflowValue},
+		{" Stage   ", stageValue},
+		{" Worker  ", workerValue},
 	}
 	for _, f := range fields {
 		stateLines = append(stateLines, fmt.Sprintf("%s  %s",
@@ -152,47 +155,101 @@ func (m Model) renderDetailBody() string {
 
 	// Timing — per-stage durations derived from history
 	if rep := report.Compute(s, time.Now()); len(rep.Stages) > 0 {
-		var timingLines []string
-		timingLines = append(timingLines, fmt.Sprintf(" %s  %-10s  %-10s  %s",
-			styleDetailLabel.Render(padRight("stage", 18)),
-			styleDetailLabel.Render("active"),
-			styleDetailLabel.Render("wall"),
-			styleDetailLabel.Render("visits")))
+		const (
+			minTimingStage = 18
+			wActive        = 10
+			wWall          = 10
+			wVisits        = 6
+		)
+		wTimingStage := minTimingStage
 		for _, st := range rep.Stages {
-			marker := ""
-			if rep.Open && st.Stage == s.Stage.Name {
-				marker = styleHealthOK.Render("  ← current")
-			}
-			timingLines = append(timingLines, fmt.Sprintf(" %s  %-10s  %-10s  %-6d%s",
-				styleSubtext.Render(padRight(truncate(st.Stage, 18), 18)),
-				report.Humanize(st.Active),
-				styleDim.Render(report.Humanize(st.Wall)),
-				st.Visits, marker))
+			wTimingStage = maxInt(wTimingStage, lipgloss.Width(st.Stage))
 		}
 		totalLabel := "total"
 		if rep.Open {
 			totalLabel = "total so far"
 		}
-		timingLines = append(timingLines, fmt.Sprintf(" %s  %-10s  %s",
-			styleDetailLabel.Render(padRight(totalLabel, 18)),
-			report.Humanize(rep.Active),
+		wTimingStage = maxInt(wTimingStage, lipgloss.Width(totalLabel))
+		maxTimingStage := innerW - wActive - wWall - wVisits - 7
+		if maxTimingStage < minTimingStage {
+			maxTimingStage = minTimingStage
+		}
+		if wTimingStage > maxTimingStage {
+			wTimingStage = maxTimingStage
+		}
+
+		var timingLines []string
+		timingLines = append(timingLines, fmt.Sprintf(" %s  %s  %s  %s",
+			padRight(styleDetailLabel.Render("stage"), wTimingStage),
+			padRight(styleDetailLabel.Render("active"), wActive),
+			padRight(styleDetailLabel.Render("elapsed"), wWall),
+			padRight(styleDetailLabel.Render("visits"), wVisits)))
+		for _, st := range rep.Stages {
+			marker := ""
+			if rep.Open && st.Stage == s.Stage.Name {
+				marker = styleHealthOK.Render("  ← current")
+			}
+			timingLines = append(timingLines, fmt.Sprintf(" %s  %s  %s  %s%s",
+				padRight(styleSubtext.Render(truncate(st.Stage, wTimingStage)), wTimingStage),
+				padRight(report.Humanize(st.Active), wActive),
+				padRight(styleDim.Render(report.Humanize(st.Wall)), wWall),
+				padRight(fmt.Sprintf("%d", st.Visits), wVisits),
+				marker))
+		}
+		timingLines = append(timingLines, fmt.Sprintf(" %s  %s  %s",
+			padRight(styleDetailLabel.Render(totalLabel), wTimingStage),
+			padRight(report.Humanize(rep.Active), wActive),
 			styleDim.Render(report.Humanize(rep.Wall))))
 		b.WriteString(drawBox(styleSection.Render(" Timing "), timingLines, outerW) + "\n")
 	}
 
 	// History
 	if len(s.History) > 0 {
+		const (
+			wAt       = 10
+			minStage  = 20
+			minWorker = 18
+			minResult = 24
+		)
+		wStage := minStage
+		wWorker := minWorker
+		for _, h := range s.History {
+			wStage = maxInt(wStage, lipgloss.Width(h.Stage))
+			wWorker = maxInt(wWorker, lipgloss.Width(h.Worker))
+		}
+		available := innerW - wAt - minResult - 7
+		if available < minStage+minWorker {
+			available = minStage + minWorker
+		}
+		if wStage+wWorker > available {
+			over := wStage + wWorker - available
+			if wWorker > minWorker {
+				shrink := minInt(over, wWorker-minWorker)
+				wWorker -= shrink
+				over -= shrink
+			}
+			if over > 0 && wStage > minStage {
+				wStage -= minInt(over, wStage-minStage)
+			}
+		}
+		wResult := innerW - wAt - wStage - wWorker - 7
 		var histLines []string
+		histLines = append(histLines, fmt.Sprintf(" %s  %s  %s  %s",
+			padRight(styleDetailLabel.Render("date"), wAt),
+			padRight(styleDetailLabel.Render("stage"), wStage),
+			padRight(styleDetailLabel.Render("worker"), wWorker),
+			styleDetailLabel.Render("result"),
+		))
 		for _, h := range s.History {
 			ts := h.At
 			if len(ts) > 10 {
 				ts = ts[:10]
 			}
-			histLines = append(histLines, fmt.Sprintf(" %s  %-20s  %-18s  %s",
-				styleDim.Render(ts),
-				styleSubtext.Render(truncate(h.Stage, 20)),
-				styleDim.Render(truncate(h.Worker, 18)),
-				styleSubtext.Render(truncate(h.Result, innerW-72)),
+			histLines = append(histLines, fmt.Sprintf(" %s  %s  %s  %s",
+				padRight(styleDim.Render(truncate(ts, wAt)), wAt),
+				padRight(styleSubtext.Render(truncate(h.Stage, wStage)), wStage),
+				padRight(styleDim.Render(truncate(h.Worker, wWorker)), wWorker),
+				styleSubtext.Render(truncate(h.Result, wResult)),
 			))
 		}
 		b.WriteString(drawBox(styleSection.Render(" History "), histLines, outerW) + "\n")
@@ -226,6 +283,50 @@ func (m Model) renderDetailBody() string {
 	}
 
 	return strings.TrimRight(b.String(), "\n")
+}
+
+func labelWithDimID(label, id string) string {
+	if id == "" || id == label {
+		return label
+	}
+	return label + styleDim.Render(" ("+id+")")
+}
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func joinColumns(left, right, gap string) string {
+	leftLines := strings.Split(strings.TrimRight(left, "\n"), "\n")
+	rightLines := strings.Split(strings.TrimRight(right, "\n"), "\n")
+	leftW := 0
+	for _, line := range leftLines {
+		leftW = maxInt(leftW, lipgloss.Width(line))
+	}
+	n := maxInt(len(leftLines), len(rightLines))
+	out := make([]string, 0, n)
+	for i := 0; i < n; i++ {
+		leftLine := ""
+		if i < len(leftLines) {
+			leftLine = leftLines[i]
+		}
+		rightLine := ""
+		if i < len(rightLines) {
+			rightLine = rightLines[i]
+		}
+		out = append(out, padRight(leftLine, leftW)+gap+rightLine)
+	}
+	return strings.Join(out, "\n")
 }
 
 // ── File viewer ───────────────────────────────────────────────────
@@ -263,7 +364,7 @@ func (m Model) viewWorkflowDetailPage() string {
 	var b strings.Builder
 	title := styleDetailTitle.Render(" Workflows") +
 		styleDim.Render(" · ") +
-		styleSubtext.Render(workflowLabel(m.wfDetailName, m.workflows)+" ")
+		styleSubtext.Render(workflowDisplayWithID(m.wfDetailName, m.workflows)+" ")
 	b.WriteString("\n" + drawBox(title, nil, outerW) + "\n")
 	b.WriteString(m.viewport.View())
 	help := strings.Join([]string{
@@ -403,7 +504,7 @@ func renderWorkerFile(path string, features []*featureRow, width int) (string, e
 		}
 
 		// Render rows as styled lines.
-		innerW := width - 4
+		outerW := width
 		var lines []string
 		for _, r := range rows {
 			pad := strings.Repeat(" ", labelW-len(r.label))
@@ -416,40 +517,30 @@ func renderWorkerFile(path string, features []*featureRow, width int) (string, e
 		if workerName == "" {
 			workerName = w.ID
 		}
-		sb.WriteString(drawBoxLabeledWith(
+		detailsBox := drawBoxLabeledWith(
 			styleHeader.Render(workerName),
 			lines,
-			innerW,
+			outerW,
 			activeTheme.Palette.Mauve,
-		))
-		sb.WriteString("\n")
+		)
 
-		// Active stories for this worker
-		var activeRows []string
-		for _, row := range features {
-			if row.s == nil {
-				continue
-			}
-			if row.s.Stage.Worker == w.ID && row.s.Status != "archived" {
-				ticket := styleSubtext.Render(padRight(row.s.Ticket, 14))
-				wf := row.s.Workflow
-				if wf == "" {
-					wf = "default"
-				}
-				workflowLabel := row.workflowLabel
-				if workflowLabel == "" {
-					workflowLabel = wf
-				}
-				stageLabel := row.stageLabel
-				if stageLabel == "" {
-					stageLabel = row.s.Stage.Name
-				}
-				stage := styleDim.Render(workflowLabel + "/" + stageLabel)
-				activeRows = append(activeRows, "  "+ticket+"  "+stage)
-			}
+		activeFeatureRows := activeWorkerFeatureRows(w.ID, features)
+		label := styleSection.Render(fmt.Sprintf("Active Features (%d)", len(activeFeatureRows)))
+		activeRows := renderActiveFeatureRows(activeFeatureRows, outerW-2)
+		activeBox := drawBoxLabeled(label, activeRows, outerW)
+		if width >= 100 {
+			const gapW = 2
+			leftW := (outerW - gapW) / 2
+			rightW := outerW - gapW - leftW
+			detailsBox = drawBoxLabeledWith(styleHeader.Render(workerName), lines, leftW, activeTheme.Palette.Mauve)
+			activeRows = renderActiveFeatureRows(activeFeatureRows, rightW-2)
+			activeBox = drawBoxLabeled(label, activeRows, rightW)
+			detailsBox, activeBox = equalizeBoxHeights(detailsBox, activeBox)
+			sb.WriteString(joinColumns(detailsBox, activeBox, "  ") + "\n")
+		} else {
+			sb.WriteString(detailsBox + "\n")
+			sb.WriteString(activeBox + "\n")
 		}
-		label := styleSection.Render(fmt.Sprintf(" Active Stories (%d) ", len(activeRows)))
-		sb.WriteString(drawBox(label, activeRows, width) + "\n")
 	}
 
 	// Render markdown body.
@@ -470,6 +561,95 @@ func renderWorkerFile(path string, features []*featureRow, width int) (string, e
 	}
 
 	return sb.String(), nil
+}
+
+type activeFeatureRow struct {
+	ticket string
+	stage  string
+}
+
+func activeWorkerFeatureRows(workerID string, features []*featureRow) []activeFeatureRow {
+	var rows []activeFeatureRow
+	for _, row := range features {
+		if row.s == nil {
+			continue
+		}
+		if row.s.Stage.Worker != workerID || row.s.Status == "archived" {
+			continue
+		}
+		wf := row.s.Workflow
+		if wf == "" {
+			wf = "default"
+		}
+		workflowLabel := row.workflowLabel
+		if workflowLabel == "" {
+			workflowLabel = wf
+		}
+		stageLabel := row.stageLabel
+		if stageLabel == "" {
+			stageLabel = row.s.Stage.Name
+		}
+		rows = append(rows, activeFeatureRow{
+			ticket: row.s.Ticket,
+			stage:  workflowLabel + "/" + stageLabel,
+		})
+	}
+	return rows
+}
+
+func renderActiveFeatureRows(rows []activeFeatureRow, width int) []string {
+	const maxVisibleActiveFeatures = 5
+	if width < 20 {
+		width = 20
+	}
+	ticketW := minInt(14, maxInt(8, width/3))
+	stageW := width - ticketW - 2
+	if stageW < 1 {
+		stageW = 1
+	}
+	visibleRows := rows
+	if len(visibleRows) > maxVisibleActiveFeatures {
+		visibleRows = visibleRows[:maxVisibleActiveFeatures]
+	}
+	lines := make([]string, 0, len(visibleRows)+1)
+	for _, row := range visibleRows {
+		ticket := styleSubtext.Render(padRight(truncate(row.ticket, ticketW), ticketW))
+		stage := styleDim.Render(truncate(row.stage, stageW))
+		lines = append(lines, ticket+"  "+stage)
+	}
+	if hidden := len(rows) - len(visibleRows); hidden > 0 {
+		lines = append(lines, styleDim.Render(fmt.Sprintf("+%d more", hidden)))
+	}
+	return lines
+}
+
+func equalizeBoxHeights(left, right string) (string, string) {
+	leftLines := strings.Split(strings.TrimRight(left, "\n"), "\n")
+	rightLines := strings.Split(strings.TrimRight(right, "\n"), "\n")
+	if len(leftLines) == len(rightLines) {
+		return left, right
+	}
+	if len(leftLines) < len(rightLines) {
+		return padBoxHeight(leftLines, len(rightLines)), right
+	}
+	return left, padBoxHeight(rightLines, len(leftLines))
+}
+
+func padBoxHeight(lines []string, target int) string {
+	if len(lines) < 2 {
+		return strings.Join(lines, "\n")
+	}
+	bottom := lines[len(lines)-1]
+	body := lines[:len(lines)-1]
+	innerW := lipgloss.Width(bottom) - 2
+	if innerW < 0 {
+		innerW = 0
+	}
+	for len(body)+1 < target {
+		body = append(body, "│"+strings.Repeat(" ", innerW)+"│")
+	}
+	body = append(body, bottom)
+	return strings.Join(body, "\n")
 }
 
 // renderWorkflowFile renders a stage markdown file. width is the available viewport width.

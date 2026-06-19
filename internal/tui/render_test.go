@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -114,6 +115,28 @@ func TestDashboardCollapsedHealthShowsIssueCount(t *testing.T) {
 	}
 }
 
+func TestDashboardExpandedHealthStaysCompact(t *testing.T) {
+	m := testModel(t)
+	m.expanded["health"] = true
+	m.focusedPane = "section"
+	m.sectionFocus = "health"
+	m.healthItems = []doctor.Check{
+		{Group: "workspace", Name: "AGENTS.md", Status: doctor.OK},
+		{Group: "workspace", Name: "worktrees/", Status: doctor.Warning, Detail: "not created yet"},
+		{Group: "tools", Name: "codex", Status: doctor.Fail, Detail: "not found on PATH"},
+	}
+
+	out := ansi.Strip(m.viewDashboard())
+	for _, want := range []string{"worktrees/", "not created yet", "codex", "not found on PATH", "enter to view full report"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expanded health output missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "AGENTS.md") {
+		t.Errorf("expanded health dashboard should omit OK checks and group headers:\n%s", out)
+	}
+}
+
 func TestRenderHealthReport(t *testing.T) {
 	checks := []doctor.Check{
 		{Group: "workspace", Name: "AGENTS.md", Status: doctor.OK},
@@ -188,6 +211,24 @@ func TestRenderRouteChain(t *testing.T) {
 	}
 }
 
+func TestRenderRouteChainUsesAliasLabelsWithCanonicalFallback(t *testing.T) {
+	chain := []routeStep{
+		{name: "default:intake", label: "intake", advance: "auto"},
+		{name: "custom:security-review", advance: "manual"},
+	}
+	loops := []repairLoop{{name: "default:code-review", label: "code-review", target: "custom:security-review"}}
+
+	out := ansi.Strip(strings.Join(renderRouteChain(chain, loops, 100), "\n"))
+	for _, want := range []string{"intake", "custom:security-review", "code-review"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("route chain missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "default:intake") || strings.Contains(out, "default:code-review") {
+		t.Fatalf("route chain should prefer alias labels when present:\n%s", out)
+	}
+}
+
 func TestRenderRouteChainWraps(t *testing.T) {
 	chain := []routeStep{
 		{name: "stage-one", advance: "auto"},
@@ -240,13 +281,19 @@ func TestRenderTable(t *testing.T) {
 	plain.hasIssues = true
 	plain.s.Runtime.JIT = &state.JITRuntime{Worker: "bob", Task: "spot check"}
 
+	longName := testRow("STORY-4", "active", "develop")
+	longName.s.Slug = "STORY-4-this-is-a-very-long-feature-name-that-should-truncate"
+
 	var m Model
-	out := m.renderTable([]*featureRow{live, dead, plain}, 140, 0)
+	out := m.renderTable([]*featureRow{live, dead, plain, longName}, 140, 0)
 
 	for _, want := range []string{"Ticket", "Status", "Worker", "Tmux"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("header missing %q", want)
 		}
+	}
+	if strings.Contains(out, "Health") {
+		t.Error("health should render as a ticket marker, not as a separate column")
 	}
 	for _, want := range []string{"STORY-1", "STORY-2", "STORY-3", "some-feature"} {
 		if !strings.Contains(out, want) {
@@ -262,11 +309,21 @@ func TestRenderTable(t *testing.T) {
 	if !strings.Contains(out, "+ jit") {
 		t.Error("running jit task should render '+ jit' in stage cell")
 	}
-	if !strings.Contains(out, "!") {
-		t.Error("row with issues should render '!' health marker")
+	if !strings.Contains(out, "! STORY-3") {
+		t.Error("row with issues should render '!' before the ticket")
 	}
-	if !strings.Contains(out, "default/develop") {
-		t.Error("stage cell should render workflow/stage")
+	if !strings.Contains(out, "default › develop") {
+		t.Error("stage cell should render workflow and stage with a separator")
+	}
+	if !strings.Contains(out, "this-is-a-very-long-feature-name-that-should-tru…") {
+		t.Errorf("long feature name should truncate with an ellipsis:\n%s", ansi.Strip(out))
+	}
+	if strings.Contains(out, "this-is-a-very-long-feature-name-that-should-truncate  ") {
+		t.Errorf("long feature name should not bleed across columns:\n%s", ansi.Strip(out))
+	}
+	wideOut := m.renderTable([]*featureRow{longName}, 180, 0)
+	if !strings.Contains(wideOut, "this-is-a-very-long-feature-name-that-should-truncate") {
+		t.Errorf("name column should expand in wider tables:\n%s", ansi.Strip(wideOut))
 	}
 }
 
@@ -279,10 +336,10 @@ func TestRenderTableUsesAliasLabels(t *testing.T) {
 	var m Model
 	out := ansi.Strip(m.renderTable([]*featureRow{row}, 140, 0))
 
-	if !strings.Contains(out, "default/develop") {
+	if !strings.Contains(out, "default › develop") {
 		t.Fatalf("stage cell missing alias labels:\n%s", out)
 	}
-	if strings.Contains(out, "default:standard/default:develop") {
+	if strings.Contains(out, "default:standard › default:develop") {
 		t.Fatalf("stage cell leaked canonical IDs:\n%s", out)
 	}
 }
@@ -315,6 +372,62 @@ func TestViewDetailShowsTimingSection(t *testing.T) {
 	// develop is the open current stage measured to now → a "current" marker.
 	if !strings.Contains(out, "current") {
 		t.Fatalf("Timing section missing current-stage marker:\n%s", out)
+	}
+}
+
+func TestViewDetailShowsDimCanonicalIDs(t *testing.T) {
+	root := t.TempDir()
+	workerPath := filepath.Join(root, "workers", "default", "bob.md")
+	if err := os.MkdirAll(filepath.Dir(workerPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	workerFile := "---\nid: default:bob\nname: Bob\nengine: codex\n---\n# Bob\n"
+	if err := os.WriteFile(workerPath, []byte(workerFile), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	row := testRow("STORY-1", "active", "default:develop")
+	row.featureDir = t.TempDir()
+	row.s.Workflow = "default:standard"
+	row.workflowLabel = "default"
+	row.stageLabel = "develop"
+	row.s.Stage.Worker = "default:bob"
+
+	m := New(root)
+	m.width = 120
+	m.height = 40
+	m.root = root
+	m.detail = row
+
+	out := ansi.Strip(m.renderDetailBody())
+	if !strings.Contains(out, "default (default:standard)") {
+		t.Fatalf("detail state should show dim canonical workflow id:\n%s", out)
+	}
+	if !strings.Contains(out, "develop (default:develop)") {
+		t.Fatalf("detail state should show dim canonical stage id:\n%s", out)
+	}
+	if !strings.Contains(out, "Bob (default:bob)") {
+		t.Fatalf("detail state should show dim canonical worker id:\n%s", out)
+	}
+}
+
+func TestViewDetailTimingKeepsLongStageName(t *testing.T) {
+	row := testRow("STORY-1", "active", "default:qa-automation")
+	row.featureDir = t.TempDir()
+	base := time.Date(2026, 6, 1, 9, 0, 0, 0, time.UTC)
+	row.s.History = []state.HistoryEntry{
+		{At: base.Format(time.RFC3339), Stage: "default:qa-automation", Worker: "default:brian", Result: "started qa"},
+	}
+
+	m := New("")
+	m.width = 120
+	m.height = 50
+	m.detail = row
+	m.detailFiles = nil
+
+	out := ansi.Strip(m.renderDetailBody())
+	if !strings.Contains(out, "default:qa-automation") {
+		t.Fatalf("Timing section should not truncate long stage names when width allows:\n%s", out)
 	}
 }
 
@@ -366,6 +479,14 @@ func testChains() []workflowChain {
 		loops:       []repairLoop{{name: "pr-repair", target: "develop"}},
 		repairSteps: []repairStep{{name: "pr-repair", workerID: "bob", advance: "auto", repairs: "develop", maxRetries: 3}},
 	}}
+}
+
+func TestWorkflowDisplayWithID(t *testing.T) {
+	chains := []workflowChain{{name: "default:standard", label: "default"}}
+	out := ansi.Strip(workflowDisplayWithID("default:standard", chains))
+	if out != "default (default:standard)" {
+		t.Fatalf("workflow display = %q, want alias plus canonical id", out)
+	}
 }
 
 func TestRenderWorkflowDetail(t *testing.T) {
@@ -479,11 +600,11 @@ Build features end to end.
 			t.Errorf("worker info missing %q", want)
 		}
 	}
-	if !strings.Contains(out, "Active Stories (1)") {
-		t.Error("missing active stories count")
+	if !strings.Contains(out, "Active Features (1)") {
+		t.Error("missing active features count")
 	}
 	if !strings.Contains(out, "STORY-7") {
-		t.Error("missing active story ticket")
+		t.Error("missing active feature ticket")
 	}
 	if !strings.Contains(out, "Build features end to end.") {
 		t.Error("missing rendered markdown body")
@@ -503,9 +624,150 @@ func TestRenderWorkerFileNoFrontmatter(t *testing.T) {
 	if !strings.Contains(out, "just a plain body") {
 		t.Error("body not rendered")
 	}
-	if strings.Contains(out, "Active Stories") {
+	if strings.Contains(out, "Active Features") {
 		t.Error("file without frontmatter should not render the info boxes")
 	}
+}
+
+func TestRenderWorkerFileWideLayoutUsesTopColumns(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "bob-developer.md")
+	content := `---
+id: bob-developer
+name: Bob
+engine: claude
+---
+
+# Role
+`
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+	story := testRow("STORY-7", "active", "develop")
+	story.s.Stage.Worker = "bob-developer"
+
+	styled, err := renderWorkerFile(path, []*featureRow{story}, 120)
+	if err != nil {
+		t.Fatalf("renderWorkerFile: %v", err)
+	}
+	out := ansi.Strip(styled)
+	line := firstLineContaining(out, "╮  ╭")
+	if line == "" {
+		t.Fatalf("wide worker detail should put details and active features on the same row:\n%s", out)
+	}
+	if bottom := firstLineContaining(out, "╯  ╰"); bottom == "" {
+		t.Fatalf("wide worker detail boxes should have equal height:\n%s", out)
+	}
+}
+
+func TestRenderWorkerFileCapsActiveFeatures(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "bob-developer.md")
+	content := `---
+id: bob-developer
+name: Bob
+engine: claude
+---
+
+# Role
+`
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stories []*featureRow
+	for i := 1; i <= 7; i++ {
+		story := testRow(fmt.Sprintf("STORY-%d", i), "active", "develop")
+		story.s.Stage.Worker = "bob-developer"
+		stories = append(stories, story)
+	}
+
+	styled, err := renderWorkerFile(path, stories, 120)
+	if err != nil {
+		t.Fatalf("renderWorkerFile: %v", err)
+	}
+	out := ansi.Strip(styled)
+	for _, want := range []string{"STORY-1", "STORY-5", "+2 more"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("capped active feature list missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "STORY-6") || strings.Contains(out, "STORY-7") {
+		t.Fatalf("capped active feature list should not render rows past the first five:\n%s", out)
+	}
+}
+
+func TestRenderWorkerGroups(t *testing.T) {
+	groups := []workerGroup{
+		{name: "default", items: []sectionItem{{label: "bob", id: "default:bob"}, {label: "fred", id: "default:fred"}}},
+		{name: "hotfix", items: []sectionItem{{label: "patcher", id: "hotfix:patcher"}}},
+	}
+
+	collapsed := ansi.Strip(strings.Join(renderWorkerGroups(groups, 80), "\n"))
+	for _, want := range []string{"default", "bob", "fred", "hotfix", "patcher"} {
+		if !strings.Contains(collapsed, want) {
+			t.Fatalf("collapsed worker groups missing %q:\n%s", want, collapsed)
+		}
+	}
+
+	focused := ansi.Strip(strings.Join(renderGroupedWorkerList(groups, 1), "\n"))
+	if !strings.Contains(focused, "fred (default:fred)") {
+		t.Fatalf("focused worker groups should include dim canonical id:\n%s", focused)
+	}
+}
+
+func TestRenderWorkflowGroups(t *testing.T) {
+	groups := []workflowGroup{
+		{name: "default", items: []sectionItem{{label: "standard", id: "default:standard"}, {label: "release", id: "default:release"}}},
+		{name: "hotfix", items: []sectionItem{{label: "standard", id: "hotfix:standard"}}},
+	}
+
+	collapsed := ansi.Strip(strings.Join(renderWorkflowGroups(groups, 80), "\n"))
+	for _, want := range []string{"default", "standard", "release", "hotfix"} {
+		if !strings.Contains(collapsed, want) {
+			t.Fatalf("collapsed workflow groups missing %q:\n%s", want, collapsed)
+		}
+	}
+
+	focused := ansi.Strip(strings.Join(renderGroupedWorkflowList(groups, 2), "\n"))
+	if !strings.Contains(focused, "standard (hotfix:standard)") {
+		t.Fatalf("focused workflow groups should include dim canonical id:\n%s", focused)
+	}
+}
+
+func TestRenderWorkflowChainGroupsKeepsStagePreview(t *testing.T) {
+	chains := []workflowChain{
+		{
+			name:  "default:standard",
+			label: "standard",
+			steps: []routeStep{
+				{name: "default:intake", label: "intake", advance: "auto"},
+				{name: "default:develop", label: "develop", advance: "manual"},
+			},
+		},
+		{
+			name:  "hotfix:standard",
+			label: "standard",
+			steps: []routeStep{
+				{name: "hotfix:patch", label: "patch", advance: "auto"},
+				{name: "hotfix:verify", label: "verify", advance: "manual"},
+			},
+		},
+	}
+
+	out := ansi.Strip(strings.Join(renderWorkflowChainGroups(chains, 100), "\n"))
+	for _, want := range []string{"default", "standard (default:standard)", "intake", "develop", "hotfix", "standard (hotfix:standard)", "patch", "verify"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("workflow chain groups missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func firstLineContaining(s, needle string) string {
+	for _, line := range strings.Split(s, "\n") {
+		if strings.Contains(line, needle) {
+			return line
+		}
+	}
+	return ""
 }
 
 // ── model filtering ──────────────────────────────────────────────

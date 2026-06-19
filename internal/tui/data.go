@@ -81,37 +81,42 @@ func loadData(root string) tea.Cmd {
 		// worker names
 		allWorkers, _ := workers.Load(filepath.Join(root, "workers"))
 		var workerNames []string
+		workerGroupsByName := map[string][]sectionItem{}
 		for _, w := range allWorkers {
-			name := w.Name
-			if name == "" {
-				name = w.ID
+			item := sectionItem{label: workerDisplayName(workflowCfg, w), id: w.ID, path: w.FilePath}
+			workerNames = append(workerNames, item.label)
+			if w.FilePath != "" {
+				workerGroupsByName[workerNamespace(w.ID)] = append(workerGroupsByName[workerNamespace(w.ID)], item)
 			}
-			workerNames = append(workerNames, name)
 		}
-
-		var repos []config.Repo
-		if cfg, err := config.Load(root); err == nil {
-			repos = cfg.Repos
+		var workerGroups []workerGroup
+		for _, name := range sortedKeys(workerGroupsByName) {
+			workerGroups = append(workerGroups, workerGroup{name: name, items: workerGroupsByName[name]})
 		}
 
 		// section items for navigable file viewer
 		si := map[string][]sectionItem{}
 
 		// workflows: one entry per workflow chain; path="" signals detail view
+		workflowGroupsByName := map[string][]sectionItem{}
 		for _, c := range chains {
-			si["workflows"] = append(si["workflows"], sectionItem{label: chainLabel(c), id: c.name, path: ""})
+			item := sectionItem{label: chainLabel(c), id: c.name, path: ""}
+			si["workflows"] = append(si["workflows"], item)
+			workflowGroupsByName[workflowNamespace(c.name)] = append(workflowGroupsByName[workflowNamespace(c.name)], item)
+		}
+		var workflowGroups []workflowGroup
+		for _, name := range sortedKeys(workflowGroupsByName) {
+			workflowGroups = append(workflowGroups, workflowGroup{name: name, items: workflowGroupsByName[name]})
 		}
 
 		// workers: actual namespaced .md files in workers/<namespace>/
-		for _, w := range allWorkers {
-			if w.FilePath == "" {
-				continue
-			}
-			label := w.ID
-			if w.Name != "" {
-				label = w.Name
-			}
-			si["workers"] = append(si["workers"], sectionItem{label: label, path: w.FilePath})
+		for _, group := range workerGroups {
+			si["workers"] = append(si["workers"], group.items...)
+		}
+
+		var repos []config.Repo
+		if cfg, err := config.Load(root); err == nil {
+			repos = cfg.Repos
 		}
 
 		// routes: ROUTER.md as a single item
@@ -124,6 +129,8 @@ func loadData(root string) tea.Cmd {
 			features:        features,
 			healthItems:     report.Checks,
 			workerNames:     workerNames,
+			workerGroups:    workerGroups,
+			workflowGroups:  workflowGroups,
 			allWorkers:      allWorkers,
 			workflows:       chains,
 			repos:           repos,
@@ -179,6 +186,44 @@ func stageDisplayName(cfg *config.Config, id string) string {
 	return cfg.StageDisplayName(cfg.ResolveStage(id))
 }
 
+func workerDisplayName(cfg *config.Config, w *workers.Worker) string {
+	if w == nil {
+		return ""
+	}
+	if cfg != nil {
+		if alias := cfg.WorkerDisplayName(w.ID); alias != "" && alias != w.ID {
+			return alias
+		}
+	}
+	if w.Name != "" {
+		return w.Name
+	}
+	return w.ID
+}
+
+func workerNamespace(id string) string {
+	if before, _, ok := strings.Cut(id, ":"); ok && before != "" {
+		return before
+	}
+	return "local"
+}
+
+func workflowNamespace(id string) string {
+	if before, _, ok := strings.Cut(id, ":"); ok && before != "" {
+		return before
+	}
+	return "local"
+}
+
+func sortedKeys[V any](values map[string]V) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
 func chainLabel(c workflowChain) string {
 	if c.label != "" {
 		return c.label
@@ -193,6 +238,10 @@ func workflowLabel(name string, chains []workflowChain) string {
 		}
 	}
 	return name
+}
+
+func workflowDisplayWithID(name string, chains []workflowChain) string {
+	return labelWithDimID(workflowLabel(name, chains), name)
 }
 
 func workflowStageLabel(name string, chains []workflowChain) string {

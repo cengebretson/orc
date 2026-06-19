@@ -7,7 +7,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cengebretson/orc/internal/config"
 	"github.com/cengebretson/orc/internal/state"
+	"github.com/cengebretson/orc/internal/workers"
 )
 
 func TestBrokenRowSurfaced(t *testing.T) {
@@ -86,6 +88,20 @@ func TestBrokenRowDoesNotPanicConsumers(t *testing.T) {
 	// a long list.
 	if dash := m.viewDashboard(); !strings.Contains(dash, "1 broken") {
 		t.Errorf("dashboard header missing broken count:\n%s", dash)
+	}
+}
+
+func TestWorkerDisplayNameUsesAliasThenNameThenID(t *testing.T) {
+	cfg := &config.Config{Aliases: config.Aliases{Workers: map[string]string{"bob": "default:bob"}}}
+
+	if got := workerDisplayName(cfg, &workers.Worker{ID: "default:bob", Name: "Bob (Developer)"}); got != "bob" {
+		t.Fatalf("workerDisplayName alias = %q, want bob", got)
+	}
+	if got := workerDisplayName(cfg, &workers.Worker{ID: "custom:jane", Name: "Jane Reviewer"}); got != "Jane Reviewer" {
+		t.Fatalf("workerDisplayName name = %q, want Jane Reviewer", got)
+	}
+	if got := workerDisplayName(cfg, &workers.Worker{ID: "custom:ci"}); got != "custom:ci" {
+		t.Fatalf("workerDisplayName id = %q, want custom:ci", got)
 	}
 }
 

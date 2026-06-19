@@ -115,6 +115,49 @@ aliases:
 	}
 }
 
+func TestInspectPackRejectsCrossPackWorkflowRefs(t *testing.T) {
+	dir := writeLocalPack(t, "hotfix", `schema: 1
+name: hotfix
+description: Fast production fix workflow
+provides:
+  workflows:
+    - id: hotfix:standard
+      path: workflow.yaml
+  workers:
+    - id: hotfix:bob
+      path: workers/bob.md
+  stages:
+    - id: hotfix:patch
+      path: stages/develop.md
+`)
+	writePackFile(t, filepath.Join(dir, "workflow.yaml"), `workflows:
+  hotfix:standard:
+    stages:
+      - name: hotfix:patch
+        worker: default:bob
+        advance: manual
+      - name: default:deploy
+        worker: hotfix:bob
+        advance: auto
+`)
+
+	report, err := workspace.InspectPack(dir)
+	if err != nil {
+		t.Fatalf("InspectPack: %v", err)
+	}
+	if report.OK() {
+		t.Fatal("InspectPack unexpectedly passed")
+	}
+	for _, want := range []string{
+		`workflow "hotfix:standard" references worker "default:bob" not provided by pack "hotfix"`,
+		`workflow "hotfix:standard" references stage "default:deploy" not provided by pack "hotfix"`,
+	} {
+		if !containsError(report.Errors, want) {
+			t.Fatalf("errors missing %q:\n%s", want, strings.Join(report.Errors, "\n"))
+		}
+	}
+}
+
 func writeLocalPack(t *testing.T, name, manifest string) string {
 	t.Helper()
 	dir := filepath.Join(t.TempDir(), name)
@@ -124,7 +167,13 @@ func writeLocalPack(t *testing.T, name, manifest string) string {
 		}
 	}
 	writePackFile(t, filepath.Join(dir, "pack.yaml"), manifest)
-	writePackFile(t, filepath.Join(dir, "workflow.yaml"), "workflows: {}\n")
+	writePackFile(t, filepath.Join(dir, "workflow.yaml"), `workflows:
+  hotfix:standard:
+    stages:
+      - name: hotfix:develop
+        worker: hotfix:bob
+        advance: manual
+`)
 	writePackFile(t, filepath.Join(dir, "workers", "bob.md"), `---
 id: hotfix:bob
 name: Bob

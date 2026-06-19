@@ -225,6 +225,7 @@ func TestDisplayNamesUseUnambiguousAliases(t *testing.T) {
 		Aliases: config.Aliases{
 			Workflows: map[string]string{"default": "default:standard"},
 			Stages:    map[string]string{"develop": "default:develop"},
+			Workers:   map[string]string{"bob": "default:bob"},
 		},
 	}
 
@@ -233,6 +234,9 @@ func TestDisplayNamesUseUnambiguousAliases(t *testing.T) {
 	}
 	if got := cfg.StageDisplayName("default:develop"); got != "develop" {
 		t.Fatalf("StageDisplayName = %q, want develop", got)
+	}
+	if got := cfg.WorkerDisplayName("default:bob"); got != "bob" {
+		t.Fatalf("WorkerDisplayName = %q, want bob", got)
 	}
 }
 

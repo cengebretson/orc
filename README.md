@@ -277,7 +277,7 @@ orc jit STORY-123 --worker default:zach "make sure the auth middleware handles t
 The agent gets the same orientation prompt as `orc next` (reads `STATE.yaml`, `TICKET.md`, `SPEC.md`), then does the task; output lands in `features/<slug>/jit/<timestamp>/`. `runtime.jit` is written before launch so the task shows up in `orc status` and the TUI:
 
 ```
-STORY-123   active   default:standard/default:develop + jit   default:bob
+STORY-123   active   default:standard · default:develop + jit   default:bob
 ```
 
 When done, the agent runs `orc mark STORY-123 jit "<summary>"`, which appends history and clears `runtime.jit`. Only one jit task runs at a time — clear it first to start another. Use `--dry` to preview and `--tmux` to send the task to the ticket's existing tmux session.

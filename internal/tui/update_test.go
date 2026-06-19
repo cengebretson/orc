@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -77,9 +78,11 @@ func testModel(t *testing.T) Model {
 		testRow("AUTH-9", "pending", "intake"),
 	}
 	m.workflows = testChains()
+	m.workflowGroups = []workflowGroup{{name: "default", items: []sectionItem{{label: "default", id: "default", path: ""}}}}
+	m.workerGroups = []workerGroup{{name: "local", items: []sectionItem{{label: "Bob", id: "bob", path: "bob.md"}}}}
 	m.sectionItems = map[string][]sectionItem{
-		"workflows": {{label: "default", path: ""}},
-		"workers":   {{label: "Bob", path: "bob.md"}},
+		"workflows": {{label: "default", id: "default", path: ""}},
+		"workers":   {{label: "Bob", id: "bob", path: "bob.md"}},
 	}
 	return m
 }
@@ -160,9 +163,18 @@ func TestHandleKeyTabCyclesSections(t *testing.T) {
 	if m.sectionFocus != "workflows" {
 		t.Errorf("second tab: focus=%q, want workflows", m.sectionFocus)
 	}
+	if m.expanded["health"] {
+		t.Error("tabbing out of an auto-expanded section should collapse it")
+	}
+	if !m.expanded["workflows"] {
+		t.Error("tab should expand the newly focused section")
+	}
 	m, _ = press(t, m, "tab", "tab")
 	if m.focusedPane != "features" {
 		t.Errorf("tab past last section should return to features, got %q", m.focusedPane)
+	}
+	if m.expanded["workers"] {
+		t.Error("tabbing out to features should collapse the last auto-expanded section")
 	}
 
 	m, _ = press(t, m, "shift+tab")
@@ -173,6 +185,9 @@ func TestHandleKeyTabCyclesSections(t *testing.T) {
 	m, _ = press(t, m, "esc")
 	if m.focusedPane != "features" {
 		t.Errorf("esc should return focus to features, got %q", m.focusedPane)
+	}
+	if m.expanded["workers"] {
+		t.Error("esc should collapse an auto-expanded focused section")
 	}
 }
 
@@ -244,7 +259,7 @@ func TestHandleKeyWorkerFileViewer(t *testing.T) {
 	}
 	m := testModel(t)
 	m.allWorkers = []*workers.Worker{{ID: "bob", Name: "Bob", Engine: "claude", FilePath: path}}
-	m.sectionItems["workers"] = []sectionItem{{label: "Bob", path: path}}
+	m.sectionItems["workers"] = []sectionItem{{label: "Bob", id: "bob", path: path}}
 
 	// shift+tab focuses last section (workers), enter opens the file viewer
 	m, _ = press(t, m, "shift+tab", "enter")
@@ -417,6 +432,53 @@ func TestHandleKeyWorkflowDetailLeftRightAliases(t *testing.T) {
 	m, _ = press(t, m, "left", "h", "left")
 	if m.wfDetailCursor != 0 {
 		t.Errorf("wfDetailCursor = %d, want clamped at 0", m.wfDetailCursor)
+	}
+}
+
+func TestWorkflowDetailScrollsSelectedRowAfterWrappedRoute(t *testing.T) {
+	m := testModel(t)
+	var steps []routeStep
+	for _, n := range []string{
+		"default:intake", "default:develop", "default:code-review",
+		"default:qa-automation", "default:pr-open", "default:evidence",
+		"default:release", "default:monitor",
+	} {
+		steps = append(steps, routeStep{name: n, label: strings.TrimPrefix(n, "default:"), advance: "auto"})
+	}
+	m.workflows = []workflowChain{{name: "default:standard", label: "default", steps: steps}}
+	m.view = viewWorkflowDetail
+	m.wfDetailName = "default:standard"
+	m.wfDetailCursor = len(steps) - 1
+	m.width = 60
+	m.height = 12
+	m.viewport = viewport.New(m.width-4, m.height-6)
+
+	m.reRenderWorkflowDetailAndScroll()
+
+	cursorLine := workflowCursorLine(m.viewport.View())
+	if cursorLine < 0 || cursorLine >= m.viewport.Height {
+		t.Fatalf("selected workflow row should be visible, cursorLine=%d height=%d\n%s", cursorLine, m.viewport.Height, ansi.Strip(m.viewport.View()))
+	}
+}
+
+func TestWorkflowDetailPageDownScrollsViewport(t *testing.T) {
+	m := testModel(t)
+	var steps []routeStep
+	for i := 0; i < 24; i++ {
+		steps = append(steps, routeStep{name: fmt.Sprintf("default:stage-%02d", i), label: fmt.Sprintf("stage-%02d", i), advance: "auto"})
+	}
+	m.workflows = []workflowChain{{name: "default:standard", label: "default", steps: steps}}
+	m.view = viewWorkflowDetail
+	m.wfDetailName = "default:standard"
+	m.width = 90
+	m.height = 12
+	m.viewport = viewport.New(m.width-4, m.height-6)
+	m.viewport.SetContent(renderWorkflowDetail(m.wfDetailName, m.workflows, nil, filepath.Join(m.root, "stages"), m.features, 0, m.width-4))
+
+	m, _ = press(t, m, "pgdown")
+
+	if m.viewport.YOffset == 0 {
+		t.Fatalf("pgdown should scroll long workflow detail vertically")
 	}
 }
 

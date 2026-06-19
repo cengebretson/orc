@@ -1,0 +1,13 @@
+schema_version: 1
+ticket: STORY-999
+slug: STORY-999-this-is-a-very-long-feature-name-that-should-truncate-in-the-dashboard
+status: active
+workflow: default:standard
+stage:
+  worker: default:bob
+  name: default:develop
+history:
+  - at: "2026-06-19T10:00:00-05:00"
+    stage: default:intake
+    worker: default:fred
+    result: ticket context loaded

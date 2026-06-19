@@ -89,10 +89,9 @@ func (m Model) viewDashboard() string {
 	left.WriteString(drawBoxLabeled(headerTitle, []string{statsLine}, leftW) + "\n")
 
 	healthFocused := m.focusedPane == "section" && m.sectionFocus == "health"
-	healthContent := m.renderHealthLines(leftInnerW - 4)
-	if issues := m.healthIssueLines(leftInnerW - 4); len(issues) > 0 {
-		healthContent = append(healthContent, "")
-		healthContent = append(healthContent, issues...)
+	healthContent := m.healthIssueLines(leftInnerW - 4)
+	if len(healthContent) == 0 {
+		healthContent = []string{styleHealthOK.Render("All checks passed")}
 	}
 	if healthFocused {
 		healthContent = append(healthContent, "", styleDim.Render("enter to view full report"))
@@ -109,20 +108,9 @@ func (m Model) viewDashboard() string {
 	wfFocused := m.focusedPane == "section" && m.sectionFocus == "workflows"
 	var wfContent []string
 	if wfFocused {
-		wfContent = renderNavigableList(m.sectionItems["workflows"], m.sectionCursor)
+		wfContent = renderGroupedWorkflowList(m.workflowGroups, m.sectionCursor)
 	} else {
-		for _, pc := range m.workflows {
-			lines := renderRouteChain(pc.steps, pc.loops, leftInnerW-4)
-			if pc.name != "" {
-				wfContent = append(wfContent, styleDim.Render(pc.name+":"))
-			}
-			wfContent = append(wfContent, lines...)
-			wfContent = append(wfContent, "")
-		}
-		// trim trailing blank
-		for len(wfContent) > 0 && wfContent[len(wfContent)-1] == "" {
-			wfContent = wfContent[:len(wfContent)-1]
-		}
+		wfContent = renderWorkflowChainGroups(m.workflows, leftInnerW-4)
 	}
 	left.WriteString(m.sectionBox("workflows", "2", "Workflows",
 		styleDim.Render(fmt.Sprintf("%d", len(m.workflows))),
@@ -131,9 +119,12 @@ func (m Model) viewDashboard() string {
 	wkFocused := m.focusedPane == "section" && m.sectionFocus == "workers"
 	var wkContent []string
 	if wkFocused {
-		wkContent = renderNavigableList(m.sectionItems["workers"], m.sectionCursor)
+		wkContent = renderGroupedWorkerList(m.workerGroups, m.sectionCursor)
 	} else {
-		wkContent = renderNameList(leftInnerW-4, m.workerNames)
+		wkContent = renderWorkerGroups(m.workerGroups, leftInnerW-4)
+		if len(wkContent) == 0 {
+			wkContent = renderNameList(leftInnerW-4, m.workerNames)
+		}
 	}
 	left.WriteString(m.sectionBox("workers", "3", "Workers",
 		styleDim.Render(fmt.Sprintf("%d", len(m.workerNames))),
@@ -498,12 +489,128 @@ func (m Model) sectionBox(key, keyStr, name, summary string, content []string, o
 func renderNavigableList(items []sectionItem, cursor int) []string {
 	var lines []string
 	for i, item := range items {
+		label := labelWithDimID(item.label, item.id)
 		if i == cursor {
-			lines = append(lines, styleHealthOK.Render("▶")+"  "+styleSubtext.Render(item.label)+
+			lines = append(lines, styleHealthOK.Render("▶")+"  "+styleSubtext.Render(label)+
 				styleDim.Render("  enter to view"))
 		} else {
-			lines = append(lines, "   "+styleDim.Render(item.label))
+			lines = append(lines, "   "+styleDim.Render(label))
 		}
+	}
+	return lines
+}
+
+func renderWorkerGroups(groups []workerGroup, maxW int) []string {
+	var lines []string
+	for _, group := range groups {
+		if len(group.items) == 0 {
+			continue
+		}
+		lines = append(lines, styleDim.Render(group.name))
+		var names []string
+		for _, item := range group.items {
+			names = append(names, item.label)
+		}
+		for _, line := range renderNameList(maxW-2, names) {
+			lines = append(lines, "  "+line)
+		}
+	}
+	return lines
+}
+
+func renderWorkflowGroups(groups []workflowGroup, maxW int) []string {
+	var lines []string
+	for _, group := range groups {
+		if len(group.items) == 0 {
+			continue
+		}
+		lines = append(lines, styleDim.Render(group.name))
+		var names []string
+		for _, item := range group.items {
+			names = append(names, item.label)
+		}
+		for _, line := range renderNameList(maxW-2, names) {
+			lines = append(lines, "  "+line)
+		}
+	}
+	return lines
+}
+
+func renderWorkflowChainGroups(chains []workflowChain, maxW int) []string {
+	grouped := map[string][]workflowChain{}
+	for _, chain := range chains {
+		grouped[workflowNamespace(chain.name)] = append(grouped[workflowNamespace(chain.name)], chain)
+	}
+
+	var lines []string
+	for _, groupName := range sortedKeys(grouped) {
+		lines = append(lines, styleDim.Render(groupName))
+		for _, chain := range grouped[groupName] {
+			if chain.name != "" {
+				lines = append(lines, "  "+workflowChainHeading(chain)+":")
+			}
+			for _, line := range renderRouteChain(chain.steps, chain.loops, maxW-2) {
+				lines = append(lines, "  "+line)
+			}
+			lines = append(lines, "")
+		}
+	}
+	for len(lines) > 0 && lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
+	}
+	return lines
+}
+
+func workflowChainHeading(c workflowChain) string {
+	return styleDim.Render(labelWithDimID(chainLabel(c), c.name))
+}
+
+func renderGroupedWorkerList(groups []workerGroup, cursor int) []string {
+	var lines []string
+	itemIdx := 0
+	for _, group := range groups {
+		if len(group.items) == 0 {
+			continue
+		}
+		lines = append(lines, styleDim.Render(group.name))
+		for _, item := range group.items {
+			label := labelWithDimID(item.label, item.id)
+			if itemIdx == cursor {
+				lines = append(lines, styleHealthOK.Render("▶")+"  "+styleSubtext.Render(label)+
+					styleDim.Render("  enter to view"))
+			} else {
+				lines = append(lines, "   "+styleDim.Render(label))
+			}
+			itemIdx++
+		}
+	}
+	if len(lines) == 0 {
+		return []string{styleDim.Render("No workers configured.")}
+	}
+	return lines
+}
+
+func renderGroupedWorkflowList(groups []workflowGroup, cursor int) []string {
+	var lines []string
+	itemIdx := 0
+	for _, group := range groups {
+		if len(group.items) == 0 {
+			continue
+		}
+		lines = append(lines, styleDim.Render(group.name))
+		for _, item := range group.items {
+			label := labelWithDimID(item.label, item.id)
+			if itemIdx == cursor {
+				lines = append(lines, styleHealthOK.Render("▶")+"  "+styleSubtext.Render(label)+
+					styleDim.Render("  enter to view"))
+			} else {
+				lines = append(lines, "   "+styleDim.Render(label))
+			}
+			itemIdx++
+		}
+	}
+	if len(lines) == 0 {
+		return []string{styleDim.Render("No workflows configured.")}
 	}
 	return lines
 }
@@ -652,19 +759,19 @@ func renderRouteChain(chain []routeStep, loops []repairLoop, maxW int) []string 
 func (m Model) renderTable(rows []*featureRow, w int, selectedIdx int) string {
 	const (
 		wTicket = 12
-		wName   = 22
-		wStatus = 20
+		wStatus = 12
 		wTmux   = 6
-		wHealth = 2
 	)
-	// fixed overhead: leading space + static columns + separators (6 × "  ")
-	fixed := 1 + wTicket + wName + wStatus + wTmux + wHealth + 6*2
+	// fixed overhead: leading space + static columns + separators (5 × "  ")
+	fixed := 1 + wTicket + wStatus + wTmux + 5*2
 	flex := w - fixed
-	if flex < 24 {
-		flex = 24
+	if flex < 48 {
+		flex = 48
 	}
-	wWorkflow := flex / 2
-	wWorker := flex - wWorkflow
+	wName := flex / 2
+	remaining := flex - wName
+	wWorkflow := remaining / 2
+	wWorker := remaining - wWorkflow
 
 	header := " " +
 		padRight(styleTableHeader.Render("Ticket"), wTicket) + "  " +
@@ -672,8 +779,7 @@ func (m Model) renderTable(rows []*featureRow, w int, selectedIdx int) string {
 		padRight(styleTableHeader.Render("Status"), wStatus) + "  " +
 		padRight(styleTableHeader.Render("Stage"), wWorkflow) + "  " +
 		padRight(styleTableHeader.Render("Worker"), wWorker) + "  " +
-		padRight(styleTableHeader.Render("Tmux"), wTmux) + "  " +
-		padRight("", wHealth)
+		padRight(styleTableHeader.Render("Tmux"), wTmux)
 
 	div := " " + styleDivider.Render(strings.Repeat("─", w-1))
 
@@ -699,7 +805,7 @@ func (m Model) renderTable(rows []*featureRow, w int, selectedIdx int) string {
 		if stageLabel == "" {
 			stageLabel = s.Stage.Name
 		}
-		stageCell := workflowLabel + "/" + stageLabel + row.stageLoopLabel
+		stageCell := workflowLabel + " › " + stageLabel + row.stageLoopLabel
 		if s.Runtime.JIT != nil {
 			stageCell += " + jit"
 		}
@@ -717,23 +823,26 @@ func (m Model) renderTable(rows []*featureRow, w int, selectedIdx int) string {
 			}
 		}
 
-		plainHealth := "·"
+		ticketCell := truncate(s.Ticket, wTicket)
 		if row.hasIssues {
-			plainHealth = "!"
+			ticketCell = truncate("! "+s.Ticket, wTicket)
 		}
 
 		if selected {
 			// Plain unstyled text so styleRowSelected background covers the full row
 			line := " " +
-				padRight(truncate(s.Ticket, wTicket), wTicket) + "  " +
+				padRight(ticketCell, wTicket) + "  " +
 				padRight(truncate(name, wName), wName) + "  " +
 				padRight(truncate(icon+" "+s.Status, wStatus), wStatus) + "  " +
 				padRight(truncate(stageCell, wWorkflow), wWorkflow) + "  " +
 				padRight(truncate(plainWorker, wWorker), wWorker) + "  " +
-				padRight(plainTmux, wTmux) + "  " +
-				padRight(plainHealth, wHealth)
+				padRight(plainTmux, wTmux)
 			lines = append(lines, styleRowSelected.Width(w).Render(line))
 		} else {
+			ticketStyled := ticketCell
+			if row.hasIssues {
+				ticketStyled = styleHealthWarn.Render(ticketCell)
+			}
 			statusCell := statusStyle(s.Status).Render(icon + " " + s.Status)
 			nameCell := styleDim.Render(truncate(name, wName))
 			workerCell := styleDim.Render(truncate(plainWorker, wWorker))
@@ -747,20 +856,13 @@ func (m Model) renderTable(rows []*featureRow, w int, selectedIdx int) string {
 			} else {
 				tmuxCell = styleTmuxNone.Render(plainTmux)
 			}
-			var healthCell string
-			if row.hasIssues {
-				healthCell = styleHealthWarn.Render(plainHealth)
-			} else {
-				healthCell = styleHealthOK.Render(plainHealth)
-			}
 			line := " " +
-				padRight(truncate(s.Ticket, wTicket), wTicket) + "  " +
+				padRight(ticketStyled, wTicket) + "  " +
 				padRight(nameCell, wName) + "  " +
 				padRight(statusCell, wStatus) + "  " +
 				padRight(truncate(stageCell, wWorkflow), wWorkflow) + "  " +
 				padRight(workerCell, wWorker) + "  " +
-				padRight(tmuxCell, wTmux) + "  " +
-				padRight(healthCell, wHealth)
+				padRight(tmuxCell, wTmux)
 			lines = append(lines, line)
 		}
 	}

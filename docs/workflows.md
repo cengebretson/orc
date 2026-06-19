@@ -136,6 +136,12 @@ Workspace configuration should satisfy these rules:
 - `loop.via` names a loop stage owned by exactly one workflow stage.
 - `loop.on_max`, when set, is `pause` or `fail`.
 
+Pack-authored workflows have one additional expectation: a pack should be
+self-contained. A workflow inside a pack should only reference stages and workers
+declared by that same pack. Once packs are installed, users can still edit the
+workspace `orc.yaml` to intentionally compose a custom workflow from resources
+provided by multiple packs.
+
 `orc` validates this configuration in the paths that would otherwise route work:
 
 - `orc doctor` reports invalid config under the `config` check.

@@ -187,6 +187,11 @@ pack list` shows installed snapshots, the source they came from, and which
 workflows are active. `orc pack show <pack>` shows one installed snapshot in
 detail.
 
+Packs are expected to be self-contained: every workflow a pack provides should
+reference only stages and workers provided by that same pack. After install, the
+workspace owns `orc.yaml`, so users may intentionally compose their own workflows
+from stages and workers installed by multiple packs.
+
 Use `orc pack install` to add packs after initialization:
 
 ```bash

@@ -4,8 +4,9 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS = -ldflags "-X main.version=$(VERSION)"
 MISE_CACHE_DIR ?= $(CURDIR)/.cache/mise
 GOCACHE ?= $(CURDIR)/.cache/go-build
+GOMODCACHE ?= $(CURDIR)/.cache/go-mod
 GOLANGCI_LINT_CACHE ?= $(CURDIR)/.cache/golangci-lint
-GO_ENV = MISE_CACHE_DIR=$(MISE_CACHE_DIR) GOCACHE=$(GOCACHE)
+GO_ENV = MISE_CACHE_DIR=$(MISE_CACHE_DIR) GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE)
 LINT_ENV = $(GO_ENV) GOLANGCI_LINT_CACHE=$(GOLANGCI_LINT_CACHE)
 
 build:

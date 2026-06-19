@@ -120,6 +120,15 @@ func (c *Config) StageDisplayName(id string) string {
 	return displayAlias(id, c.Aliases.Stages)
 }
 
+// WorkerDisplayName returns an alias for a canonical worker ID, or the canonical
+// ID if no alias points to it.
+func (c *Config) WorkerDisplayName(id string) string {
+	if c == nil {
+		return id
+	}
+	return displayAlias(id, c.Aliases.Workers)
+}
+
 func displayAlias(id string, aliases map[string]string) string {
 	if len(aliases) == 0 {
 		return id

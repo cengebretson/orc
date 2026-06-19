@@ -65,6 +65,8 @@ type dataMsg struct {
 	features        []*featureRow
 	healthItems     []doctor.Check
 	workerNames     []string
+	workerGroups    []workerGroup
+	workflowGroups  []workflowGroup
 	allWorkers      []*workers.Worker
 	workflows       []workflowChain
 	repos           []config.Repo
@@ -94,6 +96,16 @@ type repairStep struct {
 	repairs      string
 	repairsLabel string
 	maxRetries   int
+}
+
+type workerGroup struct {
+	name  string
+	items []sectionItem
+}
+
+type workflowGroup struct {
+	name  string
+	items []sectionItem
 }
 
 type workflowChain struct {
@@ -144,6 +156,8 @@ type Model struct {
 	features        []*featureRow
 	healthItems     []doctor.Check
 	workerNames     []string
+	workerGroups    []workerGroup
+	workflowGroups  []workflowGroup
 	allWorkers      []*workers.Worker
 	workflows       []workflowChain
 	repos           []config.Repo
@@ -160,10 +174,11 @@ type Model struct {
 	wfDetailCursor int
 
 	// section pane navigation
-	focusedPane   string // "features" or "section"
-	sectionFocus  string // "workflows" | "workers" | "routes"
-	sectionCursor int
-	sectionItems  map[string][]sectionItem
+	focusedPane         string // "features" or "section"
+	sectionFocus        string // "workflows" | "workers" | "routes"
+	sectionCursor       int
+	sectionItems        map[string][]sectionItem
+	autoExpandedSection string
 
 	// detail
 	detail       *featureRow

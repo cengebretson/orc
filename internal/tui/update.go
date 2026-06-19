@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/cengebretson/orc/internal/config"
@@ -46,6 +47,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.features = msg.features
 		m.healthItems = msg.healthItems
 		m.workerNames = msg.workerNames
+		m.workerGroups = msg.workerGroups
+		m.workflowGroups = msg.workflowGroups
 		m.allWorkers = msg.allWorkers
 		m.workflows = msg.workflows
 		m.repos = msg.repos
@@ -143,9 +146,7 @@ func (m Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.search.SetValue("")
 			m.cursor = 0
 		} else if m.focusedPane == "section" {
-			m.focusedPane = "features"
-			m.sectionFocus = ""
-			m.sectionCursor = 0
+			m.blurSectionFocus()
 		}
 
 	case "1":
@@ -306,29 +307,47 @@ func (m *Model) cycleSectionFocus(forward bool) {
 		next = idx + 1
 	}
 	if next < 0 || next >= len(navigable) {
-		m.focusedPane = "features"
-		m.sectionFocus = ""
+		m.blurSectionFocus()
 	} else {
 		m.focusSection(navigable[next])
 	}
 }
 
 func (m *Model) focusSection(name string) {
+	m.collapseAutoExpandedSection()
 	m.focusedPane = "section"
 	m.sectionFocus = name
 	m.sectionCursor = 0
+	if !m.expanded[name] {
+		m.autoExpandedSection = name
+	}
 	m.expanded[name] = true
+}
+
+func (m *Model) blurSectionFocus() {
+	m.collapseAutoExpandedSection()
+	m.focusedPane = "features"
+	m.sectionFocus = ""
+	m.sectionCursor = 0
+}
+
+func (m *Model) collapseAutoExpandedSection() {
+	if m.autoExpandedSection != "" {
+		m.expanded[m.autoExpandedSection] = false
+		m.autoExpandedSection = ""
+	}
 }
 
 // toggleSection expands or collapses a dashboard section; collapsing the
 // focused section returns focus to the features pane.
 func (m *Model) toggleSection(name string) {
 	wasExpanded := m.expanded[name]
+	if m.autoExpandedSection == name {
+		m.autoExpandedSection = ""
+	}
 	m.expanded[name] = !wasExpanded
 	if wasExpanded && m.sectionFocus == name {
-		m.focusedPane = "features"
-		m.sectionFocus = ""
-		m.sectionCursor = 0
+		m.blurSectionFocus()
 	}
 }
 
@@ -545,9 +564,7 @@ func (m *Model) reRenderWorkflowDetail() {
 func (m *Model) reRenderWorkflowDetailAndScroll() {
 	content := renderWorkflowDetail(m.wfDetailName, m.workflows, m.allWorkers, filepath.Join(m.root, "stages"), m.features, m.wfDetailCursor, m.width-4)
 	m.viewport.SetContent(content)
-	// Stage rows begin after the route box (~8 lines) and the table header+divider (2 lines).
-	const headerLines = 10
-	targetLine := headerLines + m.wfDetailCursor
+	targetLine := workflowCursorLine(content)
 	viewH := m.viewport.Height
 	curY := m.viewport.YOffset
 	if targetLine < curY {
@@ -555,6 +572,15 @@ func (m *Model) reRenderWorkflowDetailAndScroll() {
 	} else if targetLine >= curY+viewH {
 		m.viewport.SetYOffset(targetLine - viewH + 1)
 	}
+}
+
+func workflowCursorLine(content string) int {
+	for i, line := range strings.Split(content, "\n") {
+		if strings.Contains(line, "▶") {
+			return i
+		}
+	}
+	return 0
 }
 
 // stageViewerTitle builds the "stage · step N of M · advance · K workflows"

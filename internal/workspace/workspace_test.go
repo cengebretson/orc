@@ -398,7 +398,7 @@ provides:
 	if err == nil {
 		t.Fatal("InstallPack returned nil error")
 	}
-	if !strings.Contains(err.Error(), `workflow workflow.yaml does not define declared workflow "hotfix:standard"`) {
+	if !strings.Contains(err.Error(), `workflow workflow.yaml defines undeclared workflow "hotfix:other"`) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

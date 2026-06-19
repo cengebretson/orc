@@ -99,8 +99,56 @@ func validatePackManifest(root string, manifest PackManifestV1) []string {
 	errs = append(errs, validateAliases("workflow", manifest.Aliases.Workflows, provided["workflow"])...)
 	errs = append(errs, validateAliases("worker", manifest.Aliases.Workers, provided["worker"])...)
 	errs = append(errs, validateAliases("stage", manifest.Aliases.Stages, provided["stage"])...)
+	errs = append(errs, validatePackWorkflowClosure(root, manifest, provided)...)
 
 	sort.Strings(errs)
+	return errs
+}
+
+func validatePackWorkflowClosure(root string, manifest PackManifestV1, provided map[string]map[string]bool) []string {
+	var errs []string
+	declaredWorkflows := map[string]bool{}
+	for _, workflow := range manifest.Provides.Workflows {
+		declaredWorkflows[workflow.ID] = true
+	}
+	seenPath := map[string]bool{}
+	for _, workflow := range manifest.Provides.Workflows {
+		if strings.TrimSpace(workflow.Path) == "" || seenPath[workflow.Path] {
+			continue
+		}
+		seenPath[workflow.Path] = true
+		data, err := os.ReadFile(filepath.Join(root, filepath.Clean(workflow.Path)))
+		if err != nil {
+			continue
+		}
+		var parsed workflowFileConfig
+		if err := yaml.Unmarshal(data, &parsed); err != nil {
+			errs = append(errs, fmt.Sprintf("workflow %s: parsing workflow file: %v", workflow.Path, err))
+			continue
+		}
+		for workflowID, workflowDef := range parsed.Workflows {
+			if !declaredWorkflows[workflowID] {
+				errs = append(errs, fmt.Sprintf("workflow %s defines undeclared workflow %q", workflow.Path, workflowID))
+				continue
+			}
+			for _, stage := range workflowDef.Stages {
+				if stage.Name != "" && !provided["stage"][stage.Name] {
+					errs = append(errs, fmt.Sprintf("workflow %q references stage %q not provided by pack %q", workflowID, stage.Name, manifest.Name))
+				}
+				if stage.Worker != "" && !provided["worker"][stage.Worker] {
+					errs = append(errs, fmt.Sprintf("workflow %q references worker %q not provided by pack %q", workflowID, stage.Worker, manifest.Name))
+				}
+				if stage.Loop != nil {
+					if stage.Loop.Via != "" && !provided["stage"][stage.Loop.Via] {
+						errs = append(errs, fmt.Sprintf("workflow %q references loop stage %q not provided by pack %q", workflowID, stage.Loop.Via, manifest.Name))
+					}
+					if stage.Loop.Worker != "" && !provided["worker"][stage.Loop.Worker] {
+						errs = append(errs, fmt.Sprintf("workflow %q references loop worker %q not provided by pack %q", workflowID, stage.Loop.Worker, manifest.Name))
+					}
+				}
+			}
+		}
+	}
 	return errs
 }
 
