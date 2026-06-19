@@ -25,6 +25,8 @@ workflows:
 aliases:
   workflows:
     default: default:standard
+  stages:
+    code-review: default:code-review
 `)
 	writeFile(t, filepath.Join(root, "workers", "default", "bob.md"), `---
 id: default:bob
@@ -62,8 +64,8 @@ runtime:
 	if f.WorkerName != "Bob Developer" {
 		t.Fatalf("WorkerName = %q, want Bob Developer", f.WorkerName)
 	}
-	if f.Workflow != "default" {
-		t.Fatalf("Workflow = %q, want default", f.Workflow)
+	if f.Workflow != "default:standard" {
+		t.Fatalf("Workflow = %q, want default:standard", f.Workflow)
 	}
 	if f.StageLoopLabel != " (2/3)" {
 		t.Fatalf("StageLoopLabel = %q, want (2/3)", f.StageLoopLabel)

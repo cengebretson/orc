@@ -67,11 +67,19 @@ func (m Model) renderDetailBody() string {
 	if workerLabel == "" {
 		workerLabel = summary.WorkerID
 	}
+	workflowLabel := m.detail.workflowLabel
+	if workflowLabel == "" {
+		workflowLabel = summary.Workflow
+	}
+	stageLabel := m.detail.stageLabel
+	if stageLabel == "" {
+		stageLabel = summary.Stage
+	}
 	fields := []struct{ label, value string }{
 		{" Ticket  ", s.Ticket},
 		{" Status  ", statusStyle(s.Status).Render(statusIcon(s.Status) + " " + s.Status)},
-		{" Workflow", summary.Workflow},
-		{" Stage   ", summary.Stage + summary.StageLoopLabel},
+		{" Workflow", workflowLabel},
+		{" Stage   ", stageLabel + summary.StageLoopLabel},
 		{" Worker  ", workerLabel},
 	}
 	for _, f := range fields {
@@ -101,11 +109,12 @@ func (m Model) renderDetailBody() string {
 		)
 	}
 	if summary.NextStage != "" {
+		nextStage := workflowStageLabel(summary.NextStage, m.workflows)
 		var nextVal string
 		if summary.NextAdvance == "auto" {
-			nextVal = styleHealthOK.Render("→ "+summary.NextStage) + styleDim.Render("  auto")
+			nextVal = styleHealthOK.Render("→ "+nextStage) + styleDim.Render("  auto")
 		} else {
-			nextVal = styleStatusWaiting.Render("→ "+summary.NextStage) + styleDim.Render("  awaiting approval")
+			nextVal = styleStatusWaiting.Render("→ "+nextStage) + styleDim.Render("  awaiting approval")
 		}
 		stateLines = append(stateLines, fmt.Sprintf("%s  %s",
 			styleDetailLabel.Render(" Next    "), nextVal))
@@ -254,7 +263,7 @@ func (m Model) viewWorkflowDetailPage() string {
 	var b strings.Builder
 	title := styleDetailTitle.Render(" Workflows") +
 		styleDim.Render(" · ") +
-		styleSubtext.Render(m.wfDetailName+" ")
+		styleSubtext.Render(workflowLabel(m.wfDetailName, m.workflows)+" ")
 	b.WriteString("\n" + drawBox(title, nil, outerW) + "\n")
 	b.WriteString(m.viewport.View())
 	help := strings.Join([]string{
@@ -427,7 +436,15 @@ func renderWorkerFile(path string, features []*featureRow, width int) (string, e
 				if wf == "" {
 					wf = "default"
 				}
-				stage := styleDim.Render(wf + "/" + row.s.Stage.Name)
+				workflowLabel := row.workflowLabel
+				if workflowLabel == "" {
+					workflowLabel = wf
+				}
+				stageLabel := row.stageLabel
+				if stageLabel == "" {
+					stageLabel = row.s.Stage.Name
+				}
+				stage := styleDim.Render(workflowLabel + "/" + stageLabel)
 				activeRows = append(activeRows, "  "+ticket+"  "+stage)
 			}
 		}
@@ -476,7 +493,11 @@ func renderWorkflowDetail(name string, chains []workflowChain, allWorkers []*wor
 			continue
 		}
 		if row.workflow == name {
-			stageCounts[row.s.Stage.Name]++
+			stageName := row.stage
+			if stageName == "" {
+				stageName = row.s.Stage.Name
+			}
+			stageCounts[stageName]++
 		}
 	}
 
@@ -567,7 +588,7 @@ func renderWorkflowDetail(name string, chains []workflowChain, allWorkers []*wor
 			}
 			lines = append(lines, cursor+
 				padRight(stageExists(step.name), wCheck)+"  "+
-				padRight(styleSubtext.Render(truncate(step.name, wStageName)), wStageName)+"  "+
+				padRight(styleSubtext.Render(truncate(stepLabel(step), wStageName)), wStageName)+"  "+
 				padRight(workerLabel(step.workerID), wWorker)+"  "+
 				padRight(advVal, wAdvance)+"  "+
 				activeVal)
@@ -580,7 +601,7 @@ func renderWorkflowDetail(name string, chains []workflowChain, allWorkers []*wor
 	if len(chain.repairSteps) > 0 {
 		repairAsSteps := make([]routeStep, len(chain.repairSteps))
 		for i, rs := range chain.repairSteps {
-			repairAsSteps[i] = routeStep{name: rs.name, advance: rs.advance, workerID: rs.workerID}
+			repairAsSteps[i] = routeStep{name: rs.name, label: rs.label, advance: rs.advance, workerID: rs.workerID}
 		}
 		rawRows := stageRows(repairAsSteps, len(chain.steps))
 		// rawRows is [header, divider, row0, row1, ...]
@@ -590,9 +611,9 @@ func renderWorkflowDetail(name string, chains []workflowChain, allWorkers []*wor
 		repairLines = append(repairLines, rawRows[:2]...) // header + divider
 		for i, rs := range chain.repairSteps {
 			repairLines = append(repairLines, rawRows[2+i])
-			detail := fmt.Sprintf("repairs %s", rs.repairs)
+			detail := fmt.Sprintf("repairs %s", repairTargetLabel(rs))
 			if rs.maxRetries > 0 {
-				detail = fmt.Sprintf("repairs %s · max %d", rs.repairs, rs.maxRetries)
+				detail = fmt.Sprintf("repairs %s · max %d", repairTargetLabel(rs), rs.maxRetries)
 			}
 			repairLines = append(repairLines, annotationIndent+styleDim.Render(detail))
 		}

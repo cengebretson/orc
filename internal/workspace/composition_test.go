@@ -157,3 +157,28 @@ func TestValidatePackComposition_RejectsConflictingAliasTargets(t *testing.T) {
 		t.Fatalf("unexpected conflict message: %s", got)
 	}
 }
+
+func TestValidatePackComposition_RejectsDuplicateAliasTargets(t *testing.T) {
+	manifests := []PackManifestV1{
+		{
+			Name: "default",
+			Aliases: PackAliases{
+				Workers: map[string]string{"bob": "default:bob"},
+			},
+		},
+		{
+			Name: "default-plus",
+			Aliases: PackAliases{
+				Workers: map[string]string{"developer": "default:bob"},
+			},
+		},
+	}
+
+	err := validatePackComposition([]string{"default", "default-plus"}, manifests)
+	if err == nil {
+		t.Fatal("validatePackComposition returned nil error")
+	}
+	if got := err.Error(); !strings.Contains(got, `worker aliases "bob" and "developer" both point to default:bob`) {
+		t.Fatalf("unexpected conflict message: %s", got)
+	}
+}

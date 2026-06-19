@@ -158,10 +158,30 @@ func validatePackAgainstConfig(cfg *config.Config, manifest PackManifestV1) erro
 }
 
 func checkAliasMerge(kind string, existing, next map[string]string) error {
-	for alias, target := range next {
+	targetOwners := map[string]string{}
+	existingAliases := make([]string, 0, len(existing))
+	for alias := range existing {
+		existingAliases = append(existingAliases, alias)
+	}
+	sort.Strings(existingAliases)
+	for _, alias := range existingAliases {
+		target := existing[alias]
+		targetOwners[target] = alias
+	}
+	nextAliases := make([]string, 0, len(next))
+	for alias := range next {
+		nextAliases = append(nextAliases, alias)
+	}
+	sort.Strings(nextAliases)
+	for _, alias := range nextAliases {
+		target := next[alias]
 		if prev, ok := existing[alias]; ok && prev != target {
 			return fmt.Errorf("%s alias %q points to both %s and %s", kind, alias, prev, target)
 		}
+		if prevAlias, ok := targetOwners[target]; ok && prevAlias != alias {
+			return fmt.Errorf("%s aliases %q and %q both point to %s", kind, prevAlias, alias, target)
+		}
+		targetOwners[target] = alias
 	}
 	return nil
 }

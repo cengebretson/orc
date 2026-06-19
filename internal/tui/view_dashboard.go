@@ -572,7 +572,7 @@ func renderRouteChain(chain []routeStep, loops []repairLoop, maxW int) []string 
 	row := ""
 	rowW := 0
 	for i, step := range chain {
-		chip := styleSubtext.Render(step.name)
+		chip := styleSubtext.Render(stepLabel(step))
 		chipW := lipgloss.Width(chip)
 
 		var arrow string
@@ -617,7 +617,11 @@ func renderRouteChain(chain []routeStep, loops []repairLoop, maxW int) []string 
 			if !ok {
 				continue
 			}
-			label := styleStatusWaiting.Render("↺ ") + styleSubtext.Render(lp.name)
+			loopLabel := lp.label
+			if loopLabel == "" {
+				loopLabel = lp.name
+			}
+			label := styleStatusWaiting.Render("↺ ") + styleSubtext.Render(loopLabel)
 			annotations = append(annotations, loopAnnotation{offset: offset, label: label})
 		}
 		// sort by offset so we build the line left-to-right
@@ -687,7 +691,15 @@ func (m Model) renderTable(rows []*featureRow, w int, selectedIdx int) string {
 
 		icon := statusIcon(s.Status)
 		name := strings.TrimPrefix(s.Slug, s.Ticket+"-")
-		stageCell := row.workflow + "/" + s.Stage.Name + row.stageLoopLabel
+		workflowLabel := row.workflowLabel
+		if workflowLabel == "" {
+			workflowLabel = row.workflow
+		}
+		stageLabel := row.stageLabel
+		if stageLabel == "" {
+			stageLabel = s.Stage.Name
+		}
+		stageCell := workflowLabel + "/" + stageLabel + row.stageLoopLabel
 		if s.Runtime.JIT != nil {
 			stageCell += " + jit"
 		}

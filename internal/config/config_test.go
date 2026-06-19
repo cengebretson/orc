@@ -166,6 +166,10 @@ func TestLoad_WorkflowAliasAccessors(t *testing.T) {
 aliases:
   workflows:
     default: default:standard
+  stages:
+    intake: default:intake
+    develop: default:develop
+    code-review: default:code-review
 workflows:
   default:standard:
     description: Namespaced default workflow
@@ -207,6 +211,57 @@ workflows:
 	if !ok || owner != "default:develop" {
 		t.Fatalf("OwnerStage alias = %q, %v", owner, ok)
 	}
+	if got := cfg.NextStage("default", "intake"); got != "default:develop" {
+		t.Fatalf("NextStage with stage alias = %q", got)
+	}
+	sc, ok = cfg.StageConfig("default", "develop")
+	if !ok || sc.Name != "default:develop" {
+		t.Fatalf("StageConfig with stage alias = %+v, %v", sc, ok)
+	}
+}
+
+func TestDisplayNamesUseUnambiguousAliases(t *testing.T) {
+	cfg := &config.Config{
+		Aliases: config.Aliases{
+			Workflows: map[string]string{"default": "default:standard"},
+			Stages:    map[string]string{"develop": "default:develop"},
+		},
+	}
+
+	if got := cfg.WorkflowDisplayName("default:standard"); got != "default" {
+		t.Fatalf("WorkflowDisplayName = %q, want default", got)
+	}
+	if got := cfg.StageDisplayName("default:develop"); got != "develop" {
+		t.Fatalf("StageDisplayName = %q, want develop", got)
+	}
+}
+
+func TestValidate_AliasTargetsMustBeUnique(t *testing.T) {
+	cfg := &config.Config{
+		Settings: config.Settings{DefaultWorkflow: "default:standard"},
+		Aliases: config.Aliases{
+			Workflows: map[string]string{
+				"default": "default:standard",
+				"main":    "default:standard",
+			},
+			Stages: map[string]string{
+				"develop": "default:develop",
+				"dev":     "default:develop",
+			},
+			Workers: map[string]string{
+				"bob":       "default:bob",
+				"developer": "default:bob",
+			},
+		},
+		Workflows: map[string]config.WorkflowDef{
+			"default:standard": {Stages: []config.StageDef{{Name: "default:develop", Worker: "default:bob", Advance: "auto"}}},
+		},
+	}
+
+	errs := config.Validate(cfg, []string{"default:bob"})
+	assertValidationError(t, errs, "aliases.workflows.main", `alias target "default:standard" is already used by alias "default"`)
+	assertValidationError(t, errs, "aliases.stages.develop", `alias target "default:develop" is already used by alias "dev"`)
+	assertValidationError(t, errs, "aliases.workers.developer", `alias target "default:bob" is already used by alias "bob"`)
 }
 
 func TestLoad_NextStage(t *testing.T) {

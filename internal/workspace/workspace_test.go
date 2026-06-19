@@ -489,6 +489,48 @@ aliases:
 	}
 }
 
+func TestPackInstall_RejectsDuplicateAliasTargets(t *testing.T) {
+	packDir := writeLocalPack(t, "hotfix", `schema: 1
+name: hotfix
+description: Fast production fix workflow
+provides:
+  workflows:
+    - id: hotfix:standard
+      path: workflow.yaml
+  workers:
+    - id: hotfix:bob
+      path: workers/bob.md
+  stages:
+    - id: hotfix:develop
+      path: stages/develop.md
+aliases:
+  workers:
+    bob: hotfix:bob
+    developer: hotfix:bob
+`)
+	writePackFile(t, filepath.Join(packDir, "workflow.yaml"), `workflows:
+  "hotfix:standard":
+    description: Fast production fix workflow
+    stages:
+      - name: hotfix:develop
+        worker: hotfix:bob
+        advance: auto
+`)
+
+	dir := t.TempDir()
+	if err := workspace.Init(workspace.InitOptions{Root: dir}); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+
+	err := workspace.InstallPack(workspace.PackInstallOptions{Root: dir, Pack: packDir})
+	if err == nil {
+		t.Fatal("InstallPack returned nil error")
+	}
+	if !strings.Contains(err.Error(), `worker aliases "bob" and "developer" both point to hotfix:bob`) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestWork_CreatesFeatureFolder(t *testing.T) {
 	dir := t.TempDir()
 

@@ -109,10 +109,13 @@ func collectDir(root, dir string, archived bool, cfg *config.Config, allWorkers 
 
 func resolveWorkflow(cfg *config.Config, s *state.State) string {
 	if s.Workflow != "" {
+		if cfg != nil {
+			return cfg.ResolveWorkflow(s.Workflow)
+		}
 		return s.Workflow
 	}
 	if cfg != nil && cfg.DefaultWorkflow() != "" {
-		return cfg.DefaultWorkflow()
+		return cfg.ResolveWorkflow(cfg.DefaultWorkflow())
 	}
 	return "default"
 }
@@ -153,6 +156,9 @@ func loopCountSuffix(cfg *config.Config, workflow, stageName string, s *state.St
 		return ""
 	}
 	count := s.StageCounts[stageName]
+	if count == 0 {
+		count = s.StageCounts[cfg.ResolveStage(stageName)]
+	}
 	if count == 0 {
 		return ""
 	}

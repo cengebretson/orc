@@ -270,6 +270,23 @@ func TestRenderTable(t *testing.T) {
 	}
 }
 
+func TestRenderTableUsesAliasLabels(t *testing.T) {
+	row := testRow("STORY-1", "active", "default:develop")
+	row.workflow = "default:standard"
+	row.workflowLabel = "default"
+	row.stageLabel = "develop"
+
+	var m Model
+	out := ansi.Strip(m.renderTable([]*featureRow{row}, 140, 0))
+
+	if !strings.Contains(out, "default/develop") {
+		t.Fatalf("stage cell missing alias labels:\n%s", out)
+	}
+	if strings.Contains(out, "default:standard/default:develop") {
+		t.Fatalf("stage cell leaked canonical IDs:\n%s", out)
+	}
+}
+
 func TestViewDetailShowsTimingSection(t *testing.T) {
 	row := testRow("STORY-1", "active", "develop")
 	row.featureDir = t.TempDir()
@@ -375,6 +392,50 @@ func TestRenderWorkflowDetail(t *testing.T) {
 	// develop.md exists, code-review.md does not
 	if !strings.Contains(out, "✓") || !strings.Contains(out, "✗") {
 		t.Error("stage file existence markers missing")
+	}
+}
+
+func TestRenderWorkflowDetailUsesAliasLabels(t *testing.T) {
+	stagesDir := t.TempDir()
+	stagePath := filepath.Join(stagesDir, "default", "develop.md")
+	if err := os.MkdirAll(filepath.Dir(stagePath), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(stagePath, []byte("# develop"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	chains := []workflowChain{{
+		name:  "default:standard",
+		label: "default",
+		steps: []routeStep{
+			{name: "default:develop", label: "develop", advance: "manual", workerID: "default:bob"},
+		},
+		loops: []repairLoop{{name: "default:code-review", label: "code-review", target: "default:develop"}},
+		repairSteps: []repairStep{{
+			name:         "default:code-review",
+			label:        "code-review",
+			workerID:     "default:zach",
+			advance:      "auto",
+			repairs:      "default:develop",
+			repairsLabel: "develop",
+			maxRetries:   3,
+		}},
+	}}
+	features := []*featureRow{{
+		s:        &state.State{Ticket: "STORY-1", Stage: state.Stage{Name: "default:develop"}},
+		workflow: "default:standard",
+		stage:    "default:develop",
+	}}
+
+	out := ansi.Strip(renderWorkflowDetail("default:standard", chains, nil, stagesDir, features, 0, 100))
+
+	for _, want := range []string{"develop", "code-review", "repairs develop · max 3"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("workflow detail missing alias label %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "default:develop") || strings.Contains(out, "default:code-review") {
+		t.Fatalf("workflow detail leaked canonical stage IDs:\n%s", out)
 	}
 }
 

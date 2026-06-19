@@ -144,9 +144,21 @@ func validateResources(root, packName, kind string, resources []PackResource, se
 
 func validateAliases(kind string, aliases map[string]string, provided map[string]bool) []string {
 	var errs []string
-	for alias, target := range aliases {
+	targetOwners := map[string]string{}
+	keys := make([]string, 0, len(aliases))
+	for alias := range aliases {
+		keys = append(keys, alias)
+	}
+	sort.Strings(keys)
+	for _, alias := range keys {
+		target := aliases[alias]
 		if !validPackName(alias) {
 			errs = append(errs, fmt.Sprintf("%s alias %q must use lowercase letters, numbers, and hyphens only", kind, alias))
+		}
+		if previous, ok := targetOwners[target]; ok {
+			errs = append(errs, fmt.Sprintf("%s aliases %q and %q both point to %s", kind, previous, alias, target))
+		} else {
+			targetOwners[target] = alias
 		}
 		if !validResourceID(target) {
 			errs = append(errs, fmt.Sprintf("%s alias %q target %q must use <pack>:<resource>", kind, alias, target))

@@ -352,9 +352,13 @@ func (m *Model) openSectionItem() {
 		m.charSheetWorker = workerForPath(f.path, m.allWorkers)
 		m.openViewer(workerRenderer(f.path, m.features), f.label, sectionLabel(m.sectionFocus), viewDashboard)
 	case "workflows":
-		m.wfDetailName = f.label
+		workflowName := f.id
+		if workflowName == "" {
+			workflowName = f.label
+		}
+		m.wfDetailName = workflowName
 		m.wfDetailCursor = 0
-		content := renderWorkflowDetail(f.label, m.workflows, m.allWorkers, filepath.Join(m.root, "stages"), m.features, 0, m.width-4)
+		content := renderWorkflowDetail(workflowName, m.workflows, m.allWorkers, filepath.Join(m.root, "stages"), m.features, 0, m.width-4)
 		m.viewport = viewport.New(m.width-4, m.height-6)
 		m.viewport.SetContent(content)
 		m.view = viewWorkflowDetail
@@ -561,7 +565,7 @@ func stageViewerTitle(stageName, advance string, stepNum, total int, chains []wo
 	if wfCount == 1 {
 		wfWord = "workflow"
 	}
-	return fmt.Sprintf("%s · step %d of %d · %s · %d %s", stageName, stepNum, total, advance, wfCount, wfWord)
+	return fmt.Sprintf("%s · step %d of %d · %s · %d %s", workflowStageLabel(stageName, chains), stepNum, total, advance, wfCount, wfWord)
 }
 
 // loadViewerStage loads the stage at m.wfDetailCursor (in pipeline order) into

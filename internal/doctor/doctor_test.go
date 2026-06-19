@@ -155,6 +155,47 @@ engine: claude
 	}
 }
 
+func TestRunWithOptionsReportsDuplicateAliasTargets(t *testing.T) {
+	root := t.TempDir()
+	writeDoctorFile(t, filepath.Join(root, "orc.yaml"), `
+settings:
+  default_workflow: default:standard
+workflows:
+  default:standard:
+    stages:
+      - name: default:develop
+        worker: default:bob
+        advance: auto
+aliases:
+  stages:
+    develop: default:develop
+    dev: default:develop
+`)
+	writeDoctorFile(t, filepath.Join(root, "workers", "default", "bob.md"), `---
+id: default:bob
+name: Bob
+engine: codex
+---
+`)
+
+	report := doctor.RunWithOptions(root, doctor.Options{
+		LookPath: func(name string) (string, error) {
+			return "/bin/" + name, nil
+		},
+	})
+
+	check := findCheck(report, "config", "aliases.stages.develop")
+	if check == nil {
+		t.Fatal("duplicate alias target check not found")
+	}
+	if check.Status != doctor.Fail {
+		t.Fatalf("config status = %v, want Fail", check.Status)
+	}
+	if check.Detail != `alias target "default:develop" is already used by alias "dev"` {
+		t.Fatalf("config detail = %q", check.Detail)
+	}
+}
+
 func TestRunWithOptionsReportsStaleStateLock(t *testing.T) {
 	root := t.TempDir()
 	featureDir := filepath.Join(root, "features", "TICKET-1")

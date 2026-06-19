@@ -64,6 +64,9 @@ func Build(root, featureDir string, s *state.State, opts Options) Summary {
 	if workflow == "" {
 		workflow = "default"
 	}
+	if cfg != nil {
+		workflow = cfg.ResolveWorkflow(workflow)
+	}
 
 	workerID := s.Stage.Worker
 	if workerID == "" && cfg != nil {
@@ -133,6 +136,9 @@ func loopCountSuffix(cfg *config.Config, workflow, stageName string, s *state.St
 		return ""
 	}
 	count := s.StageCounts[stageName]
+	if count == 0 {
+		count = s.StageCounts[cfg.ResolveStage(stageName)]
+	}
 	if count == 0 {
 		return ""
 	}

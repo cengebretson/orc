@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -43,6 +44,10 @@ func Validate(cfg *Config, workerIDs []string) ValidationErrors {
 	}
 
 	var errs ValidationErrors
+	errs = append(errs, validateAliasTargets("aliases.workflows", cfg.Aliases.Workflows)...)
+	errs = append(errs, validateAliasTargets("aliases.stages", cfg.Aliases.Stages)...)
+	errs = append(errs, validateAliasTargets("aliases.workers", cfg.Aliases.Workers)...)
+
 	if len(cfg.Workflows) > 0 {
 		defaultWorkflow := cfg.ResolveWorkflow(cfg.DefaultWorkflow())
 		if defaultWorkflow == "" {
@@ -126,6 +131,28 @@ func Validate(cfg *Config, workerIDs []string) ValidationErrors {
 		}
 	}
 
+	return errs
+}
+
+func validateAliasTargets(path string, aliases map[string]string) ValidationErrors {
+	seen := map[string]string{}
+	var errs ValidationErrors
+	keys := make([]string, 0, len(aliases))
+	for alias := range aliases {
+		keys = append(keys, alias)
+	}
+	sort.Strings(keys)
+	for _, alias := range keys {
+		target := aliases[alias]
+		if previous, ok := seen[target]; ok {
+			errs = append(errs, ValidationError{
+				Path:    path + "." + alias,
+				Message: fmt.Sprintf("alias target %q is already used by alias %q", target, previous),
+			})
+			continue
+		}
+		seen[target] = alias
+	}
 	return errs
 }
 

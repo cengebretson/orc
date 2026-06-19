@@ -84,6 +84,37 @@ aliases:
 	}
 }
 
+func TestInspectPackRejectsDuplicateAliasTargets(t *testing.T) {
+	dir := writeLocalPack(t, "hotfix", `schema: 1
+name: hotfix
+provides:
+  workflows:
+    - id: hotfix:standard
+      path: workflow.yaml
+  workers:
+    - id: hotfix:bob
+      path: workers/bob.md
+  stages:
+    - id: hotfix:develop
+      path: stages/develop.md
+aliases:
+  stages:
+    dev: hotfix:develop
+    develop: hotfix:develop
+`)
+
+	report, err := workspace.InspectPack(dir)
+	if err != nil {
+		t.Fatalf("InspectPack: %v", err)
+	}
+	if report.OK() {
+		t.Fatal("InspectPack unexpectedly passed")
+	}
+	if !containsError(report.Errors, `stage aliases "dev" and "develop" both point to hotfix:develop`) {
+		t.Fatalf("errors missing duplicate alias target:\n%s", strings.Join(report.Errors, "\n"))
+	}
+}
+
 func writeLocalPack(t *testing.T, name, manifest string) string {
 	t.Helper()
 	dir := filepath.Join(t.TempDir(), name)

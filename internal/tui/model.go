@@ -75,25 +75,30 @@ type dataMsg struct {
 
 type routeStep struct {
 	name     string
+	label    string
 	advance  string // "auto" or "manual"
 	workerID string
 }
 
 type repairLoop struct {
 	name   string
+	label  string
 	target string // stage in main chain it loops back to
 }
 
 type repairStep struct {
-	name       string
-	workerID   string
-	advance    string
-	repairs    string
-	maxRetries int
+	name         string
+	label        string
+	workerID     string
+	advance      string
+	repairs      string
+	repairsLabel string
+	maxRetries   int
 }
 
 type workflowChain struct {
 	name        string
+	label       string
 	description string
 	steps       []routeStep
 	loops       []repairLoop
@@ -102,6 +107,7 @@ type workflowChain struct {
 
 type sectionItem struct {
 	label string
+	id    string
 	path  string
 }
 
@@ -111,6 +117,9 @@ type featureRow struct {
 	s              *state.State
 	featureDir     string
 	workflow       string
+	stage          string
+	workflowLabel  string
+	stageLabel     string
 	stageLoopLabel string
 	workerName     string
 	tmuxLive       bool

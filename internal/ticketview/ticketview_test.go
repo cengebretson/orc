@@ -29,6 +29,9 @@ workflows:
 aliases:
   workflows:
     default: default:standard
+  stages:
+    code-review: default:code-review
+    qa: default:qa
 `)
 	writeFile(t, filepath.Join(root, "workers", "default", "zach.md"), `---
 id: default:zach
@@ -54,8 +57,8 @@ model: gpt-5
 		AttachHint:    func(session, window string) string { return session + ":" + window },
 	})
 
-	if summary.Workflow != "default" {
-		t.Fatalf("Workflow = %q, want default", summary.Workflow)
+	if summary.Workflow != "default:standard" {
+		t.Fatalf("Workflow = %q, want default:standard", summary.Workflow)
 	}
 	if summary.WorkerID != "default:zach" {
 		t.Fatalf("WorkerID = %q, want default:zach", summary.WorkerID)

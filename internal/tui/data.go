@@ -28,7 +28,12 @@ func loadData(root string) tea.Cmd {
 			inThisChain := map[string]bool{}
 			for _, stageName := range stages {
 				sc, _ := workflowCfg.StageConfig(wfName, stageName)
-				steps = append(steps, routeStep{name: stageName, advance: sc.Advance, workerID: sc.Worker})
+				steps = append(steps, routeStep{
+					name:     stageName,
+					label:    workflowCfg.StageDisplayName(stageName),
+					advance:  sc.Advance,
+					workerID: sc.Worker,
+				})
 				inThisChain[stageName] = true
 			}
 			// loop stages — derived from Loop blocks on pipeline stages
@@ -38,15 +43,28 @@ func loadData(root string) tea.Cmd {
 				if sc.Loop == nil || !inThisChain[sc.Name] {
 					continue
 				}
-				loops = append(loops, repairLoop{name: sc.Loop.Via, target: sc.Name})
+				loops = append(loops, repairLoop{
+					name:   sc.Loop.Via,
+					label:  workflowCfg.StageDisplayName(sc.Loop.Via),
+					target: sc.Name,
+				})
 				repairs = append(repairs, repairStep{
-					name:       sc.Loop.Via,
-					workerID:   sc.Loop.Worker,
-					repairs:    sc.Name,
-					maxRetries: sc.Loop.Max,
+					name:         sc.Loop.Via,
+					label:        workflowCfg.StageDisplayName(sc.Loop.Via),
+					workerID:     sc.Loop.Worker,
+					repairs:      sc.Name,
+					repairsLabel: workflowCfg.StageDisplayName(sc.Name),
+					maxRetries:   sc.Loop.Max,
 				})
 			}
-			chains = append(chains, workflowChain{name: wfName, description: workflowCfg.WorkflowDescription(wfName), steps: steps, loops: loops, repairSteps: repairs})
+			chains = append(chains, workflowChain{
+				name:        wfName,
+				label:       workflowCfg.WorkflowDisplayName(wfName),
+				description: workflowCfg.WorkflowDescription(wfName),
+				steps:       steps,
+				loops:       loops,
+				repairSteps: repairs,
+			})
 		}
 		// fallback: flat list of all stage files
 		if len(chains) == 0 {
@@ -81,7 +99,7 @@ func loadData(root string) tea.Cmd {
 
 		// workflows: one entry per workflow chain; path="" signals detail view
 		for _, c := range chains {
-			si["workflows"] = append(si["workflows"], sectionItem{label: c.name, path: ""})
+			si["workflows"] = append(si["workflows"], sectionItem{label: chainLabel(c), id: c.name, path: ""})
 		}
 
 		// workers: actual namespaced .md files in workers/<namespace>/
@@ -117,6 +135,7 @@ func loadData(root string) tea.Cmd {
 }
 
 func collectFeatures(root string) []*featureRow {
+	workflowCfg, _ := config.Load(root)
 	features, _ := featurelist.Collect(root, featurelist.Options{IncludeArchived: true})
 	rows := make([]*featureRow, 0, len(features))
 	for _, f := range features {
@@ -134,6 +153,9 @@ func collectFeatures(root string) []*featureRow {
 			s:              f.State,
 			featureDir:     f.FeatureDir,
 			workflow:       f.Workflow,
+			stage:          workflowCfg.ResolveStage(f.State.Stage.Name),
+			workflowLabel:  workflowDisplayName(workflowCfg, f.Workflow),
+			stageLabel:     stageDisplayName(workflowCfg, f.State.Stage.Name),
 			stageLoopLabel: f.StageLoopLabel,
 			workerName:     f.WorkerName,
 			tmuxLive:       f.TmuxLive,
@@ -141,6 +163,73 @@ func collectFeatures(root string) []*featureRow {
 		})
 	}
 	return rows
+}
+
+func workflowDisplayName(cfg *config.Config, id string) string {
+	if cfg == nil {
+		return id
+	}
+	return cfg.WorkflowDisplayName(cfg.ResolveWorkflow(id))
+}
+
+func stageDisplayName(cfg *config.Config, id string) string {
+	if cfg == nil {
+		return id
+	}
+	return cfg.StageDisplayName(cfg.ResolveStage(id))
+}
+
+func chainLabel(c workflowChain) string {
+	if c.label != "" {
+		return c.label
+	}
+	return c.name
+}
+
+func workflowLabel(name string, chains []workflowChain) string {
+	for _, c := range chains {
+		if c.name == name {
+			return chainLabel(c)
+		}
+	}
+	return name
+}
+
+func workflowStageLabel(name string, chains []workflowChain) string {
+	for _, c := range chains {
+		for _, s := range c.steps {
+			if s.name == name {
+				return stepLabel(s)
+			}
+		}
+		for _, s := range c.repairSteps {
+			if s.name == name {
+				return repairStepLabel(s)
+			}
+		}
+	}
+	return name
+}
+
+func stepLabel(s routeStep) string {
+	if s.label != "" {
+		return s.label
+	}
+	return s.name
+}
+
+func repairStepLabel(s repairStep) string {
+	if s.label != "" {
+		return s.label
+	}
+	return s.name
+}
+
+func repairTargetLabel(s repairStep) string {
+	if s.repairsLabel != "" {
+		return s.repairsLabel
+	}
+	return s.repairs
 }
 
 // buildFileList collects the files shown in a feature's detail view: the

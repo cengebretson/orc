@@ -196,6 +196,7 @@ func validatePackComposition(packNames []string, manifests []PackManifestV1) err
 	}
 	seen := map[string]owner{}
 	aliasTargets := map[string]string{}
+	aliasTargetOwners := map[string]string{}
 	var conflicts []string
 
 	check := func(kind, pack string, values []PackResource) {
@@ -208,7 +209,13 @@ func validatePackComposition(packNames []string, manifests []PackManifestV1) err
 		}
 	}
 	checkAliases := func(kind, pack string, values map[string]string) {
-		for alias, target := range values {
+		aliases := make([]string, 0, len(values))
+		for alias := range values {
+			aliases = append(aliases, alias)
+		}
+		sort.Strings(aliases)
+		for _, alias := range aliases {
+			target := values[alias]
 			key := "alias:" + kind + ":" + alias
 			if prev, ok := aliasTargets[key]; ok {
 				if prev == target {
@@ -221,7 +228,13 @@ func validatePackComposition(packNames []string, manifests []PackManifestV1) err
 				}
 				continue
 			}
+			targetKey := "alias-target:" + kind + ":" + target
+			if prevAlias, ok := aliasTargetOwners[targetKey]; ok && prevAlias != alias {
+				conflicts = append(conflicts, fmt.Sprintf("%s aliases %q and %q both point to %s", kind, prevAlias, alias, target))
+				continue
+			}
 			aliasTargets[key] = target
+			aliasTargetOwners[targetKey] = alias
 			seen[key] = owner{pack: pack, kind: kind, value: target}
 		}
 	}
