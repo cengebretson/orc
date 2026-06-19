@@ -236,6 +236,7 @@ func validatePackComposition(packNames []string, manifests []PackManifestV1) err
 		value string
 	}
 	seen := map[string]owner{}
+	aliasTargets := map[string]string{}
 	var conflicts []string
 
 	check := func(kind, pack string, values []PackResource) {
@@ -248,12 +249,21 @@ func validatePackComposition(packNames []string, manifests []PackManifestV1) err
 		}
 	}
 	checkAliases := func(kind, pack string, values map[string]string) {
-		for alias := range values {
-			if prev, ok := seen["alias:"+kind+":"+alias]; ok {
-				conflicts = append(conflicts, fmt.Sprintf("%s alias %q is provided by both %s and %s", kind, alias, prev.pack, pack))
+		for alias, target := range values {
+			key := "alias:" + kind + ":" + alias
+			if prev, ok := aliasTargets[key]; ok {
+				if prev == target {
+					continue
+				}
+				if prevOwner, ok := seen[key]; ok {
+					conflicts = append(conflicts, fmt.Sprintf("%s alias %q points to both %s and %s", kind, alias, prevOwner.value, target))
+				} else {
+					conflicts = append(conflicts, fmt.Sprintf("%s alias %q points to both %s and %s", kind, alias, prev, target))
+				}
 				continue
 			}
-			seen["alias:"+kind+":"+alias] = owner{pack: pack, kind: kind, value: alias}
+			aliasTargets[key] = target
+			seen[key] = owner{pack: pack, kind: kind, value: target}
 		}
 	}
 
@@ -367,7 +377,10 @@ func assembleEmbeddedPackOrcYAML(base string, packNames []string, manifests []Pa
 	}
 	appendPackAliases(&b, packAliases)
 
-	return setDefaultWorkflow(b.String(), manifests[0].Provides.Workflows[0].ID), nil
+	if len(packNames) == 1 && len(manifests[0].Provides.Workflows) > 0 {
+		return setDefaultWorkflow(b.String(), manifests[0].Provides.Workflows[0].ID), nil
+	}
+	return b.String(), nil
 }
 
 func appendPackAliases(b *strings.Builder, aliases []PackAliases) {
