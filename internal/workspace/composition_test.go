@@ -77,6 +77,72 @@ func TestValidatePackComposition_RejectsDuplicateWorkerIDs(t *testing.T) {
 	}
 }
 
+func TestValidatePackComposition_RejectsDuplicateWorkflowIDs(t *testing.T) {
+	manifests := []PackManifestV1{
+		{
+			Name: "default",
+			Provides: struct {
+				Workflows []PackResource `json:"workflows,omitempty" yaml:"workflows"`
+				Workers   []PackResource `json:"workers,omitempty" yaml:"workers"`
+				Stages    []PackResource `json:"stages,omitempty" yaml:"stages"`
+			}{
+				Workflows: []PackResource{{ID: "default:standard", Path: "workflow.yaml"}},
+			},
+		},
+		{
+			Name: "default-plus",
+			Provides: struct {
+				Workflows []PackResource `json:"workflows,omitempty" yaml:"workflows"`
+				Workers   []PackResource `json:"workers,omitempty" yaml:"workers"`
+				Stages    []PackResource `json:"stages,omitempty" yaml:"stages"`
+			}{
+				Workflows: []PackResource{{ID: "default:standard", Path: "workflow.yaml"}},
+			},
+		},
+	}
+
+	err := validatePackComposition([]string{"default", "default-plus"}, manifests)
+	if err == nil {
+		t.Fatal("validatePackComposition returned nil error")
+	}
+	if got := err.Error(); !strings.Contains(got, `workflow "default:standard" is provided by both`) {
+		t.Fatalf("unexpected conflict message: %s", got)
+	}
+}
+
+func TestValidatePackComposition_RejectsDuplicateStageIDs(t *testing.T) {
+	manifests := []PackManifestV1{
+		{
+			Name: "default",
+			Provides: struct {
+				Workflows []PackResource `json:"workflows,omitempty" yaml:"workflows"`
+				Workers   []PackResource `json:"workers,omitempty" yaml:"workers"`
+				Stages    []PackResource `json:"stages,omitempty" yaml:"stages"`
+			}{
+				Stages: []PackResource{{ID: "default:develop", Path: "stages/develop.md"}},
+			},
+		},
+		{
+			Name: "default-plus",
+			Provides: struct {
+				Workflows []PackResource `json:"workflows,omitempty" yaml:"workflows"`
+				Workers   []PackResource `json:"workers,omitempty" yaml:"workers"`
+				Stages    []PackResource `json:"stages,omitempty" yaml:"stages"`
+			}{
+				Stages: []PackResource{{ID: "default:develop", Path: "stages/review.md"}},
+			},
+		},
+	}
+
+	err := validatePackComposition([]string{"default", "default-plus"}, manifests)
+	if err == nil {
+		t.Fatal("validatePackComposition returned nil error")
+	}
+	if got := err.Error(); !strings.Contains(got, `stage "default:develop" is provided by both`) {
+		t.Fatalf("unexpected conflict message: %s", got)
+	}
+}
+
 func TestValidatePackComposition_AllowsSharedAliasTarget(t *testing.T) {
 	manifests := []PackManifestV1{
 		{
