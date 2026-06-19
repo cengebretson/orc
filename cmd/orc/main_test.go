@@ -662,6 +662,114 @@ aliases:
 	}
 }
 
+func TestRunPackListShowsInstalledLocalPackSource(t *testing.T) {
+	resetCommandGlobals(t)
+	globalWorkspace = t.TempDir()
+	if err := workspace.Init(workspace.InitOptions{Root: globalWorkspace, SkipDefaultPack: true}); err != nil {
+		t.Fatalf("init workspace: %v", err)
+	}
+	dir := writeCommandPack(t, "hotfix", `schema: 1
+name: hotfix
+description: Fast production fix workflow
+provides:
+  workflows:
+    - id: hotfix:standard
+      path: workflow.yaml
+  workers:
+    - id: hotfix:bob
+      path: workers/bob.md
+  stages:
+    - id: hotfix:develop
+      path: stages/develop.md
+aliases:
+  workflows:
+    hotfix: hotfix:standard
+`)
+	writeCommandFile(t, filepath.Join(dir, "workflow.yaml"), `workflows:
+  "hotfix:standard":
+    description: Fast production fix workflow
+    stages:
+      - name: hotfix:develop
+        worker: hotfix:bob
+        advance: auto
+`)
+	if err := runPackInstall(nil, []string{dir}); err != nil {
+		t.Fatalf("runPackInstall: %v", err)
+	}
+
+	out, err := captureStdout(func() error {
+		return runPackList(nil, nil)
+	})
+	if err != nil {
+		t.Fatalf("runPackList: %v\n%s", err, out)
+	}
+	for _, want := range []string{
+		"hotfix",
+		"active",
+		"source: local-path (" + dir + ")",
+		"workflows: hotfix:standard",
+		"active workflows: hotfix:standard",
+		"alias: hotfix -> hotfix:standard",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("pack list output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestRunPackShowShowsInstalledLocalPackSource(t *testing.T) {
+	resetCommandGlobals(t)
+	globalWorkspace = t.TempDir()
+	if err := workspace.Init(workspace.InitOptions{Root: globalWorkspace, SkipDefaultPack: true}); err != nil {
+		t.Fatalf("init workspace: %v", err)
+	}
+	dir := writeCommandPack(t, "hotfix", `schema: 1
+name: hotfix
+description: Fast production fix workflow
+provides:
+  workflows:
+    - id: hotfix:standard
+      path: workflow.yaml
+  workers:
+    - id: hotfix:bob
+      path: workers/bob.md
+  stages:
+    - id: hotfix:develop
+      path: stages/develop.md
+aliases:
+  workflows:
+    hotfix: hotfix:standard
+`)
+	writeCommandFile(t, filepath.Join(dir, "workflow.yaml"), `workflows:
+  "hotfix:standard":
+    description: Fast production fix workflow
+    stages:
+      - name: hotfix:develop
+        worker: hotfix:bob
+        advance: auto
+`)
+	if err := runPackInstall(nil, []string{dir}); err != nil {
+		t.Fatalf("runPackInstall: %v", err)
+	}
+
+	out, err := captureStdout(func() error {
+		return runPackShow(nil, []string{"hotfix"})
+	})
+	if err != nil {
+		t.Fatalf("runPackShow: %v\n%s", err, out)
+	}
+	for _, want := range []string{
+		"Pack: hotfix",
+		"Status: active",
+		"Source: local-path (" + dir + ")",
+		"Active workflows: hotfix:standard",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("pack show output missing %q:\n%s", want, out)
+		}
+	}
+}
+
 func TestRunPackListPrintsInstalledPacks(t *testing.T) {
 	resetCommandGlobals(t)
 	globalWorkspace = t.TempDir()

@@ -100,7 +100,7 @@ func printPackList(packs []workspace.InstalledPack) {
 		fmt.Printf("  %-12s %s\n", p.Name, status)
 		fmt.Printf("    path: %s\n", p.Path)
 		if p.Install != nil {
-			fmt.Printf("    source: %s (%s)\n", p.Install.SourceType, p.Install.SourceRef)
+			fmt.Printf("    source: %s\n", formatPackSource(p.Install))
 		}
 		if p.Inspection != nil {
 			if p.Inspection.Manifest.Description != "" {
@@ -123,7 +123,7 @@ func printInstalledPack(p workspace.InstalledPack) {
 	}
 	fmt.Printf("Status: %s\n\n", status)
 	if p.Install != nil {
-		fmt.Printf("Source: %s (%s)\n\n", p.Install.SourceType, p.Install.SourceRef)
+		fmt.Printf("Source: %s\n\n", formatPackSource(p.Install))
 	}
 	if p.Inspection == nil {
 		return
@@ -148,6 +148,8 @@ func printPackInventorySection(title string, ids []string, used []string, aliase
 	fmt.Printf("    %s: %s\n", title, strings.Join(ids, ", "))
 	if len(used) > 0 {
 		fmt.Printf("    active workflows: %s\n", strings.Join(used, ", "))
+	} else if title == "workflows" && len(ids) > 0 {
+		fmt.Println("    active workflows: none")
 	}
 	if len(aliases) == 0 {
 		return
@@ -160,6 +162,16 @@ func printPackInventorySection(title string, ids []string, used []string, aliase
 	for _, alias := range keys {
 		fmt.Printf("    alias: %s -> %s\n", alias, aliases[alias])
 	}
+}
+
+func formatPackSource(info *workspace.PackInstallInfo) string {
+	if info == nil {
+		return "unknown"
+	}
+	if info.ResolvedRef != "" && info.ResolvedRef != info.SourceRef {
+		return fmt.Sprintf("%s (%s -> %s)", info.SourceType, info.SourceRef, info.ResolvedRef)
+	}
+	return fmt.Sprintf("%s (%s)", info.SourceType, info.SourceRef)
 }
 
 func packIDs(resources []workspace.PackResource) []string {
