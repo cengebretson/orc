@@ -287,6 +287,18 @@ func TestRunDoctorSystemPrintsInstallReport(t *testing.T) {
 	}
 }
 
+func TestRunDoctorSystemRejectsTicketArg(t *testing.T) {
+	resetCommandGlobals(t)
+	doctorSystem = true
+
+	_, err := captureStdout(func() error {
+		return runDoctor(nil, []string{"TEST-1"})
+	})
+	if err == nil || !strings.Contains(err.Error(), "doctor --system does not accept a ticket") {
+		t.Fatalf("runDoctor --system ticket err = %v", err)
+	}
+}
+
 func TestRunDoctorTicketFixRemovesStaleLock(t *testing.T) {
 	resetCommandGlobals(t)
 	root := t.TempDir()

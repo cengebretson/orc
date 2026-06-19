@@ -15,6 +15,9 @@ var doctorLookPath = exec.LookPath
 
 func runDoctor(cmd *cobra.Command, args []string) error {
 	if doctorSystem {
+		if len(args) > 0 {
+			return fmt.Errorf("doctor --system does not accept a ticket")
+		}
 		report := doctor.RunSystemWithOptions(doctor.Options{Fix: doctorFix, Version: version, LookPath: doctorLookPath})
 		doctor.Print(report)
 		if !report.OK() {

@@ -6,15 +6,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-19
+
 ### Added
 
 - Release archives now publish `checksums.txt`, and the README documents shell
   completion generation.
+- `orc doctor --system` checks install readiness outside a workspace, including
+  version, PATH visibility, optional tools, tmux, chafa, and supported agent
+  CLIs.
 - `orc pack inspect <path>` validates and previews local workflow packs without installing them.
 - `orc init --pack <path>` can scaffold a workspace from one local workflow pack.
 - `orc init --skip-default-pack` creates the base scaffold without installing the default pack.
 - `orc pack install <pack>` installs a built-in pack name or local pack path into an existing workspace.
 - `orc pack list` and `orc pack show <pack>` report install provenance and active workflows.
+- Pack composition checks now reject duplicate workflow IDs, duplicate worker
+  IDs, duplicate stage IDs, and conflicting aliases before install.
 - Generated workspaces now install the built-in default pack with aliases and a
   consistent namespaced runtime layout under `stages/<pack>/` and `workers/<pack>/`.
 
@@ -22,6 +29,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Makefile Go targets now use repo-local cache directories by default, avoiding
   home-cache permission failures in sandboxed runs.
+- Pack documentation now clarifies embedded packs, installed snapshots, local
+  path packs, workspace-owned files, and the roles of `inspect`, `install`,
+  `list`, and `show`.
 
 ## [0.4.0] - 2026-06-18
 
@@ -107,7 +117,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Bubble Tea TUI dashboard with health, workflow, stage, and portrait views.
 - `orc doctor --fix` to clear stale state locks.
 
-[Unreleased]: https://github.com/cengebretson/orc/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/cengebretson/orc/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/cengebretson/orc/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/cengebretson/orc/compare/v0.3.3...v0.4.0
 [0.3.3]: https://github.com/cengebretson/orc/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/cengebretson/orc/compare/v0.3.1...v0.3.2
