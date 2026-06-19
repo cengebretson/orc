@@ -92,11 +92,8 @@ func checkGolden(t *testing.T, name, got string) {
 	}
 }
 
-// TestInit_GoldenDefaultPack pins the default install (--pack omitted ==
-// --pack default). Its manifest must stay byte-identical to the pre-pack
-// --with-sample-workers scaffold: same files, same paths, same bytes including
-// the assembled orc.yaml. That equality is the proof the _base/ + packs/
-// reshuffle did not change what a user gets.
+// TestInit_GoldenDefaultPack pins the default install. Its manifest pins the
+// generated file set and exact bytes, including the assembled orc.yaml.
 func TestInit_GoldenDefaultPack(t *testing.T) {
 	dir := t.TempDir()
 	if err := workspace.Init(workspace.InitOptions{Root: dir}); err != nil {

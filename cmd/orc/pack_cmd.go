@@ -20,6 +20,15 @@ func runPackList(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+func runPackAvailable(cmd *cobra.Command, args []string) error {
+	packs, err := workspace.ListPacks()
+	if err != nil {
+		return err
+	}
+	printAvailablePacks(packs)
+	return nil
+}
+
 func runPackShow(cmd *cobra.Command, args []string) error {
 	packs, err := workspace.ListInstalledPacks(globalWorkspace)
 	if err != nil {
@@ -61,6 +70,23 @@ func runPackInstall(cmd *cobra.Command, args []string) error {
 		Root: globalWorkspace,
 		Pack: args[0],
 	})
+}
+
+func printAvailablePacks(packs []workspace.PackInfo) {
+	fmt.Println("Available packs:")
+	if len(packs) == 0 {
+		fmt.Println("  none")
+		return
+	}
+	fmt.Println()
+	for _, p := range packs {
+		fmt.Printf("  %-12s %s\n", p.Name, p.Description)
+		if len(p.Engines) > 0 {
+			fmt.Printf("  %-12s engines: %s\n", "", strings.Join(p.Engines, ", "))
+		}
+	}
+	fmt.Println()
+	fmt.Println("Install with: orc pack install <name>")
 }
 
 func printPackInspection(report *workspace.PackInspection) {

@@ -27,8 +27,11 @@ func TestEmbeddedPacks_ClosureComplete(t *testing.T) {
 	for _, p := range packs {
 		t.Run(p.Name, func(t *testing.T) {
 			dir := t.TempDir()
-			if err := workspace.Init(workspace.InitOptions{Root: dir, Packs: []string{p.Name}}); err != nil {
-				t.Fatalf("Init --pack %s: %v", p.Name, err)
+			if err := workspace.Init(workspace.InitOptions{Root: dir, SkipDefaultPack: true}); err != nil {
+				t.Fatalf("Init base workspace: %v", err)
+			}
+			if err := workspace.InstallPack(workspace.PackInstallOptions{Root: dir, Pack: p.Name}); err != nil {
+				t.Fatalf("InstallPack %s: %v", p.Name, err)
 			}
 
 			report := health.Run(dir)

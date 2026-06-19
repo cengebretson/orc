@@ -190,7 +190,7 @@ func TestInit_ForceOverwrites(t *testing.T) {
 func TestInit_DefaultPackInstallsWorkers(t *testing.T) {
 	dir := t.TempDir()
 
-	if err := workspace.Init(workspace.InitOptions{Root: dir, Packs: []string{"default"}}); err != nil {
+	if err := workspace.Init(workspace.InitOptions{Root: dir}); err != nil {
 		t.Fatalf("Init: %v", err)
 	}
 
@@ -222,39 +222,6 @@ func TestInit_SkipDefaultPackIsBaseOnly(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(dir, rel)); err == nil {
 			t.Errorf("--skip-default-pack should not install %s", rel)
 		}
-	}
-}
-
-func TestInit_RejectsLocalPack(t *testing.T) {
-	packDir := writeLocalPack(t, "hotfix", `schema: 1
-name: hotfix
-description: Fast production fix workflow
-provides:
-  workflows:
-    - id: hotfix:standard
-      path: workflow.yaml
-  workers:
-    - id: hotfix:bob
-      path: workers/bob.md
-  stages:
-    - id: hotfix:develop
-      path: stages/develop.md
-aliases:
-  workflows:
-    hotfix: hotfix:standard
-  workers:
-    bob: hotfix:bob
-  stages:
-    develop: hotfix:develop
-	`)
-
-	dir := t.TempDir()
-	err := workspace.Init(workspace.InitOptions{Root: dir, Packs: []string{packDir}})
-	if err == nil {
-		t.Fatal("Init returned nil error")
-	}
-	if !strings.Contains(err.Error(), "orc init does not install local packs") {
-		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

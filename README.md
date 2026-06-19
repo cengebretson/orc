@@ -110,8 +110,8 @@ workers and stage files it uses. `default` is assumed. Use
 extend with `orc pack install`.
 
 ```bash
-orc init --list-packs                              # see available packs
-orc init --workspace ~/my-workspace --pack default
+orc pack available                                # see built-in packs
+orc init --workspace ~/my-workspace
 orc init --workspace ~/bare-workspace --skip-default-pack
 cd ~/bare-workspace
 orc pack install default                           # install later into the current workspace
@@ -316,12 +316,11 @@ Or use the Claude Desktop settings UI. Requires a GitHub PAT with `repo` and `pu
 
 - `orc init` — scaffold a new workspace
   - `--workspace <path>` — scaffold at a specific path
-  - `--pack <name>` — install one built-in starter pack during scaffold; omit for built-in `default`
   - `--skip-default-pack` — create the base workspace without installing the default pack
-  - `--list-packs` — list available packs and exit
   - `--dry-run` — preview without writing
   - `--force` — overwrite existing files
 - `orc pack` — inspect and manage workflow packs
+  - `orc pack available` — show built-in packs available for install
   - `orc pack inspect <path>` — validate and preview a local pack without installing it
   - `orc pack install <pack>` — install a built-in pack name or local pack path into the current workspace
   - `orc pack list` — show installed packs, install source, and active workflows

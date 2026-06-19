@@ -609,6 +609,26 @@ aliases:
 	}
 }
 
+func TestRunPackAvailablePrintsBuiltInPacks(t *testing.T) {
+	resetCommandGlobals(t)
+
+	out, err := captureStdout(func() error {
+		return runPackAvailable(nil, nil)
+	})
+	if err != nil {
+		t.Fatalf("runPackAvailable: %v\n%s", err, out)
+	}
+	for _, want := range []string{
+		"Available packs:",
+		"default",
+		"orc pack install <name>",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("pack available output missing %q:\n%s", want, out)
+		}
+	}
+}
+
 func TestRunPackInstallInstallsLocalPack(t *testing.T) {
 	resetCommandGlobals(t)
 	globalWorkspace = t.TempDir()
@@ -773,7 +793,7 @@ aliases:
 func TestRunPackListPrintsInstalledPacks(t *testing.T) {
 	resetCommandGlobals(t)
 	globalWorkspace = t.TempDir()
-	if err := workspace.Init(workspace.InitOptions{Root: globalWorkspace, Packs: []string{"default"}}); err != nil {
+	if err := workspace.Init(workspace.InitOptions{Root: globalWorkspace}); err != nil {
 		t.Fatalf("init workspace: %v", err)
 	}
 
@@ -803,7 +823,7 @@ func TestRunPackListPrintsInstalledPacks(t *testing.T) {
 func TestRunPackShowPrintsOneInstalledPack(t *testing.T) {
 	resetCommandGlobals(t)
 	globalWorkspace = t.TempDir()
-	if err := workspace.Init(workspace.InitOptions{Root: globalWorkspace, Packs: []string{"default"}}); err != nil {
+	if err := workspace.Init(workspace.InitOptions{Root: globalWorkspace}); err != nil {
 		t.Fatalf("init workspace: %v", err)
 	}
 

@@ -24,7 +24,6 @@ const (
 
 type InitOptions struct {
 	Root            string
-	Packs           []string // built-in pack to install; empty = ["default"]
 	SkipDefaultPack bool
 	DryRun          bool
 	Force           bool
@@ -36,11 +35,6 @@ type PackInfo struct {
 	Description string   `yaml:"description"`
 	Schema      int      `yaml:"schema"`
 	Engines     []string `yaml:"engines"`
-	Provides    struct {
-		Workflow string   `yaml:"workflow"`
-		Workers  []string `yaml:"workers"`
-		Stages   []string `yaml:"stages"`
-	} `yaml:"provides"`
 }
 
 type fileEntry struct {
@@ -72,28 +66,6 @@ func Init(opts InitOptions) error {
 	return writeEntries(root, entries, opts.Force)
 }
 
-// resolvePacks applies the default pack unless the caller explicitly skips it.
-// The default install is empty Packs plus SkipDefaultPack=false; base-only is
-// empty Packs plus SkipDefaultPack=true.
-func resolvePacks(requested []string, skipDefaultPack bool) ([]string, error) {
-	if skipDefaultPack && len(requested) > 0 {
-		return nil, fmt.Errorf("--skip-default-pack cannot be combined with --pack")
-	}
-	if len(requested) == 0 {
-		if skipDefaultPack {
-			return nil, nil
-		}
-		return []string{"default"}, nil
-	}
-	if len(requested) > 1 {
-		return nil, fmt.Errorf("orc init installs at most one built-in pack; use `orc pack install` after init to add more packs")
-	}
-	if isLocalPackRef(requested[0]) {
-		return nil, fmt.Errorf("orc init does not install local packs; run `orc init --skip-default-pack` and then `orc pack install %s`", requested[0])
-	}
-	return requested, nil
-}
-
 // loadPack reads and parses a pack's pack.yaml.
 func loadPack(name string) (PackInfo, error) {
 	manifest, err := loadEmbeddedPackManifest(name)
@@ -106,7 +78,7 @@ func loadPack(name string) (PackInfo, error) {
 func loadEmbeddedPackManifest(name string) (PackManifestV1, error) {
 	data, err := templateFS.ReadFile(path.Join(packsDir, name, "pack.yaml"))
 	if err != nil {
-		return PackManifestV1{}, fmt.Errorf("unknown pack %q (run `orc init --list-packs` to see available packs)", name)
+		return PackManifestV1{}, fmt.Errorf("unknown pack %q (run `orc pack available` to see available packs)", name)
 	}
 	var manifest PackManifestV1
 	if err := yaml.Unmarshal(data, &manifest); err != nil {
@@ -116,22 +88,12 @@ func loadEmbeddedPackManifest(name string) (PackManifestV1, error) {
 }
 
 func packInfoFromManifest(manifest PackManifestV1) PackInfo {
-	info := PackInfo{
+	return PackInfo{
 		Name:        manifest.Name,
 		Description: manifest.Description,
 		Schema:      manifest.Schema,
 		Engines:     manifest.Engines,
 	}
-	if len(manifest.Provides.Workflows) > 0 {
-		info.Provides.Workflow = manifest.Provides.Workflows[0].ID
-	}
-	for _, worker := range manifest.Provides.Workers {
-		info.Provides.Workers = append(info.Provides.Workers, worker.ID)
-	}
-	for _, stage := range manifest.Provides.Stages {
-		info.Provides.Stages = append(info.Provides.Stages, stage.ID)
-	}
-	return info
 }
 
 // ListPacks returns the metadata for every embedded pack, sorted by name.
@@ -155,9 +117,9 @@ func ListPacks() ([]PackInfo, error) {
 }
 
 func collectEntries(opts InitOptions) ([]fileEntry, error) {
-	packs, err := resolvePacks(opts.Packs, opts.SkipDefaultPack)
-	if err != nil {
-		return nil, err
+	var packs []string
+	if !opts.SkipDefaultPack {
+		packs = []string{"default"}
 	}
 
 	var entries []fileEntry
@@ -165,7 +127,7 @@ func collectEntries(opts InitOptions) ([]fileEntry, error) {
 
 	// 1. Base scaffold — always installed. orc.yaml is held back and assembled
 	//    below so the selected packs' workflows can be spliced in.
-	err = fs.WalkDir(templateFS, baseDir, func(p string, d fs.DirEntry, err error) error {
+	err := fs.WalkDir(templateFS, baseDir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}

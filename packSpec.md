@@ -400,7 +400,24 @@ aliases:
 
 ## Pack Commands
 
-Orc should expose workspace pack inventory and local pack inspection commands.
+Orc should expose available pack discovery, workspace pack inventory, and local
+pack inspection commands.
+
+### `orc pack available`
+
+Lists built-in packs available to install after initialization with
+`orc pack install <name>`.
+
+Example:
+
+```text
+Available packs:
+
+  default      General feature workflow
+               engines: codex, claude
+
+Install with: orc pack install <name>
+```
 
 ### `orc pack list`
 
@@ -565,9 +582,10 @@ Decided implementation order:
 
 1. `orc pack inspect <path>`
 2. `orc init --skip-default-pack`
-3. workspace-aware `orc pack list`
-4. `orc pack show`
-5. `orc pack install <pack>` for built-in and local packs
+3. `orc pack available`
+4. workspace-aware `orc pack list`
+5. `orc pack show`
+6. `orc pack install <pack>` for built-in and local packs
 
 ### Slice 1: Inspect Local Packs
 
@@ -606,7 +624,6 @@ Scope:
 - `orc init --skip-default-pack` creates the base scaffold without installing
   the built-in default pack.
 - `orc init` installs the built-in default pack unless this flag is present.
-- `orc init --pack <name>` may select one built-in starter pack.
 - Local and additional packs are installed after initialization with
   `orc pack install`.
 

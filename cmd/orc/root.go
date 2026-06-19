@@ -64,8 +64,6 @@ var initCmd = &cobra.Command{
 }
 
 var (
-	initPacks           []string
-	initListPacks       bool
 	initSkipDefaultPack bool
 	initDryRun          bool
 	initForce           bool
@@ -80,6 +78,13 @@ var packListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List installed packs and what they install",
 	RunE:  runPackList,
+}
+
+var packAvailableCmd = &cobra.Command{
+	Use:   "available",
+	Short: "List built-in packs available for install",
+	Args:  cobra.NoArgs,
+	RunE:  runPackAvailable,
 }
 
 var packShowCmd = &cobra.Command{
@@ -269,9 +274,7 @@ var helpAllCmd = &cobra.Command{
 func init() {
 	rootCmd.PersistentFlags().StringVar(&globalWorkspace, "workspace", ".", "Workspace root (default: current directory)")
 
-	initCmd.Flags().StringSliceVar(&initPacks, "pack", nil, "Built-in pack to install during scaffold. Omit for 'default'")
 	initCmd.Flags().BoolVar(&initSkipDefaultPack, "skip-default-pack", false, "Create the base workspace without installing the default pack")
-	initCmd.Flags().BoolVar(&initListPacks, "list-packs", false, "List available packs and exit")
 	initCmd.Flags().BoolVar(&initDryRun, "dry-run", false, "Print what would be created without writing files")
 	initCmd.Flags().BoolVar(&initForce, "force", false, "Overwrite existing generated files")
 	packInspectCmd.Flags().BoolVar(&packInspectJSON, "json", false, "Output as JSON")
@@ -306,6 +309,7 @@ func init() {
 	doctorCmd.ValidArgsFunction = ticketCompleter(nil, false)
 
 	packCmd.AddCommand(packListCmd)
+	packCmd.AddCommand(packAvailableCmd)
 	packCmd.AddCommand(packShowCmd)
 	packCmd.AddCommand(packInspectCmd)
 	packCmd.AddCommand(packInstallCmd)
