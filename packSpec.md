@@ -609,8 +609,8 @@ Scope:
 
 - Load pack metadata from embedded packs and filesystem paths.
 - Allow multiple packs in one init.
-- Detect workflow, worker, stage, alias, and file path conflicts.
-- Require deterministic conflict handling. No last-one-wins behavior.
+- Detect workflow, worker, stage, and alias conflicts.
+- Fail the init when two packs claim the same canonical ID or alias.
 - Print what each pack contributed during `--dry-run`.
 - Keep generated workspace files self-contained.
 
@@ -693,6 +693,8 @@ Rules:
   runtime behavior unless the user also updates `stages/`, `workers/`, or
   `orc.yaml`.
 - Orc does not attempt to update, reconcile, or reset installed pack files.
+- Multiple packs can coexist only when their canonical workflow, stage, worker,
+  and alias names are disjoint.
 - A future `orc pack update` command would need explicit managed-file metadata
   and conflict handling. That is out of scope for the first implementation.
 - `orc pack inspect` validates pack sources. `orc doctor` validates the current

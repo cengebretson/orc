@@ -189,7 +189,6 @@ func collectEntries(opts InitOptions) ([]fileEntry, error) {
 			return nil, fmt.Errorf("local filesystem packs cannot be combined with other packs yet")
 		}
 	}
-
 	// 2. Selected embedded packs are snapshotted under packs/<name>/ and their
 	//    runtime resources are materialized under workers/<name>/ and stages/<name>/.
 	var manifests []PackManifestV1
@@ -205,6 +204,9 @@ func collectEntries(opts InitOptions) ([]fileEntry, error) {
 		}
 		entries = append(entries, packEntries...)
 	}
+	if err := validatePackComposition(packs, manifests); err != nil {
+		return nil, err
+	}
 
 	// 3. Assemble orc.yaml from the base config plus each pack's workflow block.
 	orcYAML, err := assembleEmbeddedPackOrcYAML(baseOrcYAML, packs, manifests)
@@ -214,6 +216,51 @@ func collectEntries(opts InitOptions) ([]fileEntry, error) {
 	entries = append(entries, fileEntry{dest: "orc.yaml", content: orcYAML})
 
 	return entries, nil
+}
+
+func validatePackComposition(packNames []string, manifests []PackManifestV1) error {
+	type owner struct {
+		pack  string
+		kind  string
+		value string
+	}
+	seen := map[string]owner{}
+	var conflicts []string
+
+	check := func(kind, pack string, values []PackResource) {
+		for _, v := range values {
+			if prev, ok := seen[kind+":"+v.ID]; ok {
+				conflicts = append(conflicts, fmt.Sprintf("%s %q is provided by both %s and %s", kind, v.ID, prev.pack, pack))
+				continue
+			}
+			seen[kind+":"+v.ID] = owner{pack: pack, kind: kind, value: v.ID}
+		}
+	}
+	checkAliases := func(kind, pack string, values map[string]string) {
+		for alias := range values {
+			if prev, ok := seen["alias:"+kind+":"+alias]; ok {
+				conflicts = append(conflicts, fmt.Sprintf("%s alias %q is provided by both %s and %s", kind, alias, prev.pack, pack))
+				continue
+			}
+			seen["alias:"+kind+":"+alias] = owner{pack: pack, kind: kind, value: alias}
+		}
+	}
+
+	for i, pack := range packNames {
+		manifest := manifests[i]
+		check("workflow", pack, manifest.Provides.Workflows)
+		check("stage", pack, manifest.Provides.Stages)
+		check("worker", pack, manifest.Provides.Workers)
+		checkAliases("workflow", pack, manifest.Aliases.Workflows)
+		checkAliases("stage", pack, manifest.Aliases.Stages)
+		checkAliases("worker", pack, manifest.Aliases.Workers)
+	}
+
+	if len(conflicts) == 0 {
+		return nil
+	}
+	sort.Strings(conflicts)
+	return fmt.Errorf("pack composition conflicts:\n  %s", strings.Join(conflicts, "\n  "))
 }
 
 func collectEmbeddedPackEntries(name string, manifest PackManifestV1) ([]fileEntry, error) {
