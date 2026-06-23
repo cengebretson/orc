@@ -608,7 +608,11 @@ func ValidateRepos(s *State, workspaceRoot string) error {
 		}
 	}
 
-	// next_action.cwd must be under a recorded worktree when any worktree is set
+	// next_action.cwd must resolve to the workspace root or under a recorded
+	// worktree when any worktree is set. The workspace root is allowed because
+	// workspace-level stages (e.g. qa-automation) intentionally run there via
+	// cwd "." even when the feature has a worktree; this mirrors ResolveCWD,
+	// which maps "."/"" to the workspace root.
 	hasWorktrees := false
 	for _, r := range s.Repos {
 		if r.Worktree != "" {
@@ -621,8 +625,13 @@ func ValidateRepos(s *State, workspaceRoot string) error {
 		if !filepath.IsAbs(cwd) {
 			cwd = filepath.Join(workspaceRoot, cwd)
 		}
-		matched := false
+		cwd = filepath.Clean(cwd)
+		// A cwd at the workspace root is a valid workspace-level stage.
+		matched := cwd == filepath.Clean(workspaceRoot)
 		for _, r := range s.Repos {
+			if matched {
+				break
+			}
 			if r.Worktree == "" {
 				continue
 			}

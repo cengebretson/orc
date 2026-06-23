@@ -6,6 +6,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- `orc validate` no longer rejects a workspace-level `next_action.cwd` (such as
+  `"."`) when the feature also has a worktree. Workspace-level stages like
+  qa-automation intentionally run at the workspace root, which `ResolveCWD`
+  already blesses; validation now agrees with it.
+
 ## [0.5.0] - 2026-06-19
 
 ### Added
