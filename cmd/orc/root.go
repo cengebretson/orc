@@ -223,6 +223,21 @@ var tuiCmd = &cobra.Command{
 	RunE:  runTui,
 }
 
+var watchCmd = &cobra.Command{
+	Use:   "watch [ticket]",
+	Short: "Open the compact watch rail for active agent work",
+	Args:  cobra.MaximumNArgs(1),
+	RunE:  runWatch,
+}
+
+var (
+	watchInterval   string
+	watchWide       bool
+	watchTmuxToggle bool
+	watchTmuxLayout string
+	watchTmuxSize   string
+)
+
 var helpAllCmd = &cobra.Command{
 	Use:   "help-all",
 	Short: "List all commands with human and agent commands separated",
@@ -298,6 +313,11 @@ func init() {
 	_ = jitCmd.MarkFlagRequired("worker")
 	jitCmd.Flags().BoolVar(&jitDry, "dry", false, "Print resolved worker and prompt without launching")
 	jitCmd.Flags().BoolVar(&jitTmux, "tmux", false, "Send to the ticket's existing tmux session instead of foreground")
+	watchCmd.Flags().StringVar(&watchInterval, "interval", "5s", "Refresh interval")
+	watchCmd.Flags().BoolVar(&watchWide, "wide", false, "Render the wider table layout")
+	watchCmd.Flags().BoolVar(&watchTmuxToggle, "tmux-toggle", false, "Toggle a narrow watch pane in the current tmux window")
+	watchCmd.Flags().StringVar(&watchTmuxLayout, "tmux-layout", "right", "Tmux toggle split layout: right or bottom")
+	watchCmd.Flags().StringVar(&watchTmuxSize, "tmux-size", "32", "Tmux toggle pane size, e.g. 32 or 25%")
 
 	nextCmd.ValidArgsFunction = ticketCompleter([]string{"pending", "active", "paused"}, false)
 	statusCmd.ValidArgsFunction = ticketCompleter(nil, true)
@@ -308,6 +328,7 @@ func init() {
 	deleteCmd.ValidArgsFunction = ticketCompleter([]string{"done", "archived"}, true)
 	jitCmd.ValidArgsFunction = ticketCompleter(nil, true)
 	doctorCmd.ValidArgsFunction = ticketCompleter(nil, false)
+	watchCmd.ValidArgsFunction = ticketCompleter(nil, false)
 
 	packCmd.AddCommand(packListCmd)
 	packCmd.AddCommand(packAvailableCmd)
@@ -328,6 +349,7 @@ func init() {
 	rootCmd.AddCommand(jitCmd)
 	rootCmd.AddCommand(attachCmd)
 	rootCmd.AddCommand(tuiCmd)
+	rootCmd.AddCommand(watchCmd)
 	rootCmd.AddCommand(helpAllCmd)
 	rootCmd.AddCommand(versionCmd)
 }
@@ -440,9 +462,37 @@ func printDryRun(plan *runner.Plan, ticket string) {
 
 func resolveRoot(path string) (string, error) {
 	if path == "." {
-		return os.Getwd()
+		cwd, err := os.Getwd()
+		if err != nil {
+			return "", err
+		}
+		root, err := findWorkspaceRoot(cwd)
+		if err != nil {
+			return "", err
+		}
+		return root, nil
 	}
-	return path, nil
+	return filepath.Abs(path)
+}
+
+func findWorkspaceRoot(start string) (string, error) {
+	dir, err := filepath.Abs(start)
+	if err != nil {
+		return "", err
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(dir, config.Filename)); err == nil {
+			return dir, nil
+		} else if err != nil && !os.IsNotExist(err) {
+			return "", fmt.Errorf("checking workspace marker in %s: %w", dir, err)
+		}
+
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", fmt.Errorf("orc workspace not found from %s — run from an orc workspace, or pass --workspace /path/to/workspace", start)
+		}
+		dir = parent
+	}
 }
 
 func main() {

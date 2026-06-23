@@ -299,6 +299,54 @@ func TestRunDoctorSystemRejectsTicketArg(t *testing.T) {
 	}
 }
 
+func TestResolveRootFindsNearestWorkspace(t *testing.T) {
+	resetCommandGlobals(t)
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "orc.yaml"), []byte("repos: []\nworkflows: {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	nested := filepath.Join(root, "worktrees", "repo", "feature")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(nested)
+
+	got, err := resolveRoot(".")
+	if err != nil {
+		t.Fatalf("resolveRoot: %v", err)
+	}
+	if got != root {
+		t.Fatalf("resolveRoot = %q, want %q", got, root)
+	}
+}
+
+func TestResolveRootExplicitPathDoesNotRequireWorkspaceMarker(t *testing.T) {
+	root := t.TempDir()
+	got, err := resolveRoot(root)
+	if err != nil {
+		t.Fatalf("resolveRoot explicit path: %v", err)
+	}
+	if got != root {
+		t.Fatalf("resolveRoot explicit path = %q, want %q", got, root)
+	}
+}
+
+func TestResolveRootMissingWorkspaceIsClear(t *testing.T) {
+	resetCommandGlobals(t)
+	dir := t.TempDir()
+	t.Chdir(dir)
+
+	_, err := resolveRoot(".")
+	if err == nil {
+		t.Fatal("resolveRoot should fail outside an orc workspace")
+	}
+	for _, want := range []string{"orc workspace not found", "--workspace"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("resolveRoot error missing %q: %v", want, err)
+		}
+	}
+}
+
 func TestRunDoctorTicketFixRemovesStaleLock(t *testing.T) {
 	resetCommandGlobals(t)
 	root := t.TempDir()
