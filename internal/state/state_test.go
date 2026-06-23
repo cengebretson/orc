@@ -513,6 +513,31 @@ func TestValidateRepos_CWDNotUnderWorktree(t *testing.T) {
 	}
 }
 
+func TestValidateRepos_CWDWorkspaceRootWithWorktree(t *testing.T) {
+	root := t.TempDir()
+	wt := filepath.Join(root, "worktrees", "my-app", "TICKET-1")
+	if err := os.MkdirAll(wt, 0755); err != nil {
+		t.Fatal(err)
+	}
+	mainPath := filepath.Join(root, "my-app")
+	if err := os.MkdirAll(mainPath, 0755); err != nil {
+		t.Fatal(err)
+	}
+	// A workspace-level stage (e.g. qa-automation) intentionally runs at the
+	// workspace root via cwd "." even when the feature has a worktree. ResolveCWD
+	// blesses this, so validation must accept it rather than reject it as "not
+	// under any worktree".
+	s := &state.State{
+		Repos: map[string]state.Repo{
+			"my-app": {Main: mainPath, Worktree: wt, Branch: "feature/x"},
+		},
+		NextAction: state.NextAction{CWD: "."},
+	}
+	if err := state.ValidateRepos(s, root); err != nil {
+		t.Errorf("expected nil for workspace-root cwd with worktree, got %v", err)
+	}
+}
+
 func TestValidateRepos_CWDSkippedWhenNoWorktrees(t *testing.T) {
 	root := t.TempDir()
 	// Repos set but no worktrees recorded — cwd check should be skipped
