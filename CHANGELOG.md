@@ -6,6 +6,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `orc watch [ticket]` opens a compact, auto-refreshing rail of active agent
+  work, with `--interval`, `--wide`, and `--tmux-toggle` (plus `--tmux-layout`
+  and `--tmux-size`) for toggling a narrow watch pane in the current tmux window.
+
 ## [0.5.0] - 2026-06-19
 
 ### Added
