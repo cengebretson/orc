@@ -322,7 +322,10 @@ func TestWatchUpdateAttachSetsMessage(t *testing.T) {
 		tmuxState: "live",
 	}}}
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
-	got := updated.(Model)
+	got, ok := updated.(Model)
+	if !ok {
+		t.Fatalf("Update returned %T, want Model", updated)
+	}
 	if got.message != "attaching PROJ-123:develop" {
 		t.Fatalf("message = %q", got.message)
 	}
