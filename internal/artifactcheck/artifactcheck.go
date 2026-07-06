@@ -15,6 +15,29 @@ const (
 	Empty
 )
 
+func (s Status) String() string {
+	switch s {
+	case Directory:
+		return "directory"
+	case Empty:
+		return "empty"
+	default:
+		return "missing"
+	}
+}
+
+// Message is the human-readable problem description, without the path.
+func (s Status) Message() string {
+	switch s {
+	case Directory:
+		return "is a directory"
+	case Empty:
+		return "empty"
+	default:
+		return "missing"
+	}
+}
+
 type Issue struct {
 	Path   string
 	Status Status
@@ -28,63 +51,46 @@ type Artifact struct {
 }
 
 func (i Issue) Detail() string {
-	switch i.Status {
-	case Missing:
-		return i.Path + " missing"
-	case Directory:
-		return i.Path + " is a directory"
-	case Empty:
-		return i.Path + " empty"
-	default:
-		return i.Path
-	}
+	return i.Path + " " + i.Status.Message()
 }
 
 func Check(featureDir string, artifacts []string) []Issue {
 	var issues []Issue
-	for _, artifact := range Inspect(featureDir, artifacts) {
-		if artifact.Ready {
-			continue
+	for _, artifact := range uniqueArtifacts(artifacts) {
+		if status, ready := stat(featureDir, artifact); !ready {
+			issues = append(issues, Issue{Path: artifact, Status: status})
 		}
-		issues = append(issues, Issue{Path: artifact.Path, Status: statusFromString(artifact.Status)})
 	}
 	return issues
 }
 
 func Inspect(featureDir string, artifacts []string) []Artifact {
-	out := make([]Artifact, 0, len(artifacts))
-	for _, artifact := range uniqueArtifacts(artifacts) {
-		path := filepath.Join(featureDir, artifact)
-		info, err := os.Stat(path)
-		if err != nil {
-			issue := Issue{Path: artifact, Status: Missing}
-			out = append(out, Artifact{Path: artifact, Status: "missing", Detail: issue.Detail(), Ready: false})
+	unique := uniqueArtifacts(artifacts)
+	out := make([]Artifact, 0, len(unique))
+	for _, artifact := range unique {
+		status, ready := stat(featureDir, artifact)
+		if ready {
+			out = append(out, Artifact{Path: artifact, Status: "ok", Ready: true})
 			continue
 		}
-		if info.IsDir() {
-			issue := Issue{Path: artifact, Status: Directory}
-			out = append(out, Artifact{Path: artifact, Status: "directory", Detail: issue.Detail(), Ready: false})
-			continue
-		}
-		if info.Size() == 0 {
-			issue := Issue{Path: artifact, Status: Empty}
-			out = append(out, Artifact{Path: artifact, Status: "empty", Detail: issue.Detail(), Ready: false})
-			continue
-		}
-		out = append(out, Artifact{Path: artifact, Status: "ok", Ready: true})
+		issue := Issue{Path: artifact, Status: status}
+		out = append(out, Artifact{Path: artifact, Status: status.String(), Detail: issue.Detail(), Ready: false})
 	}
 	return out
 }
 
-func statusFromString(status string) Status {
-	switch status {
-	case "directory":
-		return Directory
-	case "empty":
-		return Empty
-	default:
-		return Missing
+func stat(featureDir, artifact string) (Status, bool) {
+	info, err := os.Stat(filepath.Join(featureDir, artifact))
+	if err != nil {
+		return Missing, false
 	}
+	if info.IsDir() {
+		return Directory, false
+	}
+	if info.Size() == 0 {
+		return Empty, false
+	}
+	return 0, true
 }
 
 func uniqueArtifacts(artifacts []string) []string {

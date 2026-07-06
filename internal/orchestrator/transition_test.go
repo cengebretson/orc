@@ -147,6 +147,40 @@ func TestAdvanceBlocksWhenArtifactPolicyBlock(t *testing.T) {
 	}
 }
 
+// A manual stage must steer the agent to `orc mark pause` even when the block
+// policy would also reject the advance — pause is the escape valve.
+func TestAdvanceManualGateTakesPrecedenceOverArtifactPolicy(t *testing.T) {
+	root := copyFixtureWorkspace(t)
+	featureDir := filepath.Join(root, "features", "STORY-123-add-user-auth")
+	clearRepoValidationFields(t, featureDir)
+	enableArtifactPolicyBlock(t, root)
+	if err := os.Remove(filepath.Join(featureDir, "PLAN.md")); err != nil {
+		t.Fatalf("remove PLAN.md: %v", err)
+	}
+	if err := state.Update(featureDir, func(s *state.State) error {
+		s.Stage.Name = "default:develop"
+		s.Stage.Worker = "default:bob"
+		s.Status = "active"
+		return nil
+	}); err != nil {
+		t.Fatalf("Update setup: %v", err)
+	}
+
+	_, err := Advance(AdvanceOptions{
+		Root:       root,
+		FeatureDir: featureDir,
+	})
+	if err == nil {
+		t.Fatal("expected manual gate error")
+	}
+	if !strings.Contains(err.Error(), "advance: manual") {
+		t.Fatalf("error = %v, want manual gate guidance", err)
+	}
+	if strings.Contains(err.Error(), "artifact_policy") {
+		t.Fatalf("error = %v, want manual gate to take precedence over artifact policy", err)
+	}
+}
+
 func TestAdvanceRejectsUnknownWorkerOverride(t *testing.T) {
 	root := copyFixtureWorkspace(t)
 	featureDir := filepath.Join(root, "features", "STORY-123-add-user-auth")

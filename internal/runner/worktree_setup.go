@@ -74,7 +74,10 @@ func pendingWorktreeSetups(root string, cfg *config.Config, s *state.State) []pe
 			"worktree_path": absWorktree,
 		})
 		if err != nil {
-			continue
+			// Surface the broken template instead of silently dropping the
+			// setup step — the agent must not edit repos without a worktree.
+			command = fmt.Sprintf("# orc could not render repos.%s.worktree_setup (%v) — fix it in orc.yaml\n# template: %s",
+				repo.Config.Name, err, repo.Config.WorktreeSetup)
 		}
 		setups = append(setups, pendingSetup{
 			RepoName:     repo.Config.Name,

@@ -282,8 +282,8 @@ next_action:
 		"## Repo hints",
 		"Use the repo Makefile before direct commands.",
 		"## Required artifacts",
-		"features/<slug>/PLAN.md",
-		"features/<slug>/develop/HANDOFF.md",
+		"features/FLYWL-125-artifacts/PLAN.md",
+		"features/FLYWL-125-artifacts/develop/HANDOFF.md",
 	} {
 		if !strings.Contains(plan.Prompt, part) {
 			t.Fatalf("prompt missing %q:\n%s", part, plan.Prompt)

@@ -260,7 +260,7 @@ func appendFeatureSchemaChecks(r *Report, featureDir string, s *state.State) {
 	}
 	for _, name := range artifactcheck.CoreDocs {
 		if issue, found := issueByPath[name]; found {
-			r.Checks = append(r.Checks, warn("feature."+name, strings.TrimPrefix(issue.Detail(), name+" ")))
+			r.Checks = append(r.Checks, warn("feature."+name, issue.Status.Message()))
 		} else {
 			r.Checks = append(r.Checks, ok("feature."+name))
 		}

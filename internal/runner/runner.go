@@ -70,7 +70,7 @@ func Compute(root, featureDir, workerOverride string) (*Plan, error) {
 		loopDef,
 		isLoopStage,
 		worktreeSetupPrompt(root, cfg, s),
-		artifactPrompt(stageCfg.RequiredArtifacts),
+		artifactPrompt(s.Slug, stageCfg.RequiredArtifacts),
 		repoHintsPrompt(cfg, s),
 	)
 
@@ -170,15 +170,18 @@ func buildPrompt(s *state.State, nextStage, advanceMode string, loopDef *config.
 	return preamble + prompt + endInstruction(s.Ticket, nextStage, advanceMode, loopDef, isLoopStage)
 }
 
-func artifactPrompt(required []string) string {
+func artifactPrompt(slug string, required []string) string {
 	if len(required) == 0 {
 		return ""
+	}
+	if slug == "" {
+		slug = "<slug>"
 	}
 	var b strings.Builder
 	b.WriteString("## Required artifacts\n\n")
 	b.WriteString("Before completing this stage, make sure these feature-folder artifacts exist and are current:\n\n")
 	for _, artifact := range required {
-		fmt.Fprintf(&b, "- `features/<slug>/%s`\n", artifact)
+		fmt.Fprintf(&b, "- `features/%s/%s`\n", slug, artifact)
 	}
 	b.WriteString("\n")
 	return b.String()

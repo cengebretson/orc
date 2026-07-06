@@ -229,6 +229,9 @@ func worktreeSetupCommandCheck(root, name, setup string, lookPath func(string) (
 	if command == "" {
 		return Check{Group: "config", Name: name, Status: Warning, Detail: "empty setup command"}
 	}
+	if shellBuiltins[command] {
+		return Check{Group: "config", Name: name, Status: OK, Detail: "starts with shell builtin " + command + "; not checked"}
+	}
 	if strings.Contains(command, "/") {
 		path := command
 		if !filepath.IsAbs(path) {
@@ -250,6 +253,21 @@ func worktreeSetupCommandCheck(root, name, setup string, lookPath func(string) (
 		return Check{Group: "config", Name: name, Status: Warning, Detail: "command not found in PATH: " + command}
 	}
 	return Check{Group: "config", Name: name, Status: OK, Detail: "command found: " + command}
+}
+
+// shellBuiltins are command tokens that never resolve via PATH on every
+// platform; a setup command starting with one cannot be verified here.
+var shellBuiltins = map[string]bool{
+	"cd":     true,
+	".":      true,
+	"source": true,
+	"export": true,
+	"set":    true,
+	"eval":   true,
+	"exec":   true,
+	"if":     true,
+	"for":    true,
+	"while":  true,
 }
 
 func firstCommandToken(command string) string {

@@ -6,6 +6,23 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- With `artifact_policy: block`, `orc mark <ticket> next` now reports the
+  `advance: manual` pause guidance (and loop-limit pause/fail outcomes) before
+  the artifact readiness error, so agents are steered to the escape valve first.
+- `orc next` now surfaces a worktree setup command that fails placeholder
+  expansion in the launch prompt instead of silently omitting the setup step,
+  and required-artifact reminders show the real feature folder path instead of
+  `features/<slug>/`.
+
+### Fixed
+
+- `orc doctor` no longer warns "command not found in PATH" for `worktree_setup`
+  commands that start with a shell builtin such as `cd` or `source`.
+- Worktree reconciliation findings in `orc doctor <ticket>` and `orc validate`
+  are now reported in stable repo-name order.
+
 ## [0.7.2] - 2026-07-06
 
 ### Added

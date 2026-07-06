@@ -2,10 +2,12 @@ package doctor_test
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -248,6 +250,52 @@ engine: codex
 	}
 	if worktrees.Status != doctor.Warning {
 		t.Fatalf("worktrees status = %v, want Warning", worktrees.Status)
+	}
+}
+
+// A setup command starting with a shell builtin (cd, source, ...) cannot be
+// verified via PATH or a file stat — doctor must not warn about it.
+func TestRunWithOptionsSkipsShellBuiltinWorktreeSetup(t *testing.T) {
+	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, "worktrees"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeDoctorFile(t, filepath.Join(root, "orc.yaml"), `
+settings:
+  default_workflow: default
+repos:
+  - name: app
+    path: ../app
+    purpose: Application
+    agent_hints:
+      - Run make test.
+    worktree_setup: "cd ../app && ./setup-worktree.sh -b {{branch}} --path {{worktree_path}}"
+workflows:
+  default:
+    stages:
+      - name: develop
+        worker: default:bob
+        advance: auto
+`)
+	writeDoctorFile(t, filepath.Join(root, "workers", "default", "bob.md"), `---
+id: default:bob
+name: Bob
+engine: codex
+---
+`)
+
+	report := doctor.RunWithOptions(root, doctor.Options{
+		LookPath: func(name string) (string, error) {
+			return "", fmt.Errorf("%s not in PATH", name)
+		},
+	})
+
+	command := findCheck(report, "config", "repos.app.worktree_setup.command")
+	if command == nil {
+		t.Fatal("worktree_setup command check not found")
+	}
+	if command.Status != doctor.OK || !strings.Contains(command.Detail, "shell builtin") {
+		t.Fatalf("command check = %#v, want builtin skip", command)
 	}
 }
 

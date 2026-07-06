@@ -77,11 +77,6 @@ func Advance(opts AdvanceOptions) (*AdvanceResult, error) {
 	if !ok {
 		return nil, fmt.Errorf("current stage %q not found in workflow %q — check STATE.yaml.stage.name", prevStage, workflow)
 	}
-	if workflowCfg.ArtifactPolicy() == "block" {
-		if issues := artifactcheck.Check(opts.FeatureDir, append(artifactcheck.CoreDocs, stageCfg.RequiredArtifacts...)); len(issues) > 0 {
-			return nil, fmt.Errorf("artifact_policy=block: required artifacts are not ready:\n  - %s", artifactIssueDetails(issues))
-		}
-	}
 
 	if opts.Stage != "" {
 		if _, ok := workflowCfg.StageConfig(workflow, opts.Stage); !ok {
@@ -100,7 +95,7 @@ func Advance(opts AdvanceOptions) (*AdvanceResult, error) {
 	}
 
 	if nextStage != "" && !workflowCfg.IsLoopStage(workflow, prevStage) && !workflowCfg.IsLoopStage(workflow, nextStage) {
-		if sc, ok := workflowCfg.StageConfig(workflow, prevStage); ok && sc.Advance == "manual" {
+		if stageCfg.Advance == "manual" {
 			return nil, fmt.Errorf(
 				"stage %q has advance: manual — use `orc mark %s pause \"<reason>\"` so a human can review before continuing",
 				prevStage, s.Ticket,
@@ -144,6 +139,14 @@ func Advance(opts AdvanceOptions) (*AdvanceResult, error) {
 					Reason:   reason,
 				}, nil
 			}
+		}
+	}
+
+	// Checked last so agents get actionable guidance first: a manual stage says
+	// "use pause", and a loop at max still pauses/fails instead of erroring here.
+	if workflowCfg.ArtifactPolicy() == "block" {
+		if issues := artifactcheck.Check(opts.FeatureDir, append(artifactcheck.CoreDocs, stageCfg.RequiredArtifacts...)); len(issues) > 0 {
+			return nil, fmt.Errorf("artifact_policy=block: required artifacts are not ready:\n  - %s", artifactIssueDetails(issues))
 		}
 	}
 

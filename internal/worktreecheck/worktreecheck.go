@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/cengebretson/orc/internal/state"
@@ -28,8 +29,15 @@ func Reconcile(root string, s *state.State) []Finding {
 	if s == nil || len(s.Repos) == 0 {
 		return nil
 	}
+	names := make([]string, 0, len(s.Repos))
+	for name := range s.Repos {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
 	var findings []Finding
-	for name, repo := range s.Repos {
+	for _, name := range names {
+		repo := s.Repos[name]
 		if repo.Worktree == "" {
 			continue
 		}
@@ -100,8 +108,28 @@ func gitCheck(dir string, args ...string) error {
 	return err
 }
 
+// repoLocationVars redirect git away from the repo named by -C when inherited
+// from a caller running inside a git hook. They must not leak into checks.
+var repoLocationVars = map[string]bool{
+	"GIT_DIR":              true,
+	"GIT_WORK_TREE":        true,
+	"GIT_INDEX_FILE":       true,
+	"GIT_COMMON_DIR":       true,
+	"GIT_OBJECT_DIRECTORY": true,
+	"GIT_PREFIX":           true,
+}
+
 func gitOutput(dir string, args ...string) (string, error) {
 	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+	environ := os.Environ()
+	cmd.Env = make([]string, 0, len(environ))
+	for _, e := range environ {
+		name, _, _ := strings.Cut(e, "=")
+		if repoLocationVars[name] {
+			continue
+		}
+		cmd.Env = append(cmd.Env, e)
+	}
 	out, err := cmd.Output()
 	if err != nil {
 		return "", err
