@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/cengebretson/orc/internal/state"
@@ -116,6 +117,36 @@ func TestAdvanceRejectsPendingTicket(t *testing.T) {
 	}
 }
 
+func TestAdvanceBlocksWhenArtifactPolicyBlock(t *testing.T) {
+	root := copyFixtureWorkspace(t)
+	featureDir := filepath.Join(root, "features", "STORY-123-add-user-auth")
+	clearRepoValidationFields(t, featureDir)
+	enableArtifactPolicyBlock(t, root)
+	if err := os.Remove(filepath.Join(featureDir, "PLAN.md")); err != nil {
+		t.Fatalf("remove PLAN.md: %v", err)
+	}
+	if err := state.Update(featureDir, func(s *state.State) error {
+		s.Stage.Name = "default:intake"
+		s.Stage.Worker = "default:fred"
+		s.Status = "active"
+		return nil
+	}); err != nil {
+		t.Fatalf("Update setup: %v", err)
+	}
+
+	_, err := Advance(AdvanceOptions{
+		Root:       root,
+		FeatureDir: featureDir,
+		Result:     "ready",
+	})
+	if err == nil {
+		t.Fatal("expected artifact policy error")
+	}
+	if !strings.Contains(err.Error(), "artifact_policy=block") || !strings.Contains(err.Error(), "PLAN.md missing") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestAdvanceRejectsUnknownWorkerOverride(t *testing.T) {
 	root := copyFixtureWorkspace(t)
 	featureDir := filepath.Join(root, "features", "STORY-123-add-user-auth")
@@ -171,6 +202,22 @@ func TestAdvancePausesWhenLoopLimitReached(t *testing.T) {
 	}
 	if s.Status != "paused" {
 		t.Fatalf("status = %q, want paused", s.Status)
+	}
+}
+
+func enableArtifactPolicyBlock(t *testing.T, root string) {
+	t.Helper()
+	path := filepath.Join(root, "orc.yaml")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read orc.yaml: %v", err)
+	}
+	updated := strings.Replace(string(data), "\n  artifact_policy: warn", "\n  artifact_policy: block", 1)
+	if updated == string(data) {
+		t.Fatal("artifact_policy setting not found")
+	}
+	if err := os.WriteFile(path, []byte(updated), 0644); err != nil {
+		t.Fatalf("write orc.yaml: %v", err)
 	}
 }
 

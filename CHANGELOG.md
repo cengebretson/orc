@@ -6,6 +6,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Workspaces can set `settings.artifact_policy: block` to prevent `orc mark
+  <ticket> next` from advancing while core feature docs or current-stage
+  required artifacts are missing or empty.
+
 ## [0.7.0] - 2026-07-05
 
 ### Added

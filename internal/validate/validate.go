@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cengebretson/orc/internal/artifactcheck"
 	"github.com/cengebretson/orc/internal/config"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/ticketview"
@@ -252,22 +253,17 @@ func appendFeatureSchemaChecks(r *Report, featureDir string, s *state.State) {
 		}
 	}
 
-	for _, name := range []string{"TICKET.md", "SPEC.md", "PLAN.md", "DECISIONS.md"} {
-		path := filepath.Join(featureDir, name)
-		info, err := os.Stat(path)
-		if err != nil {
-			r.Checks = append(r.Checks, warn("feature."+name, "missing"))
-			continue
+	issues := artifactcheck.Check(featureDir, artifactcheck.CoreDocs)
+	issueByPath := map[string]artifactcheck.Issue{}
+	for _, issue := range issues {
+		issueByPath[issue.Path] = issue
+	}
+	for _, name := range artifactcheck.CoreDocs {
+		if issue, found := issueByPath[name]; found {
+			r.Checks = append(r.Checks, warn("feature."+name, strings.TrimPrefix(issue.Detail(), name+" ")))
+		} else {
+			r.Checks = append(r.Checks, ok("feature."+name))
 		}
-		if info.IsDir() {
-			r.Checks = append(r.Checks, warn("feature."+name, "is a directory"))
-			continue
-		}
-		if info.Size() == 0 {
-			r.Checks = append(r.Checks, warn("feature."+name, "empty"))
-			continue
-		}
-		r.Checks = append(r.Checks, ok("feature."+name))
 	}
 }
 
@@ -275,22 +271,17 @@ func appendRequiredArtifactChecks(r *Report, featureDir string, artifacts []stri
 	if len(artifacts) == 0 {
 		return
 	}
+	issues := artifactcheck.Check(featureDir, artifacts)
+	issueByPath := map[string]artifactcheck.Issue{}
+	for _, issue := range issues {
+		issueByPath[issue.Path] = issue
+	}
 	for _, artifact := range artifacts {
-		path := filepath.Join(featureDir, artifact)
-		info, err := os.Stat(path)
-		if err != nil {
-			r.Checks = append(r.Checks, warn("required artifact", artifact+" missing"))
-			continue
+		if issue, found := issueByPath[artifact]; found {
+			r.Checks = append(r.Checks, warn("required artifact", issue.Detail()))
+		} else {
+			r.Checks = append(r.Checks, okd("required artifact", artifact))
 		}
-		if info.IsDir() {
-			r.Checks = append(r.Checks, warn("required artifact", artifact+" is a directory"))
-			continue
-		}
-		if info.Size() == 0 {
-			r.Checks = append(r.Checks, warn("required artifact", artifact+" empty"))
-			continue
-		}
-		r.Checks = append(r.Checks, okd("required artifact", artifact))
 	}
 }
 

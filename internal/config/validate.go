@@ -50,6 +50,12 @@ func Validate(cfg *Config, workerIDs []string) ValidationErrors {
 	errs = append(errs, validateAliasTargets("aliases.stages", cfg.Aliases.Stages)...)
 	errs = append(errs, validateAliasTargets("aliases.workers", cfg.Aliases.Workers)...)
 	errs = append(errs, validateRepos(cfg.Repos)...)
+	if cfg.Settings.ArtifactPolicy != "" && cfg.Settings.ArtifactPolicy != "warn" && cfg.Settings.ArtifactPolicy != "block" {
+		errs = append(errs, ValidationError{
+			Path:    "settings.artifact_policy",
+			Message: `artifact_policy must be "warn" or "block"`,
+		})
+	}
 
 	if len(cfg.Workflows) > 0 {
 		defaultWorkflow := cfg.ResolveWorkflow(cfg.DefaultWorkflow())

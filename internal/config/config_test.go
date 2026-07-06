@@ -29,11 +29,19 @@ func TestDefaultWorkflow_UsesConfiguredValue(t *testing.T) {
 	}
 }
 
+func TestArtifactPolicy_DefaultsToWarn(t *testing.T) {
+	cfg := &config.Config{}
+	if got := cfg.ArtifactPolicy(); got != "warn" {
+		t.Errorf("ArtifactPolicy() = %q, want warn", got)
+	}
+}
+
 func TestLoad_Settings(t *testing.T) {
 	dir := t.TempDir()
 	writeOrcYAML(t, dir, `
 settings:
   default_workflow: hotfix
+  artifact_policy: block
   auto_archive: true
 repos: []
 `)
@@ -44,6 +52,9 @@ repos: []
 	}
 	if cfg.Settings.DefaultWorkflow != "hotfix" {
 		t.Errorf("default_workflow = %q, want \"hotfix\"", cfg.Settings.DefaultWorkflow)
+	}
+	if got := cfg.ArtifactPolicy(); got != "block" {
+		t.Errorf("ArtifactPolicy() = %q, want block", got)
 	}
 	if !cfg.Settings.AutoArchive {
 		t.Error("auto_archive = false, want true")

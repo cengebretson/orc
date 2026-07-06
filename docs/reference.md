@@ -125,6 +125,7 @@ configuration reference.
 ```yaml
 settings:
   default_workflow: default:standard
+  artifact_policy: warn
   auto_archive: false
   auto_tmux: false       # wrap every orc next launch in a tmux session automatically
   auto_next: false       # orc work immediately launches the first stage (same as --next)
@@ -185,6 +186,9 @@ Stages may define `required_artifacts` as feature-folder relative paths. `orc
 next` reminds agents to keep those files current, and `orc validate` warns when
 they are missing or empty. Loop stages can declare their own
 `required_artifacts` under `loop`.
+Set `settings.artifact_policy: block` to make `orc mark <ticket> next` refuse
+to advance when core docs or current-stage required artifacts are missing or
+empty. The default is `warn`.
 
 ## Packs
 

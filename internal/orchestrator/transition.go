@@ -2,7 +2,9 @@ package orchestrator
 
 import (
 	"fmt"
+	"strings"
 
+	"github.com/cengebretson/orc/internal/artifactcheck"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/workers"
 	"github.com/cengebretson/orc/internal/workspacectx"
@@ -71,8 +73,14 @@ func Advance(opts AdvanceOptions) (*AdvanceResult, error) {
 		return nil, fmt.Errorf("workflow %q not found in orc.yaml", workflow)
 	}
 	prevStage := s.Stage.Name
-	if _, ok := workflowCfg.StageConfig(workflow, prevStage); !ok {
+	stageCfg, ok := workflowCfg.StageConfig(workflow, prevStage)
+	if !ok {
 		return nil, fmt.Errorf("current stage %q not found in workflow %q — check STATE.yaml.stage.name", prevStage, workflow)
+	}
+	if workflowCfg.ArtifactPolicy() == "block" {
+		if issues := artifactcheck.Check(opts.FeatureDir, append(artifactcheck.CoreDocs, stageCfg.RequiredArtifacts...)); len(issues) > 0 {
+			return nil, fmt.Errorf("artifact_policy=block: required artifacts are not ready:\n  - %s", artifactIssueDetails(issues))
+		}
 	}
 
 	if opts.Stage != "" {
@@ -170,4 +178,12 @@ func Advance(opts AdvanceOptions) (*AdvanceResult, error) {
 		Outcome:     out,
 		AutoArchive: autoArchive,
 	}, nil
+}
+
+func artifactIssueDetails(issues []artifactcheck.Issue) string {
+	parts := make([]string, len(issues))
+	for i, issue := range issues {
+		parts[i] = issue.Detail()
+	}
+	return strings.Join(parts, "\n  - ")
 }

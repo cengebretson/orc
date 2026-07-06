@@ -22,6 +22,7 @@ type Repo struct {
 
 type Settings struct {
 	DefaultWorkflow string   `yaml:"default_workflow"`
+	ArtifactPolicy  string   `yaml:"artifact_policy,omitempty"`
 	AutoArchive     bool     `yaml:"auto_archive"`
 	AutoTmux        bool     `yaml:"auto_tmux"`
 	AutoNext        bool     `yaml:"auto_next"`
@@ -80,6 +81,13 @@ func (c *Config) TuiRefreshInterval() time.Duration {
 // DefaultWorkflow returns the configured default workflow name, or "" if not set.
 func (c *Config) DefaultWorkflow() string {
 	return c.Settings.DefaultWorkflow
+}
+
+func (c *Config) ArtifactPolicy() string {
+	if c == nil || c.Settings.ArtifactPolicy == "" {
+		return "warn"
+	}
+	return c.Settings.ArtifactPolicy
 }
 
 // ResolveWorkflow returns the canonical workflow ID for a workflow or alias.

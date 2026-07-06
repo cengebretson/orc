@@ -57,6 +57,15 @@ func TestValidate_DefaultWorkflowMayUseAlias(t *testing.T) {
 	}
 }
 
+func TestValidate_ArtifactPolicy(t *testing.T) {
+	cfg := &config.Config{
+		Settings:  config.Settings{DefaultWorkflow: "default", ArtifactPolicy: "strict"},
+		Workflows: map[string]config.WorkflowDef{"default": {Stages: []config.StageDef{{Name: "intake", Worker: "fred", Advance: "auto"}}}},
+	}
+
+	assertValidationError(t, config.Validate(cfg, []string{"fred"}), "settings.artifact_policy", `artifact_policy must be "warn" or "block"`)
+}
+
 func TestValidate_DefaultWorkflowRequiredWhenWorkflowsExist(t *testing.T) {
 	cfg := &config.Config{
 		Workflows: map[string]config.WorkflowDef{"default": {Stages: []config.StageDef{{Name: "intake", Worker: "fred", Advance: "auto"}}}},

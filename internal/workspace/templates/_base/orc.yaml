@@ -6,6 +6,7 @@
 
 # settings:
 #   default_workflow: default     # workflow used by `orc work` when --workflow is omitted
+#   artifact_policy: warn         # warn or block when feature artifacts are missing at stage completion
 #   auto_archive: false           # archive tickets automatically when the last stage completes
 #   auto_tmux: false              # always use tmux for new tickets (same as orc work --tmux)
 #   auto_next: false              # always launch the first stage after orc work (same as orc work --next)
@@ -14,6 +15,7 @@
 
 settings:
   default_workflow: default
+  artifact_policy: warn
   quotes:
     - "Mmm... human burgers!"
     - "Do we get fries with that?"

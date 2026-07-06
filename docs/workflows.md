@@ -12,6 +12,7 @@ generic state transitions and safety rules around that policy.
 ```yaml
 settings:
   default_workflow: default:standard
+  artifact_policy: warn
   auto_archive: false
   auto_tmux: false
   auto_next: false
@@ -57,6 +58,7 @@ workflows:
 | Field | Required | Meaning |
 |-------|----------|---------|
 | `default_workflow` | Yes, when workflows exist | Workflow used by `orc work <ticket>` when `--workflow` is omitted. |
+| `artifact_policy` | No | `warn` (default) reports missing/empty core docs and stage artifacts without blocking. `block` makes `orc mark <ticket> next` refuse to advance until they are ready. |
 | `auto_archive` | No | Archives tickets automatically after the last stage completes. |
 | `auto_tmux` | No | Uses tmux for new ticket launches by default. Same intent as `orc work --tmux`. |
 | `auto_next` | No | Launches the first stage immediately after `orc work`. Same intent as `orc work --next`. |
