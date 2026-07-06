@@ -46,6 +46,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case dataMsg:
 		m.features = msg.features
 		m.healthItems = msg.healthItems
+		m.artifactPolicy = msg.artifactPolicy
 		m.workerNames = msg.workerNames
 		m.workerGroups = msg.workerGroups
 		m.workflowGroups = msg.workflowGroups

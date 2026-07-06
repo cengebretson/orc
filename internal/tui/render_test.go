@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cengebretson/orc/internal/config"
 	"github.com/cengebretson/orc/internal/doctor"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/workers"
@@ -98,6 +99,24 @@ func TestHealthSummaryExtra(t *testing.T) {
 	clean := Model{healthItems: []doctor.Check{{Name: "a", Status: doctor.OK}}}
 	if got := clean.healthSummaryExtra(); got != "" {
 		t.Errorf("all-OK summary extra = %q, want empty", got)
+	}
+}
+
+func TestDashboardShowsArtifactPolicyAndRepoCapabilityBadges(t *testing.T) {
+	m := testModel(t)
+	m.artifactPolicy = "block"
+	m.repos = []config.Repo{{
+		Name:          "app",
+		Purpose:       "primary app",
+		WorktreeSetup: "scripts/setup.sh",
+		AgentHints:    []string{"make test"},
+	}}
+
+	out := ansi.Strip(m.viewDashboard())
+	for _, want := range []string{"artifacts block", "app", "setup", "hints"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("dashboard missing %q:\n%s", want, out)
+		}
 	}
 }
 
@@ -411,6 +430,28 @@ func TestViewDetailShowsDimCanonicalIDs(t *testing.T) {
 	}
 }
 
+func TestViewDetailShowsRequiredArtifactChecklist(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "PLAN.md"), []byte("plan"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	row := testRow("STORY-1", "active", "develop")
+	row.featureDir = dir
+	row.requiredArtifacts = []string{"PLAN.md", "develop/HANDOFF.md"}
+
+	m := New("")
+	m.width = 120
+	m.height = 40
+	m.detail = row
+
+	out := ansi.Strip(m.renderDetailBody())
+	for _, want := range []string{"Required Artifacts", "PLAN.md", "develop/HANDOFF.md missing"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("detail artifact checklist missing %q:\n%s", want, out)
+		}
+	}
+}
+
 func TestViewDetailTimingKeepsLongStageName(t *testing.T) {
 	row := testRow("STORY-1", "active", "default:qa-automation")
 	row.featureDir = t.TempDir()
@@ -473,11 +514,11 @@ func testChains() []workflowChain {
 	return []workflowChain{{
 		name: "default",
 		steps: []routeStep{
-			{name: "develop", advance: "auto", workerID: "bob"},
+			{name: "develop", advance: "auto", workerID: "bob", requiredArtifacts: []string{"PLAN.md", "develop/HANDOFF.md"}},
 			{name: "code-review", advance: "manual"},
 		},
 		loops:       []repairLoop{{name: "pr-repair", target: "develop"}},
-		repairSteps: []repairStep{{name: "pr-repair", workerID: "bob", advance: "auto", repairs: "develop", maxRetries: 3}},
+		repairSteps: []repairStep{{name: "pr-repair", workerID: "bob", advance: "auto", repairs: "develop", maxRetries: 3, requiredArtifacts: []string{"pr-repair/ci-failures.md"}}},
 	}}
 }
 
@@ -499,7 +540,11 @@ func TestRenderWorkflowDetail(t *testing.T) {
 
 	out := renderWorkflowDetail("default", testChains(), allWorkers, stagesDir, features, 0, 100)
 
-	for _, want := range []string{"Route", "Stages", "develop", "code-review", "Bob", "claude", "manual", "auto"} {
+	for _, want := range []string{
+		"Route", "Stages", "develop", "code-review", "Bob", "claude", "manual", "auto",
+		"artifacts: PLAN.md, develop/HANDOFF.md",
+		"artifacts: pr-repair/ci-failures.md",
+	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("workflow detail missing %q", want)
 		}

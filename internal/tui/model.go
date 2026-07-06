@@ -64,6 +64,7 @@ func rainbowTick() tea.Cmd {
 type dataMsg struct {
 	features        []*featureRow
 	healthItems     []doctor.Check
+	artifactPolicy  string
 	workerNames     []string
 	workerGroups    []workerGroup
 	workflowGroups  []workflowGroup
@@ -76,10 +77,11 @@ type dataMsg struct {
 }
 
 type routeStep struct {
-	name     string
-	label    string
-	advance  string // "auto" or "manual"
-	workerID string
+	name              string
+	label             string
+	advance           string // "auto" or "manual"
+	workerID          string
+	requiredArtifacts []string
 }
 
 type repairLoop struct {
@@ -89,13 +91,14 @@ type repairLoop struct {
 }
 
 type repairStep struct {
-	name         string
-	label        string
-	workerID     string
-	advance      string
-	repairs      string
-	repairsLabel string
-	maxRetries   int
+	name              string
+	label             string
+	workerID          string
+	advance           string
+	repairs           string
+	repairsLabel      string
+	maxRetries        int
+	requiredArtifacts []string
 }
 
 type workerGroup struct {
@@ -126,17 +129,18 @@ type sectionItem struct {
 // ── data types ───────────────────────────────────────────────────
 
 type featureRow struct {
-	s              *state.State
-	featureDir     string
-	workflow       string
-	stage          string
-	workflowLabel  string
-	stageLabel     string
-	stageLoopLabel string
-	workerName     string
-	tmuxLive       bool
-	hasIssues      bool
-	loadErr        error // non-nil when STATE.yaml could not be parsed; s is nil
+	s                 *state.State
+	featureDir        string
+	workflow          string
+	stage             string
+	workflowLabel     string
+	stageLabel        string
+	stageLoopLabel    string
+	workerName        string
+	tmuxLive          bool
+	hasIssues         bool
+	requiredArtifacts []string
+	loadErr           error // non-nil when STATE.yaml could not be parsed; s is nil
 }
 
 // ticketID returns the ticket for display. Broken rows have no parsed state, so
@@ -155,6 +159,7 @@ type Model struct {
 	view            viewState
 	features        []*featureRow
 	healthItems     []doctor.Check
+	artifactPolicy  string
 	workerNames     []string
 	workerGroups    []workerGroup
 	workflowGroups  []workflowGroup

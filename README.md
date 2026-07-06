@@ -40,13 +40,23 @@ exit criteria, and the exact `orc mark` command to run when done. Agents don't
 decide what to do next — the workspace tells them.
 
 **Policy lives in files, not code.** `orc.yaml` declares stage order, default
-workers, and advance mode. Stage docs are plain markdown. Change review criteria,
-add a preflight check, swap models — edit the file and the next session picks it
-up immediately.
+workers, advance mode, repo setup commands, and required feature artifacts. Stage
+docs are plain markdown. Change review criteria, add a preflight check, swap
+models — edit the file and the next session picks it up immediately.
+
+**Handoffs can be enforced.** Stages can declare `required_artifacts` such as
+`PLAN.md`, `develop/HANDOFF.md`, or `qa-automation/RESULT.md`. In the default
+`warn` mode, `orc validate` reports missing artifacts. With
+`artifact_policy: block`, `orc mark <ticket> next` refuses to advance until the
+current stage's artifacts are ready.
 
 **Right agent for each job.** A fast model for implementation, a smarter one for
 review, a specialist for QA. Each worker is a markdown file. Use `--worker` to
 override for a single run.
+
+**Repo setup stays repo-specific.** Repos can define `worktree_setup` and
+`agent_hints` in `orc.yaml`, so agents see the correct checkout command and local
+repo conventions without `orc` hardcoding them.
 
 **Human-in-the-loop where it counts.** `orc mark <ticket> pause` creates explicit
 review gates. Agents call it when they need a human decision. `orc next <ticket>`
@@ -231,6 +241,10 @@ Workers are markdown files in `workers/`. Each stage in `orc.yaml` names a worke
 `auto` — agent calls `orc mark <ticket> next`, and `orc next <ticket>` launches the next stage  
 `manual` — agent calls `orc mark <ticket> pause`; a human approves before continuing
 
+Stages may also declare `required_artifacts`. `orc next` reminds agents about
+them, `orc validate` reports missing or empty files, and
+`settings.artifact_policy: block` makes `orc mark <ticket> next` enforce them.
+
 ---
 
 ### Agent session loop
@@ -351,7 +365,7 @@ Or use the Claude Desktop settings UI. Requires a GitHub PAT with `repo` and `pu
   - `orc pack show <pack>` — show one installed pack snapshot
 - `orc doctor` — check workspace health plus `orc.yaml`, local tools, worker engines, tmux, and state locks
 - `orc doctor --system` — check install readiness outside a workspace
-  - `orc doctor <ticket>` — validate a ticket's `STATE.yaml`: workflow, stage, worker, next action, repos, and worktrees
+  - `orc doctor <ticket>` — validate a ticket's `STATE.yaml`: workflow, stage, worker, next action, repos, worktrees, and feature artifacts
   - `--fix` — remove provably-stale state locks (dead PID or old without a valid PID); live locks are never touched
 - `orc status` — show all features and their current workflow/stage
   - `orc status <ticket>` — show full details for a specific ticket
@@ -394,7 +408,7 @@ These are called by agents at the end of each session. They are hidden from `orc
 - `orc mark <ticket> done` — mark active, ready, or paused work as done
 - `orc mark <ticket> jit "<summary>"` — record a jit task as complete and clear `runtime.jit`
 
-`orc mark` validates transitions before writing `STATE.yaml`: pending tickets must be started before `next`, `done` is rejected from `pending`, stage and worker overrides must exist, and invalid workspace config blocks advancement.
+`orc mark` validates transitions before writing `STATE.yaml`: pending tickets must be started before `next`, `done` is rejected from `pending`, stage and worker overrides must exist, invalid workspace config blocks advancement, and `artifact_policy: block` blocks `next` when required artifacts are missing or empty.
 
 ## Reference
 

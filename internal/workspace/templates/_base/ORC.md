@@ -200,7 +200,12 @@ Read `STATE.yaml` and `TICKET.md` at the start of every session. Read `SPEC.md` 
 
 The feature folder is the handoff medium between stages. Read previous stage outputs before starting work. If a required input is missing, `orc mark ... pause` — do not proceed.
 
-Each stage writes its outputs to the paths declared in its stage instructions.
+Each stage writes its outputs to the paths declared in its stage instructions and
+any `required_artifacts` configured for the stage in `orc.yaml`. `orc validate`
+warns when these files are missing or empty. If `settings.artifact_policy` is
+`block`, `orc mark <ticket> next` refuses to advance until core docs and the
+current stage's required artifacts are ready.
+
 These are handoff folders, not canonical resource IDs. The default pack uses
 friendly folders such as `develop/`, `code-review/`, and `pr-open/`.
 

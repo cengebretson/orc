@@ -29,10 +29,11 @@ func loadData(root string) tea.Cmd {
 			for _, stageName := range stages {
 				sc, _ := workflowCfg.StageConfig(wfName, stageName)
 				steps = append(steps, routeStep{
-					name:     stageName,
-					label:    workflowCfg.StageDisplayName(stageName),
-					advance:  sc.Advance,
-					workerID: sc.Worker,
+					name:              stageName,
+					label:             workflowCfg.StageDisplayName(stageName),
+					advance:           sc.Advance,
+					workerID:          sc.Worker,
+					requiredArtifacts: sc.RequiredArtifacts,
 				})
 				inThisChain[stageName] = true
 			}
@@ -49,12 +50,13 @@ func loadData(root string) tea.Cmd {
 					target: sc.Name,
 				})
 				repairs = append(repairs, repairStep{
-					name:         sc.Loop.Via,
-					label:        workflowCfg.StageDisplayName(sc.Loop.Via),
-					workerID:     sc.Loop.Worker,
-					repairs:      sc.Name,
-					repairsLabel: workflowCfg.StageDisplayName(sc.Name),
-					maxRetries:   sc.Loop.Max,
+					name:              sc.Loop.Via,
+					label:             workflowCfg.StageDisplayName(sc.Loop.Via),
+					workerID:          sc.Loop.Worker,
+					repairs:           sc.Name,
+					repairsLabel:      workflowCfg.StageDisplayName(sc.Name),
+					maxRetries:        sc.Loop.Max,
+					requiredArtifacts: sc.Loop.RequiredArtifacts,
 				})
 			}
 			chains = append(chains, workflowChain{
@@ -136,6 +138,7 @@ func loadData(root string) tea.Cmd {
 			repos:           repos,
 			sectionItems:    si,
 			refreshInterval: workflowCfg.TuiRefreshInterval(),
+			artifactPolicy:  workflowCfg.ArtifactPolicy(),
 			quotes:          workflowCfg.Settings.Quotes,
 		}
 	}
@@ -157,19 +160,31 @@ func collectFeatures(root string) []*featureRow {
 			continue
 		}
 		rows = append(rows, &featureRow{
-			s:              f.State,
-			featureDir:     f.FeatureDir,
-			workflow:       f.Workflow,
-			stage:          workflowCfg.ResolveStage(f.State.Stage.Name),
-			workflowLabel:  workflowDisplayName(workflowCfg, f.Workflow),
-			stageLabel:     stageDisplayName(workflowCfg, f.State.Stage.Name),
-			stageLoopLabel: f.StageLoopLabel,
-			workerName:     f.WorkerName,
-			tmuxLive:       f.TmuxLive,
-			hasIssues:      f.HasIssues,
+			s:                 f.State,
+			featureDir:        f.FeatureDir,
+			workflow:          f.Workflow,
+			stage:             workflowCfg.ResolveStage(f.State.Stage.Name),
+			workflowLabel:     workflowDisplayName(workflowCfg, f.Workflow),
+			stageLabel:        stageDisplayName(workflowCfg, f.State.Stage.Name),
+			stageLoopLabel:    f.StageLoopLabel,
+			workerName:        f.WorkerName,
+			tmuxLive:          f.TmuxLive,
+			hasIssues:         f.HasIssues,
+			requiredArtifacts: currentStageArtifacts(workflowCfg, f.Workflow, f.State.Stage.Name),
 		})
 	}
 	return rows
+}
+
+func currentStageArtifacts(cfg *config.Config, workflowName, stageName string) []string {
+	if cfg == nil {
+		return nil
+	}
+	sc, ok := cfg.StageConfig(workflowName, stageName)
+	if !ok {
+		return nil
+	}
+	return sc.RequiredArtifacts
 }
 
 func workflowDisplayName(cfg *config.Config, id string) string {
@@ -295,7 +310,7 @@ func buildFileList(featureDir string, s *state.State) []detailFile {
 		{"PLAN.md", filepath.Join(featureDir, "PLAN.md")},
 		{"DECISIONS.md", filepath.Join(featureDir, "DECISIONS.md")},
 	}
-	core := map[string]bool{"TICKET.md": true, "SPEC.md": true, "PLAN.md": true}
+	core := map[string]bool{"TICKET.md": true, "SPEC.md": true, "PLAN.md": true, "DECISIONS.md": true}
 	var out []detailFile
 	for _, f := range topLevel {
 		if fileExists(f.path) || core[f.label] {

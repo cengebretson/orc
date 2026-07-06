@@ -102,6 +102,9 @@ func (m Model) viewDashboard() string {
 	if extra := m.healthSummaryExtra(); extra != "" {
 		healthSummary += styleDim.Render("  ·  ") + extra
 	}
+	if m.artifactPolicy != "" {
+		healthSummary += styleDim.Render("  ·  artifacts ") + artifactPolicyStyle(m.artifactPolicy).Render(m.artifactPolicy)
+	}
 	left.WriteString(m.sectionBox("health", "1", "Health",
 		healthSummary, healthContent, leftW, healthFocused) + "\n")
 
@@ -654,14 +657,32 @@ func renderRepoList(repos []config.Repo, maxW int) []string {
 		name := styleSubtext.Render(r.Name)
 		sep := styleDivider.Render("  —  ")
 		purpose := styleDim.Render(r.Purpose)
-		line := name + sep + purpose
+		var badges []string
+		if r.WorktreeSetup != "" {
+			badges = append(badges, styleHealthOK.Render("setup"))
+		}
+		if len(r.AgentHints) > 0 {
+			badges = append(badges, styleStatusWaiting.Render("hints"))
+		}
+		badgeText := ""
+		if len(badges) > 0 {
+			badgeText = styleDim.Render("  ") + strings.Join(badges, styleDim.Render(" "))
+		}
+		line := name + badgeText + sep + purpose
 		if lipgloss.Width(line) > maxW {
-			purpose = styleDim.Render(truncate(r.Purpose, maxW-lipgloss.Width(name+sep)))
-			line = name + sep + purpose
+			purpose = styleDim.Render(truncate(r.Purpose, maxW-lipgloss.Width(name+badgeText+sep)))
+			line = name + badgeText + sep + purpose
 		}
 		lines = append(lines, line)
 	}
 	return lines
+}
+
+func artifactPolicyStyle(policy string) lipgloss.Style {
+	if policy == "block" {
+		return styleHealthWarn
+	}
+	return styleHealthOK
 }
 
 // renderRouteChain renders the workflow stage sequence with colored arrows and loop stage annotations.

@@ -167,6 +167,9 @@ provided by multiple packs.
 - `orc doctor <ticket>` validates workspace config along with that ticket's `STATE.yaml`.
 - `orc next <ticket>` refuses to launch when the workspace config is invalid.
 - `orc mark <ticket> next` refuses to advance when the workspace config is invalid.
+- If `settings.artifact_policy` is `block`, `orc mark <ticket> next` also
+  refuses to advance when core feature docs or current-stage
+  `required_artifacts` are missing, empty, or directories.
 
 ## State Transitions
 

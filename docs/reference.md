@@ -326,7 +326,11 @@ Every launch gets a preamble pointing the agent at `AGENTS.md` and `ORC.md`, fol
 
 When relaunching a paused or interrupted session, `orc next` builds a richer recovery prompt that also includes: recent history entries (what each prior stage did and who ran it), any partial output files already written to the current stage folder, and a checklist of key context files to read — `TICKET.md`, `SPEC.md`, `DECISIONS.md`, and the stage doc.
 
-This means no agent ever starts cold. The prompt is a complete handoff: what the ticket is, where things stand, what this stage needs to produce, and exactly what command ends the session. The agent reads the files, does the work, runs the command — and the next agent gets the same treatment.
+When a repo referenced by the feature has `agent_hints`, the launch prompt
+includes those hints. When the current stage has `required_artifacts`, the prompt
+lists the files the agent should keep current before completing the stage.
+
+This means no agent ever starts cold. The prompt is a complete handoff: what the ticket is, where things stand, what this stage needs to produce, which repo conventions apply, and exactly what command ends the session. The agent reads the files, does the work, runs the command — and the next agent gets the same treatment.
 
 **Worker resolution order:**
 

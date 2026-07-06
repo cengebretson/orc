@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cengebretson/orc/internal/artifactcheck"
 	"github.com/cengebretson/orc/internal/config"
 	"github.com/cengebretson/orc/internal/report"
 	"github.com/cengebretson/orc/internal/ticketview"
@@ -153,6 +154,11 @@ func (m Model) renderDetailBody() string {
 		b.WriteString(drawBox(styleSection.Render(" Repos "), repoLines, outerW) + "\n")
 	}
 
+	if len(m.detail.requiredArtifacts) > 0 {
+		b.WriteString(drawBox(styleSection.Render(" Required Artifacts "),
+			artifactStatusLines(m.detail.featureDir, m.detail.requiredArtifacts, innerW), outerW) + "\n")
+	}
+
 	// Timing — per-stage durations derived from history
 	if rep := report.Compute(s, time.Now()); len(rep.Stages) > 0 {
 		const (
@@ -283,6 +289,23 @@ func (m Model) renderDetailBody() string {
 	}
 
 	return strings.TrimRight(b.String(), "\n")
+}
+
+func artifactStatusLines(featureDir string, artifacts []string, maxW int) []string {
+	issues := artifactcheck.Check(featureDir, artifacts)
+	issueByPath := map[string]artifactcheck.Issue{}
+	for _, issue := range issues {
+		issueByPath[issue.Path] = issue
+	}
+	var lines []string
+	for _, artifact := range artifacts {
+		if issue, found := issueByPath[artifact]; found {
+			lines = append(lines, " "+styleHealthWarn.Render("!")+" "+styleFileMissing.Render(truncate(issue.Detail(), maxW-4)))
+		} else {
+			lines = append(lines, " "+styleHealthOK.Render("✓")+" "+styleFileOK.Render(truncate(artifact, maxW-4)))
+		}
+	}
+	return lines
 }
 
 func labelWithDimID(label, id string) string {
@@ -745,33 +768,41 @@ func renderWorkflowDetail(name string, chains []workflowChain, allWorkers []*wor
 
 	cursorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(activeTheme.Palette.Mauve))
 
+	stageRowLines := func(step routeStep, absoluteIdx int) []string {
+		var advVal string
+		if step.advance == "manual" {
+			advVal = styleStatusWaiting.Render("● manual")
+		} else {
+			advVal = styleHealthOK.Render("auto")
+		}
+		count := stageCounts[step.name]
+		var activeVal string
+		if count > 0 {
+			activeVal = styleSubtext.Render(fmt.Sprintf("%d", count))
+		} else {
+			activeVal = styleDim.Render("—")
+		}
+		cursor := "  "
+		if absoluteIdx == selectedIdx {
+			cursor = cursorStyle.Render("▶") + " "
+		}
+		lines := []string{cursor +
+			padRight(stageExists(step.name), wCheck) + "  " +
+			padRight(styleSubtext.Render(truncate(stepLabel(step), wStageName)), wStageName) + "  " +
+			padRight(workerLabel(step.workerID), wWorker) + "  " +
+			padRight(advVal, wAdvance) + "  " +
+			activeVal}
+		if len(step.requiredArtifacts) > 0 {
+			lines = append(lines, "  "+strings.Repeat(" ", wCheck+wStageName+4)+styleDim.Render("artifacts: "+strings.Join(step.requiredArtifacts, ", ")))
+		}
+		return lines
+	}
+
 	stageRows := func(steps []routeStep, baseIdx int) []string {
 		var lines []string
 		lines = append(lines, header, divider)
 		for i, step := range steps {
-			var advVal string
-			if step.advance == "manual" {
-				advVal = styleStatusWaiting.Render("● manual")
-			} else {
-				advVal = styleHealthOK.Render("auto")
-			}
-			count := stageCounts[step.name]
-			var activeVal string
-			if count > 0 {
-				activeVal = styleSubtext.Render(fmt.Sprintf("%d", count))
-			} else {
-				activeVal = styleDim.Render("—")
-			}
-			cursor := "  "
-			if baseIdx+i == selectedIdx {
-				cursor = cursorStyle.Render("▶") + " "
-			}
-			lines = append(lines, cursor+
-				padRight(stageExists(step.name), wCheck)+"  "+
-				padRight(styleSubtext.Render(truncate(stepLabel(step), wStageName)), wStageName)+"  "+
-				padRight(workerLabel(step.workerID), wWorker)+"  "+
-				padRight(advVal, wAdvance)+"  "+
-				activeVal)
+			lines = append(lines, stageRowLines(step, baseIdx+i)...)
 		}
 		return lines
 	}
@@ -781,16 +812,13 @@ func renderWorkflowDetail(name string, chains []workflowChain, allWorkers []*wor
 	if len(chain.repairSteps) > 0 {
 		repairAsSteps := make([]routeStep, len(chain.repairSteps))
 		for i, rs := range chain.repairSteps {
-			repairAsSteps[i] = routeStep{name: rs.name, label: rs.label, advance: rs.advance, workerID: rs.workerID}
+			repairAsSteps[i] = routeStep{name: rs.name, label: rs.label, advance: rs.advance, workerID: rs.workerID, requiredArtifacts: rs.requiredArtifacts}
 		}
-		rawRows := stageRows(repairAsSteps, len(chain.steps))
-		// rawRows is [header, divider, row0, row1, ...]
 		// Interleave each annotation directly under its row.
 		annotationIndent := "  " + strings.Repeat(" ", wCheck+wStageName+4)
-		var repairLines []string
-		repairLines = append(repairLines, rawRows[:2]...) // header + divider
+		repairLines := []string{header, divider}
 		for i, rs := range chain.repairSteps {
-			repairLines = append(repairLines, rawRows[2+i])
+			repairLines = append(repairLines, stageRowLines(repairAsSteps[i], len(chain.steps)+i)...)
 			detail := fmt.Sprintf("repairs %s", repairTargetLabel(rs))
 			if rs.maxRetries > 0 {
 				detail = fmt.Sprintf("repairs %s · max %d", repairTargetLabel(rs), rs.maxRetries)

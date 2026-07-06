@@ -117,8 +117,9 @@ func TestBuildFileList(t *testing.T) {
 		}
 	}
 
-	// top-level docs (DECISIONS intentionally absent) and per-stage outputs in
-	// folders named after the stages, written out of pipeline order on disk.
+	// top-level docs and per-stage outputs in folders named after the stages,
+	// written out of pipeline order on disk. PLAN and DECISIONS are intentionally
+	// absent but still shown as core files.
 	mustWrite("TICKET.md")
 	mustWrite("SPEC.md")
 	mustWrite("code-review/REVIEW.md")
@@ -145,6 +146,7 @@ func TestBuildFileList(t *testing.T) {
 		"TICKET.md",
 		"SPEC.md",
 		"PLAN.md", // core: always listed even when missing
+		"DECISIONS.md",
 		"develop/HANDOFF.md",
 		"code-review/REVIEW.md",
 		"qa-automation/PLAN.md",
