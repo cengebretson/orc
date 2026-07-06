@@ -79,7 +79,7 @@ func RunWithOptions(root string, opts Options) *Report {
 
 	report := &Report{Root: root, Label: "Workspace"}
 	appendHealth(report, health.Run(root))
-	appendConfigChecks(report, root)
+	appendConfigChecks(report, root, opts.LookPath)
 	appendFeatureStateChecks(report, root)
 	appendStateLockChecks(report, root, opts.Fix)
 	appendToolChecks(report, root, opts.LookPath)
@@ -146,7 +146,7 @@ func appendHealth(report *Report, h *health.Report) {
 	}
 }
 
-func appendConfigChecks(report *Report, root string) {
+func appendConfigChecks(report *Report, root string, lookPath func(string) (string, error)) {
 	ctx, errs, err := workspacectx.LoadValidated(root)
 	if err != nil {
 		report.Checks = append(report.Checks, Check{
@@ -165,7 +165,7 @@ func appendConfigChecks(report *Report, root string) {
 			Detail: "valid",
 		})
 		if ctx != nil && ctx.Config != nil {
-			appendWorktreeSetupWarnings(report, ctx.Config)
+			appendRepoReadinessChecks(report, root, ctx.Config, lookPath)
 		}
 		return
 	}
@@ -178,26 +178,89 @@ func appendConfigChecks(report *Report, root string) {
 		})
 	}
 	if ctx != nil && ctx.Config != nil {
-		appendWorktreeSetupWarnings(report, ctx.Config)
+		appendRepoReadinessChecks(report, root, ctx.Config, lookPath)
 	}
 }
 
-func appendWorktreeSetupWarnings(report *Report, cfg *config.Config) {
+func appendRepoReadinessChecks(report *Report, root string, cfg *config.Config, lookPath func(string) (string, error)) {
+	hasWorktreeSetup := false
 	for _, repo := range cfg.Repos {
-		if strings.TrimSpace(repo.WorktreeSetup) == "" || worktreesetup.ReferencesWorktreePath(repo.WorktreeSetup) {
+		if strings.TrimSpace(repo.WorktreeSetup) == "" {
 			continue
 		}
+		hasWorktreeSetup = true
 		name := repo.Name
 		if name == "" {
 			name = repo.Path
 		}
-		report.Checks = append(report.Checks, Check{
-			Group:  "config",
-			Name:   "repos." + name + ".worktree_setup",
-			Status: Warning,
-			Detail: "does not include {{worktree_path}}; command may create a worktree outside orc state",
-		})
+		checkName := "repos." + name + ".worktree_setup"
+		if !worktreesetup.ReferencesWorktreePath(repo.WorktreeSetup) {
+			report.Checks = append(report.Checks, Check{
+				Group:  "config",
+				Name:   checkName,
+				Status: Warning,
+				Detail: "does not include {{worktree_path}}; command may create a worktree outside orc state",
+			})
+		}
+		report.Checks = append(report.Checks, worktreeSetupCommandCheck(root, checkName+".command", repo.WorktreeSetup, lookPath))
+		if len(repo.AgentHints) == 0 {
+			report.Checks = append(report.Checks, Check{
+				Group:  "config",
+				Name:   "repos." + name + ".agent_hints",
+				Status: Warning,
+				Detail: "none configured; agents may miss repo-specific setup and test guidance",
+			})
+		}
 	}
+	if hasWorktreeSetup {
+		if info, err := os.Stat(filepath.Join(root, "worktrees")); err != nil || !info.IsDir() {
+			report.Checks = append(report.Checks, Check{
+				Group:  "config",
+				Name:   "worktrees/",
+				Status: Warning,
+				Detail: "missing; setup commands expect workspace worktrees/ destinations",
+			})
+		}
+	}
+}
+
+func worktreeSetupCommandCheck(root, name, setup string, lookPath func(string) (string, error)) Check {
+	command := firstCommandToken(setup)
+	if command == "" {
+		return Check{Group: "config", Name: name, Status: Warning, Detail: "empty setup command"}
+	}
+	if strings.Contains(command, "/") {
+		path := command
+		if !filepath.IsAbs(path) {
+			path = filepath.Join(root, path)
+		}
+		info, err := os.Stat(path)
+		if err != nil {
+			return Check{Group: "config", Name: name, Status: Warning, Detail: "command path not found: " + command}
+		}
+		if info.IsDir() {
+			return Check{Group: "config", Name: name, Status: Warning, Detail: "command path is a directory: " + command}
+		}
+		if info.Mode().Perm()&0o111 == 0 {
+			return Check{Group: "config", Name: name, Status: Warning, Detail: "command is not executable: " + command}
+		}
+		return Check{Group: "config", Name: name, Status: OK, Detail: "command found: " + command}
+	}
+	if _, err := lookPath(command); err != nil {
+		return Check{Group: "config", Name: name, Status: Warning, Detail: "command not found in PATH: " + command}
+	}
+	return Check{Group: "config", Name: name, Status: OK, Detail: "command found: " + command}
+}
+
+func firstCommandToken(command string) string {
+	fields := strings.Fields(strings.TrimSpace(command))
+	for _, field := range fields {
+		if strings.Contains(field, "=") && !strings.Contains(field, "/") {
+			continue
+		}
+		return strings.Trim(field, `"'`)
+	}
+	return ""
 }
 
 func appendFeatureStateChecks(report *Report, root string) {

@@ -6,6 +6,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `orc artifacts <ticket>` reports required artifact readiness for the current
+  stage, with `--all` for workflow-wide checks and `--json` for automation.
+- `orc doctor` now warns when repo `worktree_setup` commands are missing or not
+  executable, when custom setup lacks `agent_hints`, and when `worktrees/` is
+  absent for worktree-driven repos.
+
 ## [0.7.1] - 2026-07-06
 
 ### Added

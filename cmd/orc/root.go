@@ -153,6 +153,18 @@ var (
 	reportArchived bool
 )
 
+var artifactsCmd = &cobra.Command{
+	Use:   "artifacts <ticket>",
+	Short: "Check required feature artifacts for a ticket",
+	Args:  cobra.ExactArgs(1),
+	RunE:  runArtifacts,
+}
+
+var (
+	artifactsAll  bool
+	artifactsJSON bool
+)
+
 var workCmd = &cobra.Command{
 	Use:   "work <ticket>",
 	Short: "Start work on a ticket — creates the feature folder and STATE.yaml",
@@ -282,6 +294,7 @@ var helpAllCmd = &cobra.Command{
 		fmt.Println("Read commands  (human commands agents also use):")
 		fmt.Println()
 		fmt.Println("  orc status <ticket> --json    read current state as JSON")
+		fmt.Println("  orc artifacts <ticket> --json read required artifact readiness as JSON")
 		fmt.Println()
 	},
 }
@@ -302,6 +315,8 @@ func init() {
 	statusCmd.Flags().BoolVar(&statusJSON, "json", false, "Output as JSON")
 	reportCmd.Flags().BoolVar(&reportJSON, "json", false, "Output as JSON")
 	reportCmd.Flags().BoolVar(&reportArchived, "archived", false, "Include archived tickets in the aggregate (no-arg) report")
+	artifactsCmd.Flags().BoolVar(&artifactsAll, "all", false, "Check every required artifact in the ticket workflow")
+	artifactsCmd.Flags().BoolVar(&artifactsJSON, "json", false, "Output as JSON")
 	workCmd.Flags().StringVar(&workSlug, "slug", "", "Optional slug suffix (e.g. add-user-export → TICKET-123-add-user-export)")
 	workCmd.Flags().BoolVar(&workTmux, "tmux", false, "Enable tmux session for this ticket — session created automatically on first orc next")
 	workCmd.Flags().BoolVar(&workNext, "next", false, "Immediately launch the first stage after creating the feature")
@@ -322,6 +337,7 @@ func init() {
 	nextCmd.ValidArgsFunction = ticketCompleter([]string{"pending", "active", "paused"}, false)
 	statusCmd.ValidArgsFunction = ticketCompleter(nil, true)
 	reportCmd.ValidArgsFunction = ticketCompleter(nil, true)
+	artifactsCmd.ValidArgsFunction = ticketCompleter(nil, true)
 	markCmd.ValidArgsFunction = ticketCompleter([]string{"pending", "active", "paused"}, false)
 	attachCmd.ValidArgsFunction = ticketCompleter([]string{"active"}, false)
 	archiveCmd.ValidArgsFunction = ticketCompleter([]string{"done"}, false)
@@ -342,6 +358,7 @@ func init() {
 	rootCmd.AddCommand(nextCmd)
 	rootCmd.AddCommand(statusCmd)
 	rootCmd.AddCommand(reportCmd)
+	rootCmd.AddCommand(artifactsCmd)
 	rootCmd.AddCommand(workCmd)
 	rootCmd.AddCommand(markCmd)
 	rootCmd.AddCommand(archiveCmd)

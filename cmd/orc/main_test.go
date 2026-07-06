@@ -196,6 +196,59 @@ func TestRunReportAggregateAcrossTickets(t *testing.T) {
 	}
 }
 
+func TestRunArtifactsCurrentStageReportsMissingArtifacts(t *testing.T) {
+	resetCommandGlobals(t)
+	globalWorkspace = writeArtifactsWorkspace(t)
+
+	out, err := captureStdout(func() error {
+		return runArtifacts(nil, []string{"ART-1"})
+	})
+	if err == nil || !strings.Contains(err.Error(), "artifacts not ready") {
+		t.Fatalf("runArtifacts err = %v, want artifacts not ready\n%s", err, out)
+	}
+	for _, want := range []string{
+		"Artifacts: ART-1",
+		"Scope:     current",
+		"current stage",
+		"DECISIONS.md missing",
+		"develop/HANDOFF.md missing",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("artifacts output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestRunArtifactsJSONAllScope(t *testing.T) {
+	resetCommandGlobals(t)
+	globalWorkspace = writeArtifactsWorkspace(t)
+	artifactsAll = true
+	artifactsJSON = true
+
+	out, err := captureStdout(func() error {
+		return runArtifacts(nil, []string{"ART-1"})
+	})
+	if err == nil || !strings.Contains(err.Error(), "artifacts not ready") {
+		t.Fatalf("runArtifacts --json err = %v, want artifacts not ready\n%s", err, out)
+	}
+	var payload artifactReport
+	if err := json.Unmarshal([]byte(out), &payload); err != nil {
+		t.Fatalf("unmarshal artifacts json: %v\n%s", err, out)
+	}
+	if payload.Ticket != "ART-1" || payload.Scope != "all" || payload.OK {
+		t.Fatalf("payload ticket=%q scope=%q ok=%v, want ART-1/all/false", payload.Ticket, payload.Scope, payload.OK)
+	}
+	var foundQA bool
+	for _, group := range payload.Groups {
+		if group.Name == "qa-automation" {
+			foundQA = true
+		}
+	}
+	if !foundQA {
+		t.Fatalf("all-scope payload missing qa-automation group: %+v", payload.Groups)
+	}
+}
+
 func TestRunDoctorTicketPrintsValidationReport(t *testing.T) {
 	resetCommandGlobals(t)
 	globalWorkspace = fixtureWorkspace()
@@ -996,6 +1049,58 @@ func loadTicketState(t *testing.T, root, query string) *state.State {
 	return s
 }
 
+func writeArtifactsWorkspace(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	mkdir := func(path string) {
+		t.Helper()
+		if err := os.MkdirAll(path, 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", path, err)
+		}
+	}
+	mkdir(filepath.Join(root, "workers", "default"))
+	mkdir(filepath.Join(root, "features", "ART-1"))
+	writeCommandFile(t, filepath.Join(root, "orc.yaml"), `
+settings:
+  default_workflow: default
+  artifact_policy: warn
+workflows:
+  default:
+    stages:
+      - name: develop
+        worker: default:bob
+        advance: manual
+        required_artifacts:
+          - PLAN.md
+          - develop/HANDOFF.md
+      - name: qa-automation
+        worker: default:bob
+        advance: auto
+        required_artifacts:
+          - qa-automation/RUNS.md
+`)
+	writeCommandFile(t, filepath.Join(root, "workers", "default", "bob.md"), `---
+id: default:bob
+name: Bob
+engine: codex
+---
+`)
+	featureDir := filepath.Join(root, "features", "ART-1")
+	writeCommandFile(t, filepath.Join(featureDir, "TICKET.md"), "# Ticket\n")
+	writeCommandFile(t, filepath.Join(featureDir, "SPEC.md"), "# Spec\n")
+	writeCommandFile(t, filepath.Join(featureDir, "PLAN.md"), "# Plan\n")
+	if err := state.Create(featureDir, &state.State{
+		Ticket:   "ART-1",
+		Slug:     "ART-1",
+		Status:   "active",
+		Workflow: "default",
+		Stage:    state.Stage{Name: "develop", Worker: "default:bob"},
+	}); err != nil {
+		t.Fatalf("create artifact state: %v", err)
+	}
+	return root
+}
+
 func resetCommandGlobals(t *testing.T) {
 	t.Helper()
 
@@ -1016,6 +1121,8 @@ func resetCommandGlobals(t *testing.T) {
 	oldMarkStage := markStage
 	oldReportJSON := reportJSON
 	oldReportArchived := reportArchived
+	oldArtifactsAll := artifactsAll
+	oldArtifactsJSON := artifactsJSON
 	oldPackInspectJSON := packInspectJSON
 	t.Cleanup(func() {
 		globalWorkspace = oldWorkspace
@@ -1035,6 +1142,8 @@ func resetCommandGlobals(t *testing.T) {
 		markStage = oldMarkStage
 		reportJSON = oldReportJSON
 		reportArchived = oldReportArchived
+		artifactsAll = oldArtifactsAll
+		artifactsJSON = oldArtifactsJSON
 		packInspectJSON = oldPackInspectJSON
 	})
 
@@ -1055,6 +1164,8 @@ func resetCommandGlobals(t *testing.T) {
 	markStage = ""
 	reportJSON = false
 	reportArchived = false
+	artifactsAll = false
+	artifactsJSON = false
 	packInspectJSON = false
 }
 

@@ -196,6 +196,116 @@ engine: codex
 	}
 }
 
+func TestRunWithOptionsChecksWorktreeSetupReadiness(t *testing.T) {
+	root := t.TempDir()
+	writeDoctorFile(t, filepath.Join(root, "orc.yaml"), `
+settings:
+  default_workflow: default
+repos:
+  - name: app
+    path: ../app
+    purpose: Application
+    worktree_setup: "../app/setup-worktree.sh -b {{branch}} --path {{worktree_path}}"
+workflows:
+  default:
+    stages:
+      - name: develop
+        worker: default:bob
+        advance: auto
+`)
+	writeDoctorFile(t, filepath.Join(root, "workers", "default", "bob.md"), `---
+id: default:bob
+name: Bob
+engine: codex
+---
+`)
+
+	report := doctor.RunWithOptions(root, doctor.Options{
+		LookPath: func(name string) (string, error) {
+			return "/bin/" + name, nil
+		},
+	})
+
+	command := findCheck(report, "config", "repos.app.worktree_setup.command")
+	if command == nil {
+		t.Fatal("worktree_setup command check not found")
+	}
+	if command.Status != doctor.Warning || command.Detail != "command path not found: ../app/setup-worktree.sh" {
+		t.Fatalf("command check = %#v, want missing path warning", command)
+	}
+
+	hints := findCheck(report, "config", "repos.app.agent_hints")
+	if hints == nil {
+		t.Fatal("agent_hints warning not found")
+	}
+	if hints.Status != doctor.Warning {
+		t.Fatalf("agent_hints status = %v, want Warning", hints.Status)
+	}
+
+	worktrees := findCheck(report, "config", "worktrees/")
+	if worktrees == nil {
+		t.Fatal("worktrees readiness warning not found")
+	}
+	if worktrees.Status != doctor.Warning {
+		t.Fatalf("worktrees status = %v, want Warning", worktrees.Status)
+	}
+}
+
+func TestRunWithOptionsAcceptsExecutableWorktreeSetup(t *testing.T) {
+	root := t.TempDir()
+	setupPath := filepath.Join(root, "scripts", "setup-worktree.sh")
+	writeDoctorFile(t, setupPath, "#!/usr/bin/env bash\n")
+	if err := os.Chmod(setupPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(root, "worktrees"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeDoctorFile(t, filepath.Join(root, "orc.yaml"), `
+settings:
+  default_workflow: default
+repos:
+  - name: app
+    path: ../app
+    purpose: Application
+    agent_hints:
+      - Run make test.
+    worktree_setup: "scripts/setup-worktree.sh -b {{branch}} --path {{worktree_path}}"
+workflows:
+  default:
+    stages:
+      - name: develop
+        worker: default:bob
+        advance: auto
+`)
+	writeDoctorFile(t, filepath.Join(root, "workers", "default", "bob.md"), `---
+id: default:bob
+name: Bob
+engine: codex
+---
+`)
+
+	report := doctor.RunWithOptions(root, doctor.Options{
+		LookPath: func(name string) (string, error) {
+			return "/bin/" + name, nil
+		},
+	})
+
+	command := findCheck(report, "config", "repos.app.worktree_setup.command")
+	if command == nil {
+		t.Fatal("worktree_setup command check not found")
+	}
+	if command.Status != doctor.OK || command.Detail != "command found: scripts/setup-worktree.sh" {
+		t.Fatalf("command check = %#v, want executable ok", command)
+	}
+	if check := findCheck(report, "config", "repos.app.agent_hints"); check != nil {
+		t.Fatalf("agent_hints warning should not appear when hints exist: %#v", check)
+	}
+	if check := findCheck(report, "config", "worktrees/"); check != nil {
+		t.Fatalf("config worktrees warning should not appear when directory exists: %#v", check)
+	}
+}
+
 func TestRunWithOptionsWarnsWhenRecordedWorktreeMissing(t *testing.T) {
 	root := t.TempDir()
 	writeDoctorFile(t, filepath.Join(root, "orc.yaml"), `

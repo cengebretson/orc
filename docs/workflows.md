@@ -192,6 +192,12 @@ Transition validation rejects:
 - `done` while a ticket is still `pending`.
 - `next --stage` values that do not name a configured workflow or loop stage.
 - `next --worker` values that do not name a worker file in `workers/`.
+- `next` when `settings.artifact_policy: block` and the current stage's
+  required artifacts are missing, empty, or directories.
+
+Use `orc artifacts <ticket>` to check the current stage's core docs and
+`required_artifacts` without advancing. Add `--all` to inspect every required
+artifact in the workflow, or `--json` for automation.
 
 ## Where to Put Policy
 

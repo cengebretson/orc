@@ -374,6 +374,9 @@ Or use the Claude Desktop settings UI. Requires a GitHub PAT with `repo` and `pu
   - `orc report <ticket>` — per-stage breakdown for one ticket with total cycle time
   - `--archived` — include archived tickets in the aggregate (no-arg) report
   - `--json` — output as JSON for scripting
+- `orc artifacts <ticket>` — check required feature artifacts for the current stage
+  - `--all` — check required artifacts across the whole workflow
+  - `--json` — output as JSON for scripting
 - `orc work <ticket>` — create the feature folder for a ticket
   - `--workflow <name>` — use a named workflow instead of the configured default
   - `--tmux` — also enable a tmux session for this ticket
@@ -408,7 +411,7 @@ These are called by agents at the end of each session. They are hidden from `orc
 - `orc mark <ticket> done` — mark active, ready, or paused work as done
 - `orc mark <ticket> jit "<summary>"` — record a jit task as complete and clear `runtime.jit`
 
-`orc mark` validates transitions before writing `STATE.yaml`: pending tickets must be started before `next`, `done` is rejected from `pending`, stage and worker overrides must exist, invalid workspace config blocks advancement, and `artifact_policy: block` blocks `next` when required artifacts are missing or empty.
+`orc mark` validates transitions before writing `STATE.yaml`: pending tickets must be started before `next`, `done` is rejected from `pending`, stage and worker overrides must exist, invalid workspace config blocks advancement, and `artifact_policy: block` blocks `next` when required artifacts are missing or empty. Use `orc artifacts <ticket>` when an agent or human needs the same artifact checklist without advancing the ticket.
 
 ## Reference
 

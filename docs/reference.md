@@ -329,6 +329,9 @@ When relaunching a paused or interrupted session, `orc next` builds a richer rec
 When a repo referenced by the feature has `agent_hints`, the launch prompt
 includes those hints. When the current stage has `required_artifacts`, the prompt
 lists the files the agent should keep current before completing the stage.
+Outside the launch prompt, `orc artifacts <ticket>` shows the same readiness
+check for the current stage, and `orc artifacts <ticket> --all --json` exposes
+the workflow-wide checklist for automation.
 
 This means no agent ever starts cold. The prompt is a complete handoff: what the ticket is, where things stand, what this stage needs to produce, which repo conventions apply, and exactly what command ends the session. The agent reads the files, does the work, runs the command — and the next agent gets the same treatment.
 

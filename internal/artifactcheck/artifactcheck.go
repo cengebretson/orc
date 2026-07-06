@@ -20,6 +20,13 @@ type Issue struct {
 	Status Status
 }
 
+type Artifact struct {
+	Path   string `json:"path"`
+	Status string `json:"status"`
+	Detail string `json:"detail,omitempty"`
+	Ready  bool   `json:"ready"`
+}
+
 func (i Issue) Detail() string {
 	switch i.Status {
 	case Missing:
@@ -35,22 +42,49 @@ func (i Issue) Detail() string {
 
 func Check(featureDir string, artifacts []string) []Issue {
 	var issues []Issue
+	for _, artifact := range Inspect(featureDir, artifacts) {
+		if artifact.Ready {
+			continue
+		}
+		issues = append(issues, Issue{Path: artifact.Path, Status: statusFromString(artifact.Status)})
+	}
+	return issues
+}
+
+func Inspect(featureDir string, artifacts []string) []Artifact {
+	out := make([]Artifact, 0, len(artifacts))
 	for _, artifact := range uniqueArtifacts(artifacts) {
 		path := filepath.Join(featureDir, artifact)
 		info, err := os.Stat(path)
 		if err != nil {
-			issues = append(issues, Issue{Path: artifact, Status: Missing})
+			issue := Issue{Path: artifact, Status: Missing}
+			out = append(out, Artifact{Path: artifact, Status: "missing", Detail: issue.Detail(), Ready: false})
 			continue
 		}
 		if info.IsDir() {
-			issues = append(issues, Issue{Path: artifact, Status: Directory})
+			issue := Issue{Path: artifact, Status: Directory}
+			out = append(out, Artifact{Path: artifact, Status: "directory", Detail: issue.Detail(), Ready: false})
 			continue
 		}
 		if info.Size() == 0 {
-			issues = append(issues, Issue{Path: artifact, Status: Empty})
+			issue := Issue{Path: artifact, Status: Empty}
+			out = append(out, Artifact{Path: artifact, Status: "empty", Detail: issue.Detail(), Ready: false})
+			continue
 		}
+		out = append(out, Artifact{Path: artifact, Status: "ok", Ready: true})
 	}
-	return issues
+	return out
+}
+
+func statusFromString(status string) Status {
+	switch status {
+	case "directory":
+		return Directory
+	case "empty":
+		return Empty
+	default:
+		return Missing
+	}
 }
 
 func uniqueArtifacts(artifacts []string) []string {
