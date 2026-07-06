@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-07-06
+
 ### Added
 
 - `orc artifacts <ticket>` reports required artifact readiness for the current
@@ -155,7 +157,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Bubble Tea TUI dashboard with health, workflow, stage, and portrait views.
 - `orc doctor --fix` to clear stale state locks.
 
-[Unreleased]: https://github.com/cengebretson/orc/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/cengebretson/orc/compare/v0.7.2...HEAD
+[0.7.2]: https://github.com/cengebretson/orc/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/cengebretson/orc/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/cengebretson/orc/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/cengebretson/orc/compare/v0.5.0...v0.6.0
