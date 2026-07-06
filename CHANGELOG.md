@@ -13,6 +13,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `orc doctor` now warns when repo `worktree_setup` commands are missing or not
   executable, when custom setup lacks `agent_hints`, and when `worktrees/` is
   absent for worktree-driven repos.
+- Generated `SETUP.md` now asks setup agents to inspect repo entrypoints when
+  users are unsure, capture durable `agent_hints`, configure
+  `required_artifacts`, and verify with `orc artifacts`.
 
 ## [0.7.1] - 2026-07-06
 

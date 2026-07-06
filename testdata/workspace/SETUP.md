@@ -111,6 +111,10 @@ always created inside this workspace under `worktrees/`.
 > 4. Optional worktree setup command, if this repo needs more than raw
 >    `git worktree add` (leave blank otherwise)
 > 5. Optional repo hints agents should see before editing that repo
+>
+> If you are unsure about setup commands or useful hints, say so and I will
+> inspect the repo for scripts, Makefile targets, README guidance, and local
+> agent instructions, then propose durable values for you to confirm.
 
 **Then update `orc.yaml`:**
 - Replace the example entry under `repos:` with the real repos (name, path, purpose)
@@ -121,10 +125,18 @@ always created inside this workspace under `worktrees/`.
 - If a repo has local conventions agents should not miss, add short
   `agent_hints` entries. Keep them generic and durable; stage-specific tasks
   belong in stage or worker files.
+- Good `agent_hints` point agents toward stable entrypoints and verification
+  habits, such as "Use the repo Makefile before direct tool commands", "Record
+  manual QA setup in the feature folder", or "Prefer the repo worktree helper".
 
 **And update `ROUTER.md`:**
 - Fill in the worktree section with either the repo-specific setup rule or the
   raw `git worktree add` fallback for this workspace.
+
+**Verify:**
+- Run `orc doctor`. If it warns that a `worktree_setup` command is missing, not
+  executable, lacks `{{worktree_path}}`, has no `agent_hints`, or needs
+  `worktrees/`, fix `orc.yaml` or create the expected directory before moving on.
 
 ---
 
@@ -143,6 +155,12 @@ This section makes the workflow match the user's process and ensures every
   still live at namespaced paths such as `stages/default/develop.md`.
 - Ask whether these stages and their order match how they work. Add, remove, or
   reorder stages as needed. Each stage references a worker by `id`.
+- Ask which outputs make each stage repeatable for the next agent. Configure
+  those as `required_artifacts` in `orc.yaml` using feature-folder relative
+  paths, such as `PLAN.md`, `develop/HANDOFF.md`, `qa/RUNS.md`, or
+  `smoke/RESULTS.md`.
+- Ask whether missing required artifacts should only warn or block advancement.
+  Set `settings.artifact_policy: warn` or `settings.artifact_policy: block`.
 
 **Find the required worker ids:**
 - Run `orc doctor`. It reports any stage whose `worker:` id has no matching file —
@@ -160,6 +178,11 @@ Claude / Codex sections):
 - Do not create root-level files such as `workers/chris.md`; runnable workers
   must use `workers/<namespace>/<name>.md` with a matching `<namespace>:<name>`
   frontmatter `id`.
+
+**Verify artifacts:**
+- For any existing ticket folder, run `orc artifacts <ticket>` to preview the
+  current stage checklist. Use `orc artifacts <ticket> --all` to verify the
+  workflow-wide artifact contract.
 
 ---
 
@@ -238,5 +261,8 @@ When your section is complete:
    (missing workers, unresolved files, an incomplete SETUP), fix them and run it
    again. Do not declare setup done until `orc doctor` is clean — then show the
    user the result.
-3. Once at least one engine has runnable workers, tell the user they can now run
+3. If any ticket folders already exist, run `orc artifacts <ticket>` on one
+   active ticket and fix missing core docs or stage artifacts that setup should
+   have established.
+4. Once at least one engine has runnable workers, tell the user they can now run
    `orc work <ticket>`
