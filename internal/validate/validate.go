@@ -12,6 +12,7 @@ import (
 	"github.com/cengebretson/orc/internal/ticketview"
 	"github.com/cengebretson/orc/internal/workers"
 	"github.com/cengebretson/orc/internal/workspacectx"
+	"github.com/cengebretson/orc/internal/worktreecheck"
 )
 
 type Status int
@@ -81,6 +82,7 @@ func Run(root, featureDir string) *Report {
 	r.Checks = append(r.Checks, ok("STATE.yaml"))
 	summary := ticketview.Build(root, featureDir, s, ticketview.Options{})
 	appendStateShapeChecks(r, s)
+	appendFeatureSchemaChecks(r, featureDir, s)
 
 	ctx, validationErrs, err := workspacectx.LoadValidated(root)
 	if err != nil {
@@ -179,6 +181,7 @@ func Run(root, featureDir string) *Report {
 			r.Checks = append(r.Checks, okd("STATE.yaml.next_action.worker", s.NextAction.Worker))
 		}
 	}
+	appendRequiredArtifactChecks(r, featureDir, sc.RequiredArtifacts)
 	if err := state.ValidateRepos(s, root); err != nil {
 		appendRepoValidationChecks(r, err)
 	} else if len(s.Repos) > 0 {
@@ -213,6 +216,7 @@ func Run(root, featureDir string) *Report {
 			r.Checks = append(r.Checks, ok("STATE.yaml.repos.worktrees"))
 		}
 	}
+	appendWorktreeReconciliationChecks(r, root, s)
 
 	// Stage output folder exists (warn if missing — agent may not have written it yet).
 	stageOutputDir := filepath.Join(featureDir, stageName)
@@ -237,6 +241,71 @@ func Run(root, featureDir string) *Report {
 	}
 
 	return r
+}
+
+func appendFeatureSchemaChecks(r *Report, featureDir string, s *state.State) {
+	if s.Slug != "" {
+		if got := filepath.Base(featureDir); got != s.Slug {
+			r.Checks = append(r.Checks, warn("feature folder", fmt.Sprintf("folder name %q does not match STATE.yaml.slug %q", got, s.Slug)))
+		} else {
+			r.Checks = append(r.Checks, okd("feature folder", s.Slug))
+		}
+	}
+
+	for _, name := range []string{"TICKET.md", "SPEC.md", "PLAN.md", "DECISIONS.md"} {
+		path := filepath.Join(featureDir, name)
+		info, err := os.Stat(path)
+		if err != nil {
+			r.Checks = append(r.Checks, warn("feature."+name, "missing"))
+			continue
+		}
+		if info.IsDir() {
+			r.Checks = append(r.Checks, warn("feature."+name, "is a directory"))
+			continue
+		}
+		if info.Size() == 0 {
+			r.Checks = append(r.Checks, warn("feature."+name, "empty"))
+			continue
+		}
+		r.Checks = append(r.Checks, ok("feature."+name))
+	}
+}
+
+func appendRequiredArtifactChecks(r *Report, featureDir string, artifacts []string) {
+	if len(artifacts) == 0 {
+		return
+	}
+	for _, artifact := range artifacts {
+		path := filepath.Join(featureDir, artifact)
+		info, err := os.Stat(path)
+		if err != nil {
+			r.Checks = append(r.Checks, warn("required artifact", artifact+" missing"))
+			continue
+		}
+		if info.IsDir() {
+			r.Checks = append(r.Checks, warn("required artifact", artifact+" is a directory"))
+			continue
+		}
+		if info.Size() == 0 {
+			r.Checks = append(r.Checks, warn("required artifact", artifact+" empty"))
+			continue
+		}
+		r.Checks = append(r.Checks, okd("required artifact", artifact))
+	}
+}
+
+func appendWorktreeReconciliationChecks(r *Report, root string, s *state.State) {
+	for _, finding := range worktreecheck.Reconcile(root, s) {
+		status := Warning
+		if finding.Severity == worktreecheck.Fail {
+			status = Fail
+		}
+		r.Checks = append(r.Checks, Check{
+			Name:   "STATE.yaml." + finding.Field,
+			Status: status,
+			Detail: finding.Message,
+		})
+	}
 }
 
 func appendStateShapeChecks(r *Report, s *state.State) {

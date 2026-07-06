@@ -108,12 +108,23 @@ always created inside this workspace under `worktrees/`.
 > 1. Short name (e.g. "my-app", "qa-suite")
 > 2. Full path on the filesystem (e.g. /Users/me/projects/my-app)
 > 3. Purpose (one line)
+> 4. Optional worktree setup command, if this repo needs more than raw
+>    `git worktree add` (leave blank otherwise)
+> 5. Optional repo hints agents should see before editing that repo
 
 **Then update `orc.yaml`:**
 - Replace the example entry under `repos:` with the real repos (name, path, purpose)
+- If a repo needs custom worktree setup, add `worktree_setup`. Supported
+  placeholders are `{{branch}}`, `{{worktree_path}}`, `{{repo_path}}`,
+  `{{repo_name}}`, `{{ticket}}`, `{{slug}}`, and `{{workspace}}`. Include
+  `{{worktree_path}}` so the command creates the checkout where orc expects it.
+- If a repo has local conventions agents should not miss, add short
+  `agent_hints` entries. Keep them generic and durable; stage-specific tasks
+  belong in stage or worker files.
 
 **And update `ROUTER.md`:**
-- Fill in the `git worktree add` example command with the actual workspace path
+- Fill in the worktree section with either the repo-specific setup rule or the
+  raw `git worktree add` fallback for this workspace.
 
 ---
 

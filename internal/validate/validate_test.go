@@ -249,6 +249,65 @@ repos:
 	assertCheck(t, report, "STATE.yaml.next_action.cwd", validate.Fail, "does not match any recorded worktree")
 }
 
+func TestRun_FeatureSchemaWarnings(t *testing.T) {
+	root := writeValidateWorkspace(t)
+	featureDir := writeValidateFeature(t, root, `
+schema_version: 1
+ticket: TICKET-1
+slug: TICKET-1
+status: pending
+stage:
+  name: intake
+next_action:
+  worker: human
+  cwd: .
+repos: {}
+`)
+
+	report := validate.Run(root, featureDir)
+
+	assertCheck(t, report, "feature folder", validate.Warning, "does not match STATE.yaml.slug")
+	assertCheck(t, report, "feature.TICKET.md", validate.Warning, "missing")
+	assertCheck(t, report, "feature.SPEC.md", validate.Warning, "missing")
+	assertCheck(t, report, "feature.PLAN.md", validate.Warning, "missing")
+	assertCheck(t, report, "feature.DECISIONS.md", validate.Warning, "missing")
+}
+
+func TestRun_RequiredArtifactWarnings(t *testing.T) {
+	root := writeValidateWorkspace(t)
+	writeValidateFile(t, filepath.Join(root, "orc.yaml"), `
+settings:
+  default_workflow: default
+workflows:
+  default:
+    stages:
+      - name: develop
+        worker: default:bob
+        advance: manual
+        required_artifacts:
+          - PLAN.md
+          - develop/HANDOFF.md
+`)
+	featureDir := writeValidateFeature(t, root, `
+schema_version: 1
+ticket: TICKET-1
+slug: TICKET-1
+status: pending
+stage:
+  name: develop
+next_action:
+  worker: human
+  cwd: .
+repos: {}
+`)
+	writeValidateFile(t, filepath.Join(featureDir, "PLAN.md"), "Do the thing.\n")
+
+	report := validate.Run(root, featureDir)
+
+	assertCheckMatching(t, report, "required artifact", validate.OK, "PLAN.md")
+	assertCheckMatching(t, report, "required artifact", validate.Warning, "develop/HANDOFF.md missing")
+}
+
 func writeValidateWorkspace(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
@@ -321,4 +380,17 @@ func assertCheck(t *testing.T, report *validate.Report, name string, status vali
 		return
 	}
 	t.Fatalf("check %q not found in %#v", name, report.Checks)
+}
+
+func assertCheckMatching(t *testing.T, report *validate.Report, name string, status validate.Status, detailContains string) {
+	t.Helper()
+	for _, check := range report.Checks {
+		if check.Name != name || check.Status != status {
+			continue
+		}
+		if detailContains == "" || strings.Contains(check.Detail, detailContains) {
+			return
+		}
+	}
+	t.Fatalf("check %q with status %v and detail containing %q not found in %#v", name, status, detailContains, report.Checks)
 }

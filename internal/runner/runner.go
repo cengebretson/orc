@@ -63,7 +63,16 @@ func Compute(root, featureDir, workerOverride string) (*Plan, error) {
 	}
 
 	cwd := s.ResolveCWD(root)
-	prompt := buildPrompt(s, nextStage, stageCfg.Advance, loopDef, isLoopStage)
+	prompt := buildPrompt(
+		s,
+		nextStage,
+		stageCfg.Advance,
+		loopDef,
+		isLoopStage,
+		worktreeSetupPrompt(root, cfg, s),
+		artifactPrompt(stageCfg.RequiredArtifacts),
+		repoHintsPrompt(cfg, s),
+	)
 
 	plan := &Plan{
 		Ticket:         s.Ticket,
@@ -130,7 +139,7 @@ func resolveWorker(allWorkers []*workers.Worker, flagOverride, stageOwner, confi
 	return nil, "", fmt.Errorf("no worker assigned for stage %q — set worker: in orc.yaml", stageName)
 }
 
-func buildPrompt(s *state.State, nextStage, advanceMode string, loopDef *config.LoopDef, isLoopStage bool) string {
+func buildPrompt(s *state.State, nextStage, advanceMode string, loopDef *config.LoopDef, isLoopStage bool, worktreeSetup, artifacts, repoHints string) string {
 	prompt := s.NextAction.Prompt
 	if prompt == "" {
 		prompt = fmt.Sprintf(
@@ -148,7 +157,53 @@ func buildPrompt(s *state.State, nextStage, advanceMode string, loopDef *config.
 		s.Ticket, markAction,
 	)
 
+	if worktreeSetup != "" {
+		prompt = worktreeSetup + prompt
+	}
+	if artifacts != "" {
+		prompt = artifacts + prompt
+	}
+	if repoHints != "" {
+		prompt = repoHints + prompt
+	}
+
 	return preamble + prompt + endInstruction(s.Ticket, nextStage, advanceMode, loopDef, isLoopStage)
+}
+
+func artifactPrompt(required []string) string {
+	if len(required) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("## Required artifacts\n\n")
+	b.WriteString("Before completing this stage, make sure these feature-folder artifacts exist and are current:\n\n")
+	for _, artifact := range required {
+		fmt.Fprintf(&b, "- `features/<slug>/%s`\n", artifact)
+	}
+	b.WriteString("\n")
+	return b.String()
+}
+
+func repoHintsPrompt(cfg *config.Config, s *state.State) string {
+	repos := targetRepos(cfg, s)
+	var b strings.Builder
+	for _, repo := range repos {
+		if len(repo.Config.AgentHints) == 0 {
+			continue
+		}
+		if b.Len() == 0 {
+			b.WriteString("## Repo hints\n\n")
+		}
+		fmt.Fprintf(&b, "Repo `%s`:\n", repo.Config.Name)
+		for _, hint := range repo.Config.AgentHints {
+			if strings.TrimSpace(hint) == "" {
+				continue
+			}
+			fmt.Fprintf(&b, "- %s\n", hint)
+		}
+		b.WriteString("\n")
+	}
+	return b.String()
 }
 
 func endInstruction(ticket, nextStage, advanceMode string, loopDef *config.LoopDef, isLoopStage bool) string {

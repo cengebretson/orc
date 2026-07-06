@@ -135,6 +135,9 @@ repos:
   - name: my-app
     path: ../my-app
     purpose: Application code, APIs, tests
+    worktree_setup: "../my-app/scripts/setup-worktree.sh -b {{branch}} --path {{worktree_path}}"
+    agent_hints:
+      - Use the repo Makefile before direct tool commands.
 
 workflows:
   default:standard:
@@ -146,6 +149,9 @@ workflows:
       - name: default:develop
         worker: default:bob
         advance: manual
+        required_artifacts:
+          - PLAN.md
+          - develop/HANDOFF.md
         loop:
           via: default:code-review
           worker: default:zach
@@ -168,6 +174,17 @@ workflows:
 If it is not set, `orc work` returns an error. `advance: auto` tells agents to
 run `orc mark <ticket> next` when a stage is complete; `advance: manual` tells agents to
 run `orc mark <ticket> pause` so a human can review before continuing.
+
+Repos may define `worktree_setup` when raw `git worktree add` is not enough.
+`orc next` resolves supported placeholders and prints the command for the agent
+when the target worktree is missing. `orc` does not execute the command itself.
+Repos may also define `agent_hints`; `orc next` includes those hints when the
+current feature references that repo.
+
+Stages may define `required_artifacts` as feature-folder relative paths. `orc
+next` reminds agents to keep those files current, and `orc validate` warns when
+they are missing or empty. Loop stages can declare their own
+`required_artifacts` under `loop`.
 
 ## Packs
 

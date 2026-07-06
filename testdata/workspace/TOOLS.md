@@ -69,9 +69,12 @@ Recommended local commands:
 | `git status --short` | Check for local changes |
 | `git branch --show-current` | Confirm current branch |
 | `git worktree list` | See existing worktrees |
-| `git worktree add <path> -b <branch>` | Create a ticket worktree and branch |
+| `git worktree add <path> -b <branch>` | Create a ticket worktree and branch when no repo-specific setup command is configured |
 | `git diff --stat` | Summarize local changes |
 | `git diff` | Review local changes |
+
+If `orc.yaml` defines `repos[].worktree_setup`, use the setup command that
+`orc next` prints instead of raw `git worktree add`.
 
 After creating or using a worktree, update `STATE.yaml` through the process in
 `ORC.md` so later stages know where repo work happened.

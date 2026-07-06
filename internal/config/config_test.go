@@ -53,6 +53,33 @@ repos: []
 	}
 }
 
+func TestLoad_RepoWorktreeSetup(t *testing.T) {
+	dir := t.TempDir()
+	writeOrcYAML(t, dir, `
+repos:
+  - name: my-app
+    path: ../my-app
+    purpose: Application code
+    worktree_setup: "../my-app/setup.sh -b {{branch}} --path {{worktree_path}}"
+    agent_hints:
+      - Use the repo Makefile before direct tool commands.
+`)
+
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(cfg.Repos) != 1 {
+		t.Fatalf("repos len = %d, want 1", len(cfg.Repos))
+	}
+	if got := cfg.Repos[0].WorktreeSetup; got != "../my-app/setup.sh -b {{branch}} --path {{worktree_path}}" {
+		t.Fatalf("WorktreeSetup = %q", got)
+	}
+	if got := cfg.Repos[0].AgentHints; len(got) != 1 || got[0] != "Use the repo Makefile before direct tool commands." {
+		t.Fatalf("AgentHints = %#v", got)
+	}
+}
+
 func TestLoad_MissingFile_ReturnsEmptyConfig(t *testing.T) {
 	cfg, err := config.Load(t.TempDir())
 	if err != nil {
@@ -141,6 +168,9 @@ workflows:
       - name: develop
         worker: bob-developer
         advance: manual
+        required_artifacts:
+          - PLAN.md
+          - develop/HANDOFF.md
 `)
 
 	cfg, err := config.Load(dir)
@@ -157,6 +187,13 @@ workflows:
 	}
 	if sc.Advance != "auto" {
 		t.Errorf("Advance = %q, want auto", sc.Advance)
+	}
+	sc, ok = cfg.StageConfig("default", "develop")
+	if !ok {
+		t.Fatal("StageConfig(default, develop) not found")
+	}
+	if got := sc.RequiredArtifacts; len(got) != 2 || got[0] != "PLAN.md" || got[1] != "develop/HANDOFF.md" {
+		t.Fatalf("RequiredArtifacts = %#v", got)
 	}
 }
 
@@ -266,6 +303,38 @@ func TestValidate_AliasTargetsMustBeUnique(t *testing.T) {
 	assertValidationError(t, errs, "aliases.workflows.main", `alias target "default:standard" is already used by alias "default"`)
 	assertValidationError(t, errs, "aliases.stages.develop", `alias target "default:develop" is already used by alias "dev"`)
 	assertValidationError(t, errs, "aliases.workers.developer", `alias target "default:bob" is already used by alias "bob"`)
+}
+
+func TestValidate_WorktreeSetupUnknownPlaceholder(t *testing.T) {
+	cfg := &config.Config{
+		Repos: []config.Repo{
+			{
+				Name:          "my-app",
+				Path:          "../my-app",
+				WorktreeSetup: "../my-app/setup.sh --path {{worktree_path}} --bad {{unknown}}",
+			},
+		},
+	}
+
+	errs := config.Validate(cfg, nil)
+	assertValidationError(t, errs, "repos[0].worktree_setup", "unknown placeholder(s): unknown")
+}
+
+func TestValidate_RequiredArtifactMustBeRelative(t *testing.T) {
+	cfg := &config.Config{
+		Settings: config.Settings{DefaultWorkflow: "default"},
+		Workflows: map[string]config.WorkflowDef{
+			"default": {
+				Stages: []config.StageDef{
+					{Name: "develop", Worker: "default:bob", Advance: "auto", RequiredArtifacts: []string{"/tmp/out.md", "../escape.md"}},
+				},
+			},
+		},
+	}
+
+	errs := config.Validate(cfg, []string{"default:bob"})
+	assertValidationError(t, errs, "workflows.default.stages[0].required_artifacts[0]", "must be relative")
+	assertValidationError(t, errs, "workflows.default.stages[0].required_artifacts[1]", "cannot contain ..")
 }
 
 func TestLoad_NextStage(t *testing.T) {

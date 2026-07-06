@@ -22,6 +22,9 @@ repos:
   - name: my-app
     path: ../my-app
     purpose: Application code, APIs, tests
+    worktree_setup: "../my-app/scripts/setup-worktree.sh -b {{branch}} --path {{worktree_path}}"
+    agent_hints:
+      - Use the repo Makefile before direct tool commands.
 
 workflows:
   default:standard:
@@ -33,6 +36,9 @@ workflows:
       - name: default:develop
         worker: default:bob
         advance: manual
+        required_artifacts:
+          - PLAN.md
+          - develop/HANDOFF.md
         loop:
           via: default:code-review
           worker: default:zach
@@ -67,6 +73,14 @@ workflows:
 | `name` | Yes | Stable repo identifier used in state and displays. |
 | `path` | Yes | Path to the repo, usually relative to the workspace root. |
 | `purpose` | No | Human-readable description of what belongs in the repo. |
+| `worktree_setup` | No | Repo-specific setup command for ticket worktrees. `orc` prints the resolved command in launch prompts when the target worktree is missing; the agent runs it. |
+| `agent_hints` | No | Short repo-specific guidance shown in `orc next` prompts for features using that repo. |
+
+`worktree_setup` supports these placeholders: `{{branch}}`, `{{worktree_path}}`,
+`{{repo_path}}`, `{{repo_name}}`, `{{ticket}}`, `{{slug}}`, and
+`{{workspace}}`. Include `{{worktree_path}}` so the command creates the checkout
+where `STATE.yaml` expects it. If omitted, `orc doctor` warns because the command
+may create an untracked worktree.
 
 ## Workflows
 
@@ -88,6 +102,7 @@ Each workflow stage supports:
 | `name` | Yes | Stage identifier. Canonical pack stages use `<pack>:<stage>` and map to `stages/<pack>/<stage>.md`. |
 | `worker` | Yes | Worker ID from `workers/<namespace>/*.md` that owns the stage by default. |
 | `advance` | Yes | Completion mode. Valid values are `auto` and `manual`. |
+| `required_artifacts` | No | Feature-folder files this stage should leave current before completion, such as `PLAN.md` or `develop/HANDOFF.md`. |
 | `loop` | No | Optional repair/review loop attached to this stage. |
 
 ## Advance Modes
@@ -123,6 +138,7 @@ Loop fields:
 | `worker` | Yes | Worker ID assigned to the loop stage. |
 | `max` | No | Maximum loop count before `on_max` behavior applies. |
 | `on_max` | No | Behavior when the loop count reaches `max`. `pause` (default) pauses for human review. `fail` marks the ticket done immediately. |
+| `required_artifacts` | No | Feature-folder files expected from the loop stage before it returns to the owning stage. |
 
 ## Validation Expectations
 
@@ -133,6 +149,7 @@ Workspace configuration should satisfy these rules:
 - Stage names are unique within a workflow, including loop stage names.
 - Every stage `worker` and loop `worker` names an existing file in `workers/`.
 - `advance` is either `auto` or `manual`.
+- `required_artifacts` entries are relative feature-folder paths and do not contain `..`.
 - `loop.via` names a loop stage owned by exactly one workflow stage.
 - `loop.on_max`, when set, is `pause` or `fail`.
 

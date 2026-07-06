@@ -37,3 +37,10 @@ repos:
   - name: my-app
     path: ../my-app
     purpose: Application code, APIs, tests
+    # Optional: repo-specific hints shown in `orc next` launch prompts.
+    # agent_hints:
+    #   - Use the repo Makefile before direct tool commands.
+    # Optional: use when this repo needs setup beyond raw git worktree add.
+    # Supported placeholders: {{branch}}, {{worktree_path}}, {{repo_path}},
+    # {{repo_name}}, {{ticket}}, {{slug}}, {{workspace}}.
+    # worktree_setup: "../my-app/scripts/setup-worktree.sh -b {{branch}} --path {{worktree_path}}"

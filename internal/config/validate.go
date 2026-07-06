@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/cengebretson/orc/internal/worktreesetup"
 )
 
 type ValidationError struct {
@@ -47,6 +49,7 @@ func Validate(cfg *Config, workerIDs []string) ValidationErrors {
 	errs = append(errs, validateAliasTargets("aliases.workflows", cfg.Aliases.Workflows)...)
 	errs = append(errs, validateAliasTargets("aliases.stages", cfg.Aliases.Stages)...)
 	errs = append(errs, validateAliasTargets("aliases.workers", cfg.Aliases.Workers)...)
+	errs = append(errs, validateRepos(cfg.Repos)...)
 
 	if len(cfg.Workflows) > 0 {
 		defaultWorkflow := cfg.ResolveWorkflow(cfg.DefaultWorkflow())
@@ -97,6 +100,7 @@ func Validate(cfg *Config, workerIDs []string) ValidationErrors {
 					Message: `advance must be "auto" or "manual"`,
 				})
 			}
+			errs = append(errs, validateArtifactPaths(stagePath+".required_artifacts", stage.RequiredArtifacts)...)
 
 			if stage.Loop != nil {
 				loopPath := stagePath + ".loop"
@@ -127,10 +131,54 @@ func Validate(cfg *Config, workerIDs []string) ValidationErrors {
 						Message: `loop on_max must be "pause" or "fail"`,
 					})
 				}
+				errs = append(errs, validateArtifactPaths(loopPath+".required_artifacts", stage.Loop.RequiredArtifacts)...)
 			}
 		}
 	}
 
+	return errs
+}
+
+func validateArtifactPaths(path string, artifacts []string) ValidationErrors {
+	var errs ValidationErrors
+	for i, artifact := range artifacts {
+		artifactPath := fmt.Sprintf("%s[%d]", path, i)
+		trimmed := strings.TrimSpace(artifact)
+		if trimmed == "" {
+			errs = append(errs, ValidationError{Path: artifactPath, Message: "artifact path is required"})
+			continue
+		}
+		if strings.HasPrefix(trimmed, "/") {
+			errs = append(errs, ValidationError{Path: artifactPath, Message: "artifact path must be relative to the feature folder"})
+			continue
+		}
+		parts := strings.FieldsFunc(trimmed, func(r rune) bool {
+			return r == '/' || r == '\\'
+		})
+		for _, part := range parts {
+			if part == ".." {
+				errs = append(errs, ValidationError{Path: artifactPath, Message: "artifact path cannot contain .."})
+				break
+			}
+		}
+	}
+	return errs
+}
+
+func validateRepos(repos []Repo) ValidationErrors {
+	var errs ValidationErrors
+	for i, repo := range repos {
+		repoPath := fmt.Sprintf("repos[%d]", i)
+		if strings.TrimSpace(repo.WorktreeSetup) == "" {
+			continue
+		}
+		if unknown := worktreesetup.UnknownPlaceholders(repo.WorktreeSetup); len(unknown) > 0 {
+			errs = append(errs, ValidationError{
+				Path:    repoPath + ".worktree_setup",
+				Message: fmt.Sprintf("unknown placeholder(s): %s", strings.Join(unknown, ", ")),
+			})
+		}
+	}
 	return errs
 }
 

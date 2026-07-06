@@ -13,9 +13,11 @@ import (
 const Filename = "orc.yaml"
 
 type Repo struct {
-	Name    string `yaml:"name"`
-	Path    string `yaml:"path"`
-	Purpose string `yaml:"purpose"`
+	Name          string   `yaml:"name"`
+	Path          string   `yaml:"path"`
+	Purpose       string   `yaml:"purpose"`
+	WorktreeSetup string   `yaml:"worktree_setup,omitempty"`
+	AgentHints    []string `yaml:"agent_hints,omitempty"`
 }
 
 type Settings struct {
@@ -44,18 +46,20 @@ type Aliases struct {
 // The loop stage (Via) runs when the owning stage needs to cycle back.
 // It is not part of the linear pipeline — only reachable via the loop or orc jit.
 type LoopDef struct {
-	Via    string `yaml:"via"`
-	Worker string `yaml:"worker"`
-	Max    int    `yaml:"max"`
-	OnMax  string `yaml:"on_max"` // "pause" (default) or "fail"
+	Via               string   `yaml:"via"`
+	Worker            string   `yaml:"worker"`
+	Max               int      `yaml:"max"`
+	OnMax             string   `yaml:"on_max"` // "pause" (default) or "fail"
+	RequiredArtifacts []string `yaml:"required_artifacts,omitempty"`
 }
 
 // StageDef is one step in a workflow.
 type StageDef struct {
-	Name    string   `yaml:"name"`
-	Worker  string   `yaml:"worker"`
-	Advance string   `yaml:"advance"`
-	Loop    *LoopDef `yaml:"loop,omitempty"`
+	Name              string   `yaml:"name"`
+	Worker            string   `yaml:"worker"`
+	Advance           string   `yaml:"advance"`
+	RequiredArtifacts []string `yaml:"required_artifacts,omitempty"`
+	Loop              *LoopDef `yaml:"loop,omitempty"`
 }
 
 type Config struct {
@@ -203,7 +207,7 @@ func (c *Config) StageConfig(workflowName, stageName string) (StageDef, bool) {
 	// Check if it's a loop stage — return a synthetic StageDef with the loop's worker.
 	for _, s := range stages {
 		if s.Loop != nil && s.Loop.Via == stageName {
-			return StageDef{Name: stageName, Worker: s.Loop.Worker}, true
+			return StageDef{Name: stageName, Worker: s.Loop.Worker, RequiredArtifacts: s.Loop.RequiredArtifacts}, true
 		}
 	}
 	return StageDef{}, false

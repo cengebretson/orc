@@ -43,7 +43,13 @@ branches stay clean and multiple tickets can run in parallel.
 
 Worktrees live inside this workspace under `worktrees/<repo-name>/<ticket-slug>`.
 
-To create a worktree for a ticket:
+If the repo in `orc.yaml` defines `worktree_setup`, use the setup command that
+`orc next` prints for the ticket. That command is repo-specific and may copy
+environment files, install dependencies, initialize submodules, or start a local
+stack. It must create the worktree at the path `orc` passes.
+
+If no repo-specific setup command is configured, create a worktree for a ticket:
+
 ```
 git -C <repo-path> worktree add <workspace>/worktrees/<repo-name>/<ticket-slug> -b <branch>
 ```

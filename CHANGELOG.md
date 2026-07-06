@@ -6,6 +6,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Repos can declare `worktree_setup` in `orc.yaml`; `orc next` prints the resolved
+  command when the target ticket worktree is missing, and `orc doctor` validates
+  placeholders plus warns when the command omits `{{worktree_path}}`.
+- Workflows can declare stage `required_artifacts`, repos can declare
+  `agent_hints`, and validation now warns about stale feature-folder artifacts
+  and recorded worktree drift.
+
 ## [0.6.0] - 2026-06-25
 
 ### Added

@@ -154,6 +154,100 @@ func TestRunWithOptionsReportsValidConfig(t *testing.T) {
 	}
 }
 
+func TestRunWithOptionsWarnsWhenWorktreeSetupOmitsWorktreePath(t *testing.T) {
+	root := t.TempDir()
+	writeDoctorFile(t, filepath.Join(root, "orc.yaml"), `
+settings:
+  default_workflow: default
+repos:
+  - name: app
+    path: ../app
+    purpose: Application
+    worktree_setup: "../app/setup-worktree.sh -b {{branch}}"
+workflows:
+  default:
+    stages:
+      - name: develop
+        worker: default:bob
+        advance: auto
+`)
+	writeDoctorFile(t, filepath.Join(root, "workers", "default", "bob.md"), `---
+id: default:bob
+name: Bob
+engine: codex
+---
+`)
+
+	report := doctor.RunWithOptions(root, doctor.Options{
+		LookPath: func(name string) (string, error) {
+			return "/bin/" + name, nil
+		},
+	})
+
+	check := findCheck(report, "config", "repos.app.worktree_setup")
+	if check == nil {
+		t.Fatal("worktree_setup warning not found")
+	}
+	if check.Status != doctor.Warning {
+		t.Fatalf("status = %v, want Warning", check.Status)
+	}
+	if check.Detail != "does not include {{worktree_path}}; command may create a worktree outside orc state" {
+		t.Fatalf("detail = %q", check.Detail)
+	}
+}
+
+func TestRunWithOptionsWarnsWhenRecordedWorktreeMissing(t *testing.T) {
+	root := t.TempDir()
+	writeDoctorFile(t, filepath.Join(root, "orc.yaml"), `
+settings:
+  default_workflow: default
+workflows:
+  default:
+    stages:
+      - name: develop
+        worker: default:bob
+        advance: auto
+`)
+	writeDoctorFile(t, filepath.Join(root, "workers", "default", "bob.md"), `---
+id: default:bob
+name: Bob
+engine: codex
+---
+`)
+	writeDoctorFile(t, filepath.Join(root, "features", "TICKET-1", "STATE.yaml"), `
+schema_version: 1
+ticket: TICKET-1
+slug: TICKET-1
+status: active
+stage:
+  name: develop
+repos:
+  app:
+    worktree: worktrees/app/TICKET-1
+    branch: feature/ticket-1
+next_action:
+  worker: human
+  cwd: .
+`)
+
+	report := doctor.RunWithOptions(root, doctor.Options{
+		LookPath: func(name string) (string, error) {
+			return "/bin/" + name, nil
+		},
+	})
+
+	check := findCheck(report, "feature state", "TICKET-1.app")
+	if check == nil {
+		t.Fatal("feature worktree warning not found")
+	}
+	if check.Status != doctor.Warning {
+		t.Fatalf("status = %v, want Warning", check.Status)
+	}
+	if check.Detail != "recorded worktree missing: worktrees/app/TICKET-1" {
+		t.Fatalf("detail = %q", check.Detail)
+	}
+}
+
 func TestRunWithOptionsReportsInvalidConfig(t *testing.T) {
 	root := t.TempDir()
 	writeDoctorFile(t, filepath.Join(root, "orc.yaml"), `

@@ -142,6 +142,155 @@ func TestCompute_LaunchCommandNonEmpty(t *testing.T) {
 	}
 }
 
+func TestCompute_IncludesWorktreeSetupWhenConfiguredWorktreeMissing(t *testing.T) {
+	root := writeRunnerWorkspace(t)
+	writeRunnerFile(t, filepath.Join(root, "orc.yaml"), `
+settings:
+  default_workflow: default
+repos:
+  - name: app
+    path: ../app
+    purpose: Application code
+    worktree_setup: "../app/setup-worktree.sh -b {{branch}} --path {{worktree_path}} --repo {{repo_name}}"
+workflows:
+  default:
+    stages:
+      - name: develop
+        worker: default:bob
+        advance: manual
+`)
+
+	featureDir := writeRunnerFeature(t, root, `
+ticket: FLYWL-123
+slug: FLYWL-123-use-orc
+status: pending
+stage:
+  name: develop
+next_action:
+  prompt: Implement the feature.
+  cwd: .
+`)
+
+	plan, err := runner.Compute(root, featureDir, "")
+	if err != nil {
+		t.Fatalf("Compute: %v", err)
+	}
+
+	wantWorktree := filepath.Join(root, "worktrees", "app", "FLYWL-123-use-orc")
+	for _, part := range []string{
+		"## Worktree setup",
+		"../app/setup-worktree.sh",
+		"-b feature/flywl-123-use-orc",
+		"--path " + wantWorktree,
+		"--repo app",
+		"Expected worktree: `" + wantWorktree + "`",
+	} {
+		if !strings.Contains(plan.Prompt, part) {
+			t.Fatalf("prompt missing %q:\n%s", part, plan.Prompt)
+		}
+	}
+}
+
+func TestCompute_SkipsWorktreeSetupWhenWorktreeExists(t *testing.T) {
+	root := writeRunnerWorkspace(t)
+	worktreePath := filepath.Join(root, "worktrees", "app", "FLYWL-124-ready")
+	if err := os.MkdirAll(worktreePath, 0755); err != nil {
+		t.Fatal(err)
+	}
+	writeRunnerFile(t, filepath.Join(root, "orc.yaml"), `
+settings:
+  default_workflow: default
+repos:
+  - name: app
+    path: ../app
+    purpose: Application code
+    worktree_setup: "../app/setup-worktree.sh -b {{branch}} --path {{worktree_path}}"
+workflows:
+  default:
+    stages:
+      - name: develop
+        worker: default:bob
+        advance: manual
+`)
+
+	featureDir := writeRunnerFeature(t, root, `
+ticket: FLYWL-124
+slug: FLYWL-124-ready
+status: pending
+stage:
+  name: develop
+repos:
+  app:
+    worktree: worktrees/app/FLYWL-124-ready
+    branch: feature/flywl-124-ready
+next_action:
+  prompt: Continue implementation.
+  cwd: worktrees/app/FLYWL-124-ready
+`)
+
+	plan, err := runner.Compute(root, featureDir, "")
+	if err != nil {
+		t.Fatalf("Compute: %v", err)
+	}
+	if strings.Contains(plan.Prompt, "setup-worktree.sh") {
+		t.Fatalf("prompt included setup despite existing worktree:\n%s", plan.Prompt)
+	}
+}
+
+func TestCompute_IncludesRequiredArtifactsAndRepoHints(t *testing.T) {
+	root := writeRunnerWorkspace(t)
+	writeRunnerFile(t, filepath.Join(root, "orc.yaml"), `
+settings:
+  default_workflow: default
+repos:
+  - name: app
+    path: ../app
+    purpose: Application code
+    agent_hints:
+      - Use the repo Makefile before direct commands.
+      - Keep feature artifacts in the feature folder.
+workflows:
+  default:
+    stages:
+      - name: develop
+        worker: default:bob
+        advance: manual
+        required_artifacts:
+          - PLAN.md
+          - develop/HANDOFF.md
+`)
+
+	featureDir := writeRunnerFeature(t, root, `
+ticket: FLYWL-125
+slug: FLYWL-125-artifacts
+status: pending
+stage:
+  name: develop
+repos:
+  app: {}
+next_action:
+  prompt: Continue implementation.
+  cwd: .
+`)
+
+	plan, err := runner.Compute(root, featureDir, "")
+	if err != nil {
+		t.Fatalf("Compute: %v", err)
+	}
+
+	for _, part := range []string{
+		"## Repo hints",
+		"Use the repo Makefile before direct commands.",
+		"## Required artifacts",
+		"features/<slug>/PLAN.md",
+		"features/<slug>/develop/HANDOFF.md",
+	} {
+		if !strings.Contains(plan.Prompt, part) {
+			t.Fatalf("prompt missing %q:\n%s", part, plan.Prompt)
+		}
+	}
+}
+
 func TestCompute_WorkflowAndStagePopulated(t *testing.T) {
 	ws := fixtureWorkspace()
 	featureDir := fixtureFeatureDir(ws, "STORY-123")

@@ -13,6 +13,8 @@ import (
 	"github.com/cengebretson/orc/internal/health"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/workspacectx"
+	"github.com/cengebretson/orc/internal/worktreecheck"
+	"github.com/cengebretson/orc/internal/worktreesetup"
 )
 
 type Status int
@@ -78,6 +80,7 @@ func RunWithOptions(root string, opts Options) *Report {
 	report := &Report{Root: root, Label: "Workspace"}
 	appendHealth(report, health.Run(root))
 	appendConfigChecks(report, root)
+	appendFeatureStateChecks(report, root)
 	appendStateLockChecks(report, root, opts.Fix)
 	appendToolChecks(report, root, opts.LookPath)
 	return report
@@ -144,7 +147,7 @@ func appendHealth(report *Report, h *health.Report) {
 }
 
 func appendConfigChecks(report *Report, root string) {
-	_, errs, err := workspacectx.LoadValidated(root)
+	ctx, errs, err := workspacectx.LoadValidated(root)
 	if err != nil {
 		report.Checks = append(report.Checks, Check{
 			Group:  "config",
@@ -161,6 +164,9 @@ func appendConfigChecks(report *Report, root string) {
 			Status: OK,
 			Detail: "valid",
 		})
+		if ctx != nil && ctx.Config != nil {
+			appendWorktreeSetupWarnings(report, ctx.Config)
+		}
 		return
 	}
 	for _, err := range errs {
@@ -169,6 +175,109 @@ func appendConfigChecks(report *Report, root string) {
 			Name:   err.Path,
 			Status: Fail,
 			Detail: err.Message,
+		})
+	}
+	if ctx != nil && ctx.Config != nil {
+		appendWorktreeSetupWarnings(report, ctx.Config)
+	}
+}
+
+func appendWorktreeSetupWarnings(report *Report, cfg *config.Config) {
+	for _, repo := range cfg.Repos {
+		if strings.TrimSpace(repo.WorktreeSetup) == "" || worktreesetup.ReferencesWorktreePath(repo.WorktreeSetup) {
+			continue
+		}
+		name := repo.Name
+		if name == "" {
+			name = repo.Path
+		}
+		report.Checks = append(report.Checks, Check{
+			Group:  "config",
+			Name:   "repos." + name + ".worktree_setup",
+			Status: Warning,
+			Detail: "does not include {{worktree_path}}; command may create a worktree outside orc state",
+		})
+	}
+}
+
+func appendFeatureStateChecks(report *Report, root string) {
+	featuresDir := filepath.Join(root, "features")
+	entries, err := os.ReadDir(featuresDir)
+	if err != nil {
+		return
+	}
+
+	found := false
+	for _, entry := range entries {
+		if !entry.IsDir() || strings.HasPrefix(entry.Name(), "_") {
+			continue
+		}
+		featureDir := filepath.Join(featuresDir, entry.Name())
+		statePath := filepath.Join(featureDir, state.Filename)
+		if _, err := os.Stat(statePath); err != nil {
+			continue
+		}
+		found = true
+		s, err := state.Load(featureDir)
+		if err != nil {
+			report.Checks = append(report.Checks, Check{
+				Group:  "feature state",
+				Name:   entry.Name(),
+				Status: Fail,
+				Detail: err.Error(),
+			})
+			continue
+		}
+		appendFeatureWorktreeChecks(report, root, s)
+	}
+	if !found {
+		return
+	}
+	hasFeatureStateCheck := false
+	for _, check := range report.Checks {
+		if check.Group == "feature state" {
+			hasFeatureStateCheck = true
+			break
+		}
+	}
+	if !hasFeatureStateCheck {
+		report.Checks = append(report.Checks, Check{
+			Group:  "feature state",
+			Name:   "worktrees",
+			Status: OK,
+			Detail: "recorded worktrees reconciled",
+		})
+	}
+}
+
+func appendFeatureWorktreeChecks(report *Report, root string, s *state.State) {
+	for name, repo := range s.Repos {
+		if repo.Worktree == "" {
+			continue
+		}
+		p := repo.Worktree
+		if !filepath.IsAbs(p) {
+			p = filepath.Join(root, p)
+		}
+		if _, err := os.Stat(p); err != nil {
+			report.Checks = append(report.Checks, Check{
+				Group:  "feature state",
+				Name:   s.Slug + "." + name,
+				Status: Warning,
+				Detail: "recorded worktree missing: " + repo.Worktree,
+			})
+		}
+	}
+	for _, finding := range worktreecheck.Reconcile(root, s) {
+		status := Warning
+		if finding.Severity == worktreecheck.Fail {
+			status = Fail
+		}
+		report.Checks = append(report.Checks, Check{
+			Group:  "feature state",
+			Name:   s.Slug + "." + finding.RepoName,
+			Status: status,
+			Detail: finding.Message,
 		})
 	}
 }
