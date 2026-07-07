@@ -187,8 +187,12 @@ next` reminds agents to keep those files current, and `orc validate` warns when
 they are missing or empty. Loop stages can declare their own
 `required_artifacts` under `loop`.
 Set `settings.artifact_policy: block` to make `orc mark <ticket> next` refuse
-to advance when core docs or current-stage required artifacts are missing or
-empty. The default is `warn`.
+to advance when core docs are missing or empty, or when current-stage
+`required_artifacts` are missing, empty, or still byte-identical to the feature
+template (reported as `unchanged from template` — nobody has written the doc
+yet). Pass `orc mark <ticket> next --force` to override the block for human
+review; the skipped artifacts are recorded in the stage result and history. The
+default is `warn`.
 
 ## Packs
 

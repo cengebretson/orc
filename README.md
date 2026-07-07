@@ -407,11 +407,12 @@ These are called by agents at the end of each session. They are hidden from `orc
   - `--stage <name>` — jump to a specific stage (e.g. send back to develop after review)
   - `--worker <id>` — override the worker for the next stage
   - `--result "<summary>"` — record what was accomplished in history
+  - `--force` — with `artifact_policy: block`, advance even when required artifacts are not ready; the skipped artifacts are recorded in history
 - `orc mark <ticket> pause "<reason>"` — pause for human input, approval, or an external blocker
 - `orc mark <ticket> done` — mark active, ready, or paused work as done
 - `orc mark <ticket> jit "<summary>"` — record a jit task as complete and clear `runtime.jit`
 
-`orc mark` validates transitions before writing `STATE.yaml`: pending tickets must be started before `next`, `done` is rejected from `pending`, stage and worker overrides must exist, invalid workspace config blocks advancement, and `artifact_policy: block` blocks `next` when required artifacts are missing or empty. Use `orc artifacts <ticket>` when an agent or human needs the same artifact checklist without advancing the ticket.
+`orc mark` validates transitions before writing `STATE.yaml`: pending tickets must be started before `next`, `done` is rejected from `pending`, stage and worker overrides must exist, invalid workspace config blocks advancement, and `artifact_policy: block` blocks `next` when required artifacts are missing, empty, or unchanged from the feature template (override with `--force`). Use `orc artifacts <ticket>` when an agent or human needs the same artifact checklist without advancing the ticket.
 
 ## Reference
 

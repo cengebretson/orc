@@ -95,10 +95,24 @@ func buildArtifactReport(featureDir, templateDir string, s *state.State, cfg *co
 		if !ok {
 			return nil, fmt.Errorf("current stage %q not found in workflow %q", s.Stage.Name, workflow)
 		}
+		// Core docs are presence-only; required artifacts also get the
+		// unchanged-from-template check. A doc that is both is reported once,
+		// under the stronger required check — mirroring the block gate in
+		// orchestrator.blockingArtifactIssues so the report and the gate agree.
+		inRequired := make(map[string]bool, len(stageCfg.RequiredArtifacts))
+		for _, artifact := range stageCfg.RequiredArtifacts {
+			inRequired[artifact] = true
+		}
+		var coreOnly []string
+		for _, doc := range artifactcheck.CoreDocs {
+			if !inRequired[doc] {
+				coreOnly = append(coreOnly, doc)
+			}
+		}
 		groups = append(groups, artifactGroup{
 			Name: "current stage",
 			Artifacts: append(
-				artifactcheck.Inspect(featureDir, "", artifactcheck.CoreDocs),
+				artifactcheck.Inspect(featureDir, "", coreOnly),
 				artifactcheck.Inspect(featureDir, templateDir, stageCfg.RequiredArtifacts)...,
 			),
 		})

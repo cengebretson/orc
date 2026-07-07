@@ -219,6 +219,37 @@ func TestRunArtifactsCurrentStageReportsMissingArtifacts(t *testing.T) {
 	}
 }
 
+// A core doc that is also a stage required_artifact must appear once, not once
+// per check list — the current-stage group dedups core-vs-required like the
+// block gate does.
+func TestRunArtifactsCurrentStageDedupsCoreAndRequired(t *testing.T) {
+	resetCommandGlobals(t)
+	globalWorkspace = writeArtifactsWorkspace(t)
+	artifactsJSON = true
+
+	out, err := captureStdout(func() error {
+		return runArtifacts(nil, []string{"ART-1"})
+	})
+	if err == nil || !strings.Contains(err.Error(), "artifacts not ready") {
+		t.Fatalf("runArtifacts --json err = %v, want artifacts not ready\n%s", err, out)
+	}
+	var payload artifactReport
+	if err := json.Unmarshal([]byte(out), &payload); err != nil {
+		t.Fatalf("unmarshal artifacts json: %v\n%s", err, out)
+	}
+	planCount := 0
+	for _, group := range payload.Groups {
+		for _, artifact := range group.Artifacts {
+			if artifact.Path == "PLAN.md" {
+				planCount++
+			}
+		}
+	}
+	if planCount != 1 {
+		t.Fatalf("PLAN.md appears %d times in current-stage report, want 1:\n%s", planCount, out)
+	}
+}
+
 func TestRunArtifactsJSONAllScope(t *testing.T) {
 	resetCommandGlobals(t)
 	globalWorkspace = writeArtifactsWorkspace(t)

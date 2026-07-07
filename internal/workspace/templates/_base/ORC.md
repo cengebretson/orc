@@ -204,7 +204,10 @@ Each stage writes its outputs to the paths declared in its stage instructions an
 any `required_artifacts` configured for the stage in `orc.yaml`. `orc validate`
 warns when these files are missing or empty. If `settings.artifact_policy` is
 `block`, `orc mark <ticket> next` refuses to advance until core docs and the
-current stage's required artifacts are ready.
+current stage's required artifacts are ready — a required artifact that is still
+byte-identical to the feature template counts as not written yet. A human can
+override with `orc mark <ticket> next --force`, which records the skipped
+artifacts in history; agents should `orc mark <ticket> pause` instead.
 
 These are handoff folders, not canonical resource IDs. The default pack uses
 friendly folders such as `develop/`, `code-review/`, and `pr-open/`.

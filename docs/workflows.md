@@ -168,8 +168,10 @@ provided by multiple packs.
 - `orc next <ticket>` refuses to launch when the workspace config is invalid.
 - `orc mark <ticket> next` refuses to advance when the workspace config is invalid.
 - If `settings.artifact_policy` is `block`, `orc mark <ticket> next` also
-  refuses to advance when core feature docs or current-stage
-  `required_artifacts` are missing, empty, or directories.
+  refuses to advance when core feature docs are missing, empty, or directories,
+  or when current-stage `required_artifacts` are missing, empty, directories, or
+  still unchanged from the feature template. `--force` overrides the block and
+  records the skipped artifacts in history.
 
 ## State Transitions
 
@@ -193,7 +195,8 @@ Transition validation rejects:
 - `next --stage` values that do not name a configured workflow or loop stage.
 - `next --worker` values that do not name a worker file in `workers/`.
 - `next` when `settings.artifact_policy: block` and the current stage's
-  required artifacts are missing, empty, or directories.
+  required artifacts are missing, empty, directories, or unchanged from the
+  feature template — unless `--force` is passed to override for human review.
 
 Use `orc artifacts <ticket>` to check the current stage's core docs and
 `required_artifacts` without advancing. Add `--all` to inspect every required
