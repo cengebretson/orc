@@ -436,48 +436,33 @@ func AppendHistory(featureDir, stage, workerID, result string) error {
 // Supports full slug match or prefix match on ticket ID (e.g. "FLYWL-123").
 func FindFeatureDir(workspaceRoot, query string) (string, error) {
 	featuresDir := filepath.Join(workspaceRoot, "features")
-
-	entries, err := os.ReadDir(featuresDir)
-	if err != nil {
+	if _, err := os.ReadDir(featuresDir); err != nil {
 		return "", fmt.Errorf("reading features/: %w", err)
 	}
-
-	query = strings.ToUpper(strings.TrimSpace(query))
-
-	var matches []string
-	for _, e := range entries {
-		if !e.IsDir() || e.Name() == "_template" {
-			continue
-		}
-		name := e.Name()
-		upper := strings.ToUpper(name)
-		if upper == query || strings.HasPrefix(upper, query) {
-			matches = append(matches, filepath.Join(featuresDir, name))
-		}
+	notFound := func(q string) error {
+		return fmt.Errorf("no feature found matching %q — create one with `orc work %s`", q, q)
 	}
-
-	switch len(matches) {
-	case 0:
-		return "", fmt.Errorf("no feature found matching %q — create one with `orc work %s`", query, query)
-	case 1:
-		return matches[0], nil
-	default:
-		names := make([]string, len(matches))
-		for i, m := range matches {
-			names[i] = filepath.Base(m)
-		}
-		return "", fmt.Errorf("ambiguous slug %q matches multiple features:\n  %s\nUse the full slug", query, strings.Join(names, "\n  "))
-	}
+	return matchFeature(query, notFound, featuresDir)
 }
 
 // FindFeatureDirWithArchive searches both features/ and features/_archive/ for a ticket match.
 func FindFeatureDirWithArchive(workspaceRoot, query string) (string, error) {
-	query = strings.ToUpper(strings.TrimSpace(query))
 	featuresDir := filepath.Join(workspaceRoot, "features")
+	notFound := func(q string) error {
+		return fmt.Errorf("no feature found matching %q", q)
+	}
+	return matchFeature(query, notFound, featuresDir, filepath.Join(featuresDir, "_archive"))
+}
+
+// matchFeature scans the given directories for a feature folder whose name
+// equals or is prefixed by query (case-insensitive), skipping the _template and
+// _archive scaffolding dirs. notFound builds the error for the zero-match case
+// from the normalized query. Unreadable dirs are skipped.
+func matchFeature(query string, notFound func(q string) error, dirs ...string) (string, error) {
+	query = strings.ToUpper(strings.TrimSpace(query))
 
 	var matches []string
-	searchDirs := []string{featuresDir, filepath.Join(featuresDir, "_archive")}
-	for _, dir := range searchDirs {
+	for _, dir := range dirs {
 		entries, err := os.ReadDir(dir)
 		if err != nil {
 			continue
@@ -495,7 +480,7 @@ func FindFeatureDirWithArchive(workspaceRoot, query string) (string, error) {
 
 	switch len(matches) {
 	case 0:
-		return "", fmt.Errorf("no feature found matching %q", query)
+		return "", notFound(query)
 	case 1:
 		return matches[0], nil
 	default:

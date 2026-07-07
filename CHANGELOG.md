@@ -6,6 +6,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Launched agents now abort if they cannot `cd` into the recorded worktree
+  instead of silently starting in the wrong directory and running repo commands
+  against the wrong tree.
+
 ## [0.8.0] - 2026-07-06
 
 ### Added

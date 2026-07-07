@@ -232,7 +232,10 @@ func writeScript(runDir string, argv []string) (string, error) {
 		parts = append(parts, shellQuote(arg))
 	}
 	// cd to the right directory, run the command, and self-delete on any exit.
-	if _, err := fmt.Fprintf(f, "#!/usr/bin/env bash\ntrap 'rm -f %s' EXIT\ncd %s\n%s\n",
+	// The cd must not fall through: if runDir was removed, launching the agent
+	// from the wrong directory would silently run repo commands against the
+	// wrong tree, so exit instead.
+	if _, err := fmt.Fprintf(f, "#!/usr/bin/env bash\ntrap 'rm -f %s' EXIT\ncd %s || exit 1\n%s\n",
 		shellQuote(f.Name()),
 		shellQuote(runDir),
 		strings.Join(parts, " "),

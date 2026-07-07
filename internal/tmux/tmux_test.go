@@ -37,8 +37,8 @@ func TestWriteScriptQuotesArguments(t *testing.T) {
 	if !strings.Contains(text, "trap 'rm -f ") {
 		t.Fatalf("script missing cleanup trap:\n%s", text)
 	}
-	if !strings.Contains(text, "cd "+shellQuote(runDir)) {
-		t.Fatalf("script missing quoted run dir:\n%s", text)
+	if !strings.Contains(text, "cd "+shellQuote(runDir)+" || exit 1") {
+		t.Fatalf("script missing guarded cd into run dir:\n%s", text)
 	}
 	if !strings.Contains(text, shellQuote("value with 'quotes'")) {
 		t.Fatalf("script missing quoted argument:\n%s", text)

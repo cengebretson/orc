@@ -280,6 +280,58 @@ func TestAdvancePausesWhenLoopLimitReached(t *testing.T) {
 	}
 }
 
+func TestAdvanceClosesTicketWhenLoopLimitReachedOnMaxFail(t *testing.T) {
+	root := copyFixtureWorkspace(t)
+	featureDir := filepath.Join(root, "features", "STORY-123-add-user-auth")
+	clearRepoValidationFields(t, featureDir)
+
+	// The develop→code-review loop defaults to on_max: pause; flip it to fail.
+	orcPath := filepath.Join(root, "orc.yaml")
+	data, err := os.ReadFile(orcPath)
+	if err != nil {
+		t.Fatalf("read orc.yaml: %v", err)
+	}
+	updated := strings.Replace(string(data), "on_max: pause", "on_max: fail", 1)
+	if updated == string(data) {
+		t.Fatal("on_max: pause not found in fixture")
+	}
+	if err := os.WriteFile(orcPath, []byte(updated), 0644); err != nil {
+		t.Fatalf("write orc.yaml: %v", err)
+	}
+
+	if err := state.Update(featureDir, func(s *state.State) error {
+		s.Status = "active"
+		s.Stage.Name = "default:develop"
+		s.StageCounts = map[string]int{"default:code-review": 3}
+		return nil
+	}); err != nil {
+		t.Fatalf("Update setup: %v", err)
+	}
+
+	result, err := Advance(AdvanceOptions{
+		Root:       root,
+		FeatureDir: featureDir,
+		Stage:      "default:code-review",
+	})
+	if err != nil {
+		t.Fatalf("Advance: %v", err)
+	}
+	if result.Outcome != AdvanceOutcomeDone {
+		t.Fatalf("Outcome = %q, want %q", result.Outcome, AdvanceOutcomeDone)
+	}
+	if result.Reason != "loop limit reached (3/3 for default:code-review)" {
+		t.Fatalf("Reason = %q", result.Reason)
+	}
+
+	s, err := state.Load(featureDir)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if s.Status != "done" {
+		t.Fatalf("status = %q, want done", s.Status)
+	}
+}
+
 func enableArtifactPolicyBlock(t *testing.T, root string) {
 	t.Helper()
 	path := filepath.Join(root, "orc.yaml")

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/cengebretson/orc/internal/artifactcheck"
+	"github.com/cengebretson/orc/internal/config"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/workers"
 	"github.com/cengebretson/orc/internal/workspacectx"
@@ -106,43 +107,8 @@ func Advance(opts AdvanceOptions) (*AdvanceResult, error) {
 		}
 	}
 
-	if opts.Stage != "" && workflowCfg.IsLoopStage(workflow, opts.Stage) {
-		owner, _ := workflowCfg.OwnerStage(workflow, opts.Stage)
-		if owner != prevStage {
-			return nil, fmt.Errorf("stage %q is a loop stage owned by %q, not %q", opts.Stage, owner, prevStage)
-		}
-		if loopDef, ok := workflowCfg.LoopConfig(workflow, prevStage); ok && loopDef.Max > 0 {
-			count := s.StageCounts[opts.Stage]
-			if count >= loopDef.Max {
-				reason := fmt.Sprintf("loop limit reached (%d/%d for %s)", count, loopDef.Max, opts.Stage)
-				if loopDef.OnMax == "fail" {
-					result := opts.Result
-					if result == "" {
-						result = reason
-					}
-					if err := state.Done(opts.FeatureDir, result); err != nil {
-						return nil, err
-					}
-					return &AdvanceResult{
-						Ticket:   s.Ticket,
-						Previous: prevStage,
-						Next:     "",
-						Outcome:  AdvanceOutcomeDone,
-						Reason:   reason,
-					}, nil
-				}
-				if err := state.Pause(opts.FeatureDir, reason); err != nil {
-					return nil, err
-				}
-				return &AdvanceResult{
-					Ticket:   s.Ticket,
-					Previous: prevStage,
-					Next:     prevStage,
-					Outcome:  AdvanceOutcomePaused,
-					Reason:   reason,
-				}, nil
-			}
-		}
+	if res, err := handleLoopLimit(opts, workflowCfg, workflow, prevStage, s); err != nil || res != nil {
+		return res, err
 	}
 
 	// Checked last so agents get actionable guidance first: a manual stage says
@@ -194,6 +160,57 @@ func Advance(opts AdvanceOptions) (*AdvanceResult, error) {
 		Outcome:     out,
 		Reason:      forcedNote,
 		AutoArchive: autoArchive,
+	}, nil
+}
+
+// handleLoopLimit governs an explicit `--stage` jump into a loop stage. It
+// rejects a jump whose loop stage is owned by a different pipeline stage, and
+// when the loop's max iterations are reached it terminates the advance: on_max
+// "fail" closes the ticket, otherwise it pauses back to the owner. A nil result
+// with nil error means the jump is within limits and Advance should proceed.
+func handleLoopLimit(opts AdvanceOptions, cfg *config.Config, workflow, prevStage string, s *state.State) (*AdvanceResult, error) {
+	if opts.Stage == "" || !cfg.IsLoopStage(workflow, opts.Stage) {
+		return nil, nil
+	}
+	owner, _ := cfg.OwnerStage(workflow, opts.Stage)
+	if owner != prevStage {
+		return nil, fmt.Errorf("stage %q is a loop stage owned by %q, not %q", opts.Stage, owner, prevStage)
+	}
+	loopDef, ok := cfg.LoopConfig(workflow, prevStage)
+	if !ok || loopDef.Max <= 0 {
+		return nil, nil
+	}
+	count := s.StageCounts[opts.Stage]
+	if count < loopDef.Max {
+		return nil, nil
+	}
+
+	reason := fmt.Sprintf("loop limit reached (%d/%d for %s)", count, loopDef.Max, opts.Stage)
+	if loopDef.OnMax == "fail" {
+		result := opts.Result
+		if result == "" {
+			result = reason
+		}
+		if err := state.Done(opts.FeatureDir, result); err != nil {
+			return nil, err
+		}
+		return &AdvanceResult{
+			Ticket:   s.Ticket,
+			Previous: prevStage,
+			Next:     "",
+			Outcome:  AdvanceOutcomeDone,
+			Reason:   reason,
+		}, nil
+	}
+	if err := state.Pause(opts.FeatureDir, reason); err != nil {
+		return nil, err
+	}
+	return &AdvanceResult{
+		Ticket:   s.Ticket,
+		Previous: prevStage,
+		Next:     prevStage,
+		Outcome:  AdvanceOutcomePaused,
+		Reason:   reason,
 	}, nil
 }
 

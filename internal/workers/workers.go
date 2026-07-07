@@ -122,6 +122,11 @@ func LaunchArgs(w *Worker, workspaceRoot, cwd, prompt string) []string {
 		}
 		return append(args, "--cd", cwd, prompt)
 	case "cursor":
+		// Cursor launches its interactive editor at cwd; the `cursor` binary has
+		// no headless prompt flag, and passing prompt as a positional arg would
+		// make it open the prompt text as a file path. The agent reads the task
+		// from STATE.yaml / the stage file once the editor is open, so the prompt
+		// is intentionally not forwarded here.
 		return []string{"cursor", cwd}
 	default: // claude
 		args := []string{"claude", "--add-dir", workspaceRoot}
