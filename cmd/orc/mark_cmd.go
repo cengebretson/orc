@@ -114,7 +114,7 @@ func runMark(cmd *cobra.Command, args []string) error {
 		return nil
 
 	default:
-		return fmt.Errorf("unknown action %q — use: start | resume | next [--result] [--stage] [--worker] | pause <reason> | done [--result] | jit <summary>", action)
+		return fmt.Errorf("unknown action %q — use: start | resume | next [--result] [--stage] [--worker] [--force] | pause <reason> | done [--result] | jit <summary>", action)
 	}
 }
 
@@ -145,6 +145,7 @@ func runMarkNext(root, featureDir string) error {
 		Stage:      markStage,
 		Worker:     markWorker,
 		Result:     markResult,
+		Force:      markForce,
 	})
 	if err != nil {
 		return err
@@ -192,5 +193,8 @@ func printAdvanceResult(result *orchestrator.AdvanceResult) {
 	}
 	if result.Worker != "" {
 		fmt.Printf("Worker:   %s\n", result.Worker)
+	}
+	if result.Reason != "" {
+		fmt.Printf("Note:     %s\n", result.Reason)
 	}
 }

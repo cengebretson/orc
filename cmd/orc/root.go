@@ -192,6 +192,7 @@ var (
 	markWorker string
 	markResult string
 	markStage  string
+	markForce  bool
 )
 
 var archiveCmd = &cobra.Command{
@@ -324,6 +325,7 @@ func init() {
 	markCmd.Flags().StringVar(&markWorker, "worker", "", "Worker ID that owns the new stage (next only)")
 	markCmd.Flags().StringVar(&markResult, "result", "", "Summary of what was accomplished (next/done only)")
 	markCmd.Flags().StringVar(&markStage, "stage", "", "New stage name (next only — required when crossing workflow boundaries)")
+	markCmd.Flags().BoolVar(&markForce, "force", false, "Human override: advance past artifact_policy=block even when required artifacts are not ready (next only, recorded in history)")
 	jitCmd.Flags().StringVar(&jitWorker, "worker", "", "Worker ID to run the task (required)")
 	_ = jitCmd.MarkFlagRequired("worker")
 	jitCmd.Flags().BoolVar(&jitDry, "dry", false, "Print resolved worker and prompt without launching")

@@ -147,6 +147,47 @@ func TestAdvanceBlocksWhenArtifactPolicyBlock(t *testing.T) {
 	}
 }
 
+// Force is the human override for artifact_policy=block: the advance succeeds
+// and the skipped artifacts are recorded in the result reason and history.
+func TestAdvanceForcePastArtifactPolicyBlock(t *testing.T) {
+	root := copyFixtureWorkspace(t)
+	featureDir := filepath.Join(root, "features", "STORY-123-add-user-auth")
+	clearRepoValidationFields(t, featureDir)
+	enableArtifactPolicyBlock(t, root)
+	if err := os.Remove(filepath.Join(featureDir, "PLAN.md")); err != nil {
+		t.Fatalf("remove PLAN.md: %v", err)
+	}
+	if err := state.Update(featureDir, func(s *state.State) error {
+		s.Stage.Name = "default:intake"
+		s.Stage.Worker = "default:fred"
+		s.Status = "active"
+		return nil
+	}); err != nil {
+		t.Fatalf("Update setup: %v", err)
+	}
+
+	result, err := Advance(AdvanceOptions{
+		Root:       root,
+		FeatureDir: featureDir,
+		Result:     "ready",
+		Force:      true,
+	})
+	if err != nil {
+		t.Fatalf("Advance with Force: %v", err)
+	}
+	if !strings.Contains(result.Reason, "forced past artifact_policy=block") || !strings.Contains(result.Reason, "PLAN.md") {
+		t.Fatalf("Reason = %q, want forced note naming PLAN.md", result.Reason)
+	}
+
+	s, err := state.Load(featureDir)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if s.Stage.Name == "default:intake" {
+		t.Fatalf("stage did not advance: %q", s.Stage.Name)
+	}
+}
+
 // A manual stage must steer the agent to `orc mark pause` even when the block
 // policy would also reject the advance — pause is the escape valve.
 func TestAdvanceManualGateTakesPrecedenceOverArtifactPolicy(t *testing.T) {

@@ -24,6 +24,9 @@ type AdvanceOptions struct {
 	Stage      string
 	Worker     string
 	Result     string
+	// Force is the human override for artifact_policy=block: advance even when
+	// required artifacts are not ready. The override is recorded in history.
+	Force bool
 }
 
 type AdvanceResult struct {
@@ -144,9 +147,16 @@ func Advance(opts AdvanceOptions) (*AdvanceResult, error) {
 
 	// Checked last so agents get actionable guidance first: a manual stage says
 	// "use pause", and a loop at max still pauses/fails instead of erroring here.
+	forcedNote := ""
 	if workflowCfg.ArtifactPolicy() == "block" {
-		if issues := artifactcheck.Check(opts.FeatureDir, append(artifactcheck.CoreDocs, stageCfg.RequiredArtifacts...)); len(issues) > 0 {
-			return nil, fmt.Errorf("artifact_policy=block: required artifacts are not ready:\n  - %s", artifactIssueDetails(issues))
+		if issues := blockingArtifactIssues(opts.FeatureDir, opts.Root, stageCfg.RequiredArtifacts); len(issues) > 0 {
+			if !opts.Force {
+				return nil, fmt.Errorf(
+					"artifact_policy=block: required artifacts are not ready:\n  - %s\nComplete them first, or `orc mark %s pause \"<reason>\"` for human review",
+					artifactIssueDetails(issues), s.Ticket,
+				)
+			}
+			forcedNote = "forced past artifact_policy=block: " + strings.Join(artifactIssueList(issues), ", ")
 		}
 	}
 
@@ -157,6 +167,9 @@ func Advance(opts AdvanceOptions) (*AdvanceResult, error) {
 		} else {
 			result = fmt.Sprintf("completed %s", prevStage)
 		}
+	}
+	if forcedNote != "" {
+		result += " (" + forcedNote + ")"
 	}
 
 	if err := state.Next(opts.FeatureDir, nextStage, opts.Worker, result); err != nil {
@@ -179,14 +192,39 @@ func Advance(opts AdvanceOptions) (*AdvanceResult, error) {
 		Next:        nextStage,
 		Worker:      opts.Worker,
 		Outcome:     out,
+		Reason:      forcedNote,
 		AutoArchive: autoArchive,
 	}, nil
 }
 
+// blockingArtifactIssues gathers the readiness problems that gate an advance.
+// Core docs must exist and be non-empty; the stage's required artifacts must
+// additionally differ from the feature template — they are the stage's actual
+// output contract. Core docs not required by the stage never block on content,
+// so an untouched DECISIONS.md cannot wedge a workflow.
+func blockingArtifactIssues(featureDir, root string, required []string) []artifactcheck.Issue {
+	inRequired := make(map[string]bool, len(required))
+	for _, artifact := range required {
+		inRequired[artifact] = true
+	}
+	var coreOnly []string
+	for _, doc := range artifactcheck.CoreDocs {
+		if !inRequired[doc] {
+			coreOnly = append(coreOnly, doc)
+		}
+	}
+	issues := artifactcheck.Check(featureDir, "", coreOnly)
+	return append(issues, artifactcheck.Check(featureDir, artifactcheck.TemplateDir(root), required)...)
+}
+
 func artifactIssueDetails(issues []artifactcheck.Issue) string {
+	return strings.Join(artifactIssueList(issues), "\n  - ")
+}
+
+func artifactIssueList(issues []artifactcheck.Issue) []string {
 	parts := make([]string, len(issues))
 	for i, issue := range issues {
 		parts[i] = issue.Detail()
 	}
-	return strings.Join(parts, "\n  - ")
+	return parts
 }

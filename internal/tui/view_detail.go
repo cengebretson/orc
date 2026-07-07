@@ -156,7 +156,7 @@ func (m Model) renderDetailBody() string {
 
 	if len(m.detail.requiredArtifacts) > 0 {
 		b.WriteString(drawBox(styleSection.Render(" Required Artifacts "),
-			artifactStatusLines(m.detail.featureDir, m.detail.requiredArtifacts, innerW), outerW) + "\n")
+			artifactStatusLines(m.detail.featureDir, artifactcheck.TemplateDir(m.root), m.detail.requiredArtifacts, innerW), outerW) + "\n")
 	}
 
 	// Timing — per-stage durations derived from history
@@ -291,8 +291,8 @@ func (m Model) renderDetailBody() string {
 	return strings.TrimRight(b.String(), "\n")
 }
 
-func artifactStatusLines(featureDir string, artifacts []string, maxW int) []string {
-	issues := artifactcheck.Check(featureDir, artifacts)
+func artifactStatusLines(featureDir, templateDir string, artifacts []string, maxW int) []string {
+	issues := artifactcheck.Check(featureDir, templateDir, artifacts)
 	issueByPath := map[string]artifactcheck.Issue{}
 	for _, issue := range issues {
 		issueByPath[issue.Path] = issue

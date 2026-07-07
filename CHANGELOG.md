@@ -6,8 +6,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `orc mark <ticket> next --force` lets a human advance past
+  `artifact_policy: block` when required artifacts are not ready; the skipped
+  artifacts are recorded in the stage result and STATE.yaml history.
+
 ### Changed
 
+- Required-artifact readiness checks now flag stage artifacts that are still
+  byte-identical to the feature template as `unchanged from template`, so an
+  untouched scaffolded doc no longer counts as done. Core docs remain a
+  presence-only check.
 - With `artifact_policy: block`, `orc mark <ticket> next` now reports the
   `advance: manual` pause guidance (and loop-limit pause/fail outcomes) before
   the artifact readiness error, so agents are steered to the escape valve first.

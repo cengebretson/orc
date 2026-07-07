@@ -48,7 +48,7 @@ func runArtifacts(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid workspace config: %w", validationErrs)
 	}
 
-	report, err := buildArtifactReport(featureDir, s, ctx.Config, artifactsAll)
+	report, err := buildArtifactReport(featureDir, artifactcheck.TemplateDir(root), s, ctx.Config, artifactsAll)
 	if err != nil {
 		return err
 	}
@@ -65,7 +65,7 @@ func runArtifacts(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func buildArtifactReport(featureDir string, s *state.State, cfg *config.Config, all bool) (*artifactReport, error) {
+func buildArtifactReport(featureDir, templateDir string, s *state.State, cfg *config.Config, all bool) (*artifactReport, error) {
 	workflow := s.Workflow
 	if workflow == "" {
 		workflow = cfg.DefaultWorkflow()
@@ -74,17 +74,20 @@ func buildArtifactReport(featureDir string, s *state.State, cfg *config.Config, 
 		return nil, fmt.Errorf("workflow %q not found in orc.yaml", workflow)
 	}
 
+	// Core docs are checked for presence only; stage artifacts are the stage's
+	// output contract and must also differ from the feature template. This
+	// mirrors the artifact_policy=block gate in orc mark next.
 	scope := "current"
 	var groups []artifactGroup
 	if all {
 		scope = "all"
-		groups = append(groups, inspectArtifactGroup(featureDir, "core", artifactcheck.CoreDocs))
+		groups = append(groups, inspectArtifactGroup(featureDir, "", "core", artifactcheck.CoreDocs))
 		for _, stage := range cfg.Stages(workflow) {
 			if len(stage.RequiredArtifacts) > 0 {
-				groups = append(groups, inspectArtifactGroup(featureDir, cfg.StageDisplayName(stage.Name), stage.RequiredArtifacts))
+				groups = append(groups, inspectArtifactGroup(featureDir, templateDir, cfg.StageDisplayName(stage.Name), stage.RequiredArtifacts))
 			}
 			if stage.Loop != nil && len(stage.Loop.RequiredArtifacts) > 0 {
-				groups = append(groups, inspectArtifactGroup(featureDir, cfg.StageDisplayName(stage.Loop.Via), stage.Loop.RequiredArtifacts))
+				groups = append(groups, inspectArtifactGroup(featureDir, templateDir, cfg.StageDisplayName(stage.Loop.Via), stage.Loop.RequiredArtifacts))
 			}
 		}
 	} else {
@@ -92,9 +95,13 @@ func buildArtifactReport(featureDir string, s *state.State, cfg *config.Config, 
 		if !ok {
 			return nil, fmt.Errorf("current stage %q not found in workflow %q", s.Stage.Name, workflow)
 		}
-		artifacts := append([]string{}, artifactcheck.CoreDocs...)
-		artifacts = append(artifacts, stageCfg.RequiredArtifacts...)
-		groups = append(groups, inspectArtifactGroup(featureDir, "current stage", artifacts))
+		groups = append(groups, artifactGroup{
+			Name: "current stage",
+			Artifacts: append(
+				artifactcheck.Inspect(featureDir, "", artifactcheck.CoreDocs),
+				artifactcheck.Inspect(featureDir, templateDir, stageCfg.RequiredArtifacts)...,
+			),
+		})
 	}
 
 	ok := true
@@ -118,8 +125,8 @@ func buildArtifactReport(featureDir string, s *state.State, cfg *config.Config, 
 	}, nil
 }
 
-func inspectArtifactGroup(featureDir, name string, artifacts []string) artifactGroup {
-	return artifactGroup{Name: name, Artifacts: artifactcheck.Inspect(featureDir, artifacts)}
+func inspectArtifactGroup(featureDir, templateDir, name string, artifacts []string) artifactGroup {
+	return artifactGroup{Name: name, Artifacts: artifactcheck.Inspect(featureDir, templateDir, artifacts)}
 }
 
 func printArtifactReport(report *artifactReport) {

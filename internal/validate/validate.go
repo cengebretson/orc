@@ -83,7 +83,7 @@ func Run(root, featureDir string) *Report {
 	r.Checks = append(r.Checks, ok("STATE.yaml"))
 	summary := ticketview.Build(root, featureDir, s, ticketview.Options{})
 	appendStateShapeChecks(r, s)
-	appendFeatureSchemaChecks(r, featureDir, s)
+	appendFeatureSchemaChecks(r, featureDir, artifactcheck.TemplateDir(root), s)
 
 	ctx, validationErrs, err := workspacectx.LoadValidated(root)
 	if err != nil {
@@ -182,7 +182,7 @@ func Run(root, featureDir string) *Report {
 			r.Checks = append(r.Checks, okd("STATE.yaml.next_action.worker", s.NextAction.Worker))
 		}
 	}
-	appendRequiredArtifactChecks(r, featureDir, sc.RequiredArtifacts)
+	appendRequiredArtifactChecks(r, featureDir, artifactcheck.TemplateDir(root), sc.RequiredArtifacts)
 	if err := state.ValidateRepos(s, root); err != nil {
 		appendRepoValidationChecks(r, err)
 	} else if len(s.Repos) > 0 {
@@ -244,7 +244,7 @@ func Run(root, featureDir string) *Report {
 	return r
 }
 
-func appendFeatureSchemaChecks(r *Report, featureDir string, s *state.State) {
+func appendFeatureSchemaChecks(r *Report, featureDir, templateDir string, s *state.State) {
 	if s.Slug != "" {
 		if got := filepath.Base(featureDir); got != s.Slug {
 			r.Checks = append(r.Checks, warn("feature folder", fmt.Sprintf("folder name %q does not match STATE.yaml.slug %q", got, s.Slug)))
@@ -253,7 +253,7 @@ func appendFeatureSchemaChecks(r *Report, featureDir string, s *state.State) {
 		}
 	}
 
-	issues := artifactcheck.Check(featureDir, artifactcheck.CoreDocs)
+	issues := artifactcheck.Check(featureDir, templateDir, artifactcheck.CoreDocs)
 	issueByPath := map[string]artifactcheck.Issue{}
 	for _, issue := range issues {
 		issueByPath[issue.Path] = issue
@@ -267,11 +267,11 @@ func appendFeatureSchemaChecks(r *Report, featureDir string, s *state.State) {
 	}
 }
 
-func appendRequiredArtifactChecks(r *Report, featureDir string, artifacts []string) {
+func appendRequiredArtifactChecks(r *Report, featureDir, templateDir string, artifacts []string) {
 	if len(artifacts) == 0 {
 		return
 	}
-	issues := artifactcheck.Check(featureDir, artifacts)
+	issues := artifactcheck.Check(featureDir, templateDir, artifacts)
 	issueByPath := map[string]artifactcheck.Issue{}
 	for _, issue := range issues {
 		issueByPath[issue.Path] = issue
