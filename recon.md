@@ -37,6 +37,8 @@ The first Recon-inspired implementation added:
 - Guarded provider resume with discovery, active-process protection, CWD
   validation, exact argv, and dry-run support.
 - Crash-safe, confirmed `orc sessions park` and `orc sessions unpark` flows.
+- Repository and branch grouping from durable managed state plus cached Git
+  metadata for orphaned and unmanaged sessions.
 
 See [docs/sessions.md](docs/sessions.md) and [docs/watch.md](docs/watch.md) for
 the implemented behavior.
@@ -124,25 +126,25 @@ Implemented behavior:
 Filtering should only affect presentation. It must not change focus priority or
 workflow state.
 
-## Remaining recommendations
+### 4. Git-aware grouping — implemented
 
-### 4. Git-aware grouping
-
-Priority: medium.
+Completed on 2026-07-16.
 
 Recon uses `git rev-parse --git-common-dir` to group worktrees under a canonical
 repository and caches branch information:
 
 - [Recon Git metadata](https://github.com/gavraz/recon/blob/main/src/session.rs)
 
-This maps well to Orc, especially for multi-repository tickets:
+Implemented behavior:
 
-- Use `STATE.yaml.repos` directly for managed sessions.
-- Inspect Git only for unmanaged sessions or when durable data is absent.
-- Cache unmanaged Git results with a short TTL.
-- Offer grouping and filtering by repository and branch.
-- Show the relative worktree directory without replacing the ticket or stage as
-  the primary identity.
+- Managed sessions project all repository, branch, and relative worktree data
+  directly from `STATE.yaml.repos` without invoking Git.
+- Orphaned and unmanaged sessions resolve canonical identity through
+  `git rev-parse --git-common-dir` only when durable data is absent.
+- Successful and failed Git lookups share a five-second process-local cache.
+- Session inventory and resume search expose repository, worktree, and branch.
+- Rows group by kind, repository, and branch without replacing ticket or stage
+  as the primary workflow identity.
 
 Example:
 
@@ -151,6 +153,8 @@ los-app-los-django
   FLYWL-123  feature/flywl-123  develop  working
   FLYWL-456  feature/flywl-456  review   input
 ```
+
+## Remaining recommendations
 
 ### 5. Context-pressure warnings
 
@@ -246,7 +250,7 @@ recovery, filtering, and context pressure before adding another visual mode.
 1. ~~Exact provider-session and pane identity.~~ Completed 2026-07-13.
 2. ~~Incremental telemetry parsing with total refresh budgets.~~ Completed 2026-07-13.
 3. ~~Search and interactive resume picker.~~ Completed 2026-07-16.
-4. Git-aware grouping and filters.
+4. ~~Git-aware grouping and filters.~~ Completed 2026-07-16.
 5. Context-pressure presentation.
 6. Labels and popup documentation only when demanded by actual use.
 

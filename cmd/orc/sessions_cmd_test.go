@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cengebretson/orc/internal/gitmeta"
+	"github.com/cengebretson/orc/internal/sessionlist"
 	"github.com/cengebretson/orc/internal/sessionpicker"
 	"github.com/cengebretson/orc/internal/telemetry"
 )
@@ -39,7 +41,7 @@ func TestProviderResumeArgs(t *testing.T) {
 	}
 }
 
-func TestBuildResumeCandidatesCachesBranchLookup(t *testing.T) {
+func TestBuildResumeCandidatesCachesRepositoryLookup(t *testing.T) {
 	discovered := []telemetry.Live{
 		{Engine: "codex", ProviderSessionID: "one", CWD: "/work/orc"},
 		{Engine: "codex", ProviderSessionID: "two", CWD: "/work/orc"},
@@ -47,24 +49,34 @@ func TestBuildResumeCandidatesCachesBranchLookup(t *testing.T) {
 		{Engine: "other", ProviderSessionID: "ignored", CWD: "/work/other"},
 	}
 	calls := 0
-	candidates := buildResumeCandidates(discovered, "codex", func(cwd string) string {
+	candidates := buildResumeCandidates(discovered, "codex", func(cwd string) (gitmeta.Metadata, bool) {
 		calls++
-		return "feature/search"
+		return gitmeta.Metadata{Repository: "orc", Branch: "feature/search", Worktree: "orc-wt"}, true
 	})
 	if len(candidates) != 2 || calls != 1 {
 		t.Fatalf("candidates=%d branch calls=%d, want 2/1", len(candidates), calls)
 	}
 	for _, candidate := range candidates {
-		if candidate.Branch != "feature/search" {
-			t.Errorf("branch = %q", candidate.Branch)
+		if candidate.Repository != "orc" || candidate.Branch != "feature/search" || candidate.Worktree != "orc-wt" {
+			t.Errorf("repository metadata = %#v", candidate)
 		}
+	}
+}
+
+func TestRepositoryColumns(t *testing.T) {
+	repository, branch := repositoryColumns([]sessionlist.Repository{
+		{Name: "orc", Branch: "feature/grouping", Worktree: "orc-wt"},
+		{Name: "qa", Branch: "main", Worktree: "."},
+	})
+	if repository != "orc/orc-wt +1" || branch != "feature/grouping +1" {
+		t.Fatalf("columns = %q / %q", repository, branch)
 	}
 }
 
 func TestRunSessionResumeWithoutIDUsesPicker(t *testing.T) {
 	originalDiscover := discoverResumeSessions
 	originalSelect := selectResumeSession
-	originalBranch := lookupResumeBranch
+	originalRepository := lookupResumeRepository
 	originalDry := sessionsResumeDry
 	originalForce := sessionsResumeForce
 	originalEngine := sessionsResumeEngine
@@ -72,7 +84,7 @@ func TestRunSessionResumeWithoutIDUsesPicker(t *testing.T) {
 	defer func() {
 		discoverResumeSessions = originalDiscover
 		selectResumeSession = originalSelect
-		lookupResumeBranch = originalBranch
+		lookupResumeRepository = originalRepository
 		sessionsResumeDry = originalDry
 		sessionsResumeForce = originalForce
 		sessionsResumeEngine = originalEngine
@@ -83,9 +95,11 @@ func TestRunSessionResumeWithoutIDUsesPicker(t *testing.T) {
 	discoverResumeSessions = func(string) ([]telemetry.Live, error) {
 		return []telemetry.Live{{Engine: "codex", ProviderSessionID: "picked-session", Model: "gpt-5", CWD: cwd}}, nil
 	}
-	lookupResumeBranch = func(string) string { return "feature/picker" }
+	lookupResumeRepository = func(string) (gitmeta.Metadata, bool) {
+		return gitmeta.Metadata{Repository: "orc", Branch: "feature/picker", Worktree: "orc-wt"}, true
+	}
 	selectResumeSession = func(candidates []sessionpicker.Candidate) (sessionpicker.Candidate, error) {
-		if len(candidates) != 1 || candidates[0].Branch != "feature/picker" {
+		if len(candidates) != 1 || candidates[0].Repository != "orc" || candidates[0].Branch != "feature/picker" {
 			return sessionpicker.Candidate{}, fmt.Errorf("unexpected candidates: %#v", candidates)
 		}
 		return candidates[0], nil

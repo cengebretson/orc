@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/cengebretson/orc/internal/featurelist"
+	"github.com/cengebretson/orc/internal/gitmeta"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/telemetry"
 	"github.com/cengebretson/orc/internal/tmux"
@@ -47,6 +48,74 @@ func TestCollectClassifiesManagedOrphanedAndUnmanaged(t *testing.T) {
 	}
 	if got[2].Kind != KindUnmanaged || got[2].Live.ProviderSessionID != "personal" {
 		t.Fatalf("unmanaged = %#v", got[2])
+	}
+}
+
+func TestCollectUsesDurableManagedRepositoriesWithoutGit(t *testing.T) {
+	feature := &featurelist.Feature{
+		State: &state.State{
+			Ticket: "ORC-1", Stage: state.Stage{Name: "develop"},
+			Runtime: state.Runtime{Tmux: &state.TmuxRuntime{Session: "orc-1"}},
+			Repos: map[string]state.Repo{
+				"los-app": {Main: "/repos/los-app", Worktree: "/worktrees/los-app-feature", Branch: "feature/orc-1"},
+				"qa":      {Main: "/repos/qa", Worktree: "/repos/qa", Branch: "main"},
+			},
+		},
+		FeatureDir: "/features/orc-1",
+	}
+	gitCalls := 0
+	got, err := Collect("/work", Options{
+		Features: []*featurelist.Feature{feature}, Panes: []tmux.Pane{}, Telemetry: []telemetry.Live{},
+		ResolveGit: func(string) (gitmeta.Metadata, bool) {
+			gitCalls++
+			return gitmeta.Metadata{}, false
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gitCalls != 0 {
+		t.Fatalf("managed session performed %d Git lookups", gitCalls)
+	}
+	if len(got) != 1 || len(got[0].Repositories) != 2 {
+		t.Fatalf("sessions = %#v", got)
+	}
+	if got[0].Repositories[0] != (Repository{Name: "los-app", Branch: "feature/orc-1", Worktree: "los-app-feature"}) {
+		t.Fatalf("first repository = %#v", got[0].Repositories[0])
+	}
+	if got[0].Repositories[1] != (Repository{Name: "qa", Branch: "main", Worktree: "."}) {
+		t.Fatalf("second repository = %#v", got[0].Repositories[1])
+	}
+}
+
+func TestCollectResolvesGitOnlyForOrphanedAndUnmanagedSessions(t *testing.T) {
+	panes := []tmux.Pane{{ID: "%1", Session: "old", Window: "review", CWD: "/work/orc", Agent: true, Ticket: "ORC-OLD"}}
+	live := []telemetry.Live{
+		{Engine: "codex", ProviderSessionID: "orphan", CWD: "/work/orc"},
+		{Engine: "claude", ProviderSessionID: "personal", CWD: "/work/personal"},
+	}
+	lookups := map[string]int{}
+	resolve := func(cwd string) (gitmeta.Metadata, bool) {
+		lookups[cwd]++
+		if cwd == "/work/orc" {
+			return gitmeta.Metadata{Repository: "orc", Branch: "feature/grouping", Worktree: "orc-wt"}, true
+		}
+		return gitmeta.Metadata{Repository: "personal", Branch: "main", Worktree: "."}, true
+	}
+	got, err := Collect("/work", Options{
+		IncludeUnmanaged: true, Features: []*featurelist.Feature{}, Panes: panes, Telemetry: live, ResolveGit: resolve,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0].Kind != KindOrphaned || got[1].Kind != KindUnmanaged {
+		t.Fatalf("sessions = %#v", got)
+	}
+	if got[0].Repositories[0].Name != "orc" || got[1].Repositories[0].Name != "personal" {
+		t.Fatalf("repositories = %#v / %#v", got[0].Repositories, got[1].Repositories)
+	}
+	if lookups["/work/orc"] != 1 || lookups["/work/personal"] != 1 {
+		t.Fatalf("lookups = %#v", lookups)
 	}
 }
 

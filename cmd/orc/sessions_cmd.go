@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -11,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cengebretson/orc/internal/gitmeta"
 	"github.com/cengebretson/orc/internal/sessionlist"
 	"github.com/cengebretson/orc/internal/sessionpicker"
 	"github.com/cengebretson/orc/internal/telemetry"
@@ -20,7 +20,7 @@ import (
 var (
 	discoverResumeSessions = telemetry.Discover
 	selectResumeSession    = sessionpicker.Select
-	lookupResumeBranch     = gitBranch
+	lookupResumeRepository = gitmeta.Resolve
 )
 
 func runSessions(cmd *cobra.Command, args []string) error {
@@ -28,7 +28,7 @@ func runSessions(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	sessions, err := sessionlist.Collect(root, sessionlist.Options{IncludeUnmanaged: sessionsAll})
+	sessions, err := sessionlist.Collect(root, sessionlist.Options{IncludeUnmanaged: sessionsAll, ResolveGit: gitmeta.Resolve})
 	if err != nil {
 		return err
 	}
@@ -44,8 +44,8 @@ func runSessions(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	fmt.Printf("%-10s  %-14s  %-9s  %-18s  %-11s  %-17s  %-10s  %s\n", "Kind", "Ticket", "Engine", "Model", "State", "Target", "Context", "Last active")
-	fmt.Printf("%-10s  %-14s  %-9s  %-18s  %-11s  %-17s  %-10s  %s\n", "----", "------", "------", "-----", "-----", "------", "-------", "-----------")
+	fmt.Printf("%-10s  %-14s  %-22s  %-24s  %-9s  %-18s  %-11s  %-17s  %-10s  %s\n", "Kind", "Ticket", "Repository", "Branch", "Engine", "Model", "State", "Target", "Context", "Last active")
+	fmt.Printf("%-10s  %-14s  %-22s  %-24s  %-9s  %-18s  %-11s  %-17s  %-10s  %s\n", "----", "------", "----------", "------", "------", "-----", "-----", "------", "-------", "-----------")
 	for _, session := range sessions {
 		model, liveState, context, active := liveColumns(session.Live)
 		if liveState == "" && session.Kind == sessionlist.KindManaged && !session.Running {
@@ -62,8 +62,9 @@ func runSessions(cmd *cobra.Command, args []string) error {
 		if engine == "" && session.Live != nil {
 			engine = session.Live.Engine
 		}
-		fmt.Printf("%-10s  %-14s  %-9s  %-18s  %-11s  %-17s  %-10s  %s\n",
-			session.Kind, emptyDash(session.Ticket), emptyDash(engine), emptyDash(model),
+		repository, branch := repositoryColumns(session.Repositories)
+		fmt.Printf("%-10s  %-14s  %-22s  %-24s  %-9s  %-18s  %-11s  %-17s  %-10s  %s\n",
+			session.Kind, emptyDash(session.Ticket), repository, branch, emptyDash(engine), emptyDash(model),
 			emptyDash(liveState), target, context, active)
 	}
 	return nil
@@ -76,7 +77,7 @@ func runSessionResume(cmd *cobra.Command, args []string) error {
 	}
 	var live telemetry.Live
 	if len(args) == 0 {
-		candidates := buildResumeCandidates(discovered, sessionsResumeEngine, lookupResumeBranch)
+		candidates := buildResumeCandidates(discovered, sessionsResumeEngine, lookupResumeRepository)
 		selected, err := selectResumeSession(candidates)
 		if errors.Is(err, sessionpicker.ErrCancelled) {
 			return nil
@@ -114,8 +115,8 @@ func findResumeSession(discovered []telemetry.Live, id, engine string) (telemetr
 	return matches[0], nil
 }
 
-func buildResumeCandidates(discovered []telemetry.Live, engine string, branch func(string) string) []sessionpicker.Candidate {
-	branches := make(map[string]string)
+func buildResumeCandidates(discovered []telemetry.Live, engine string, resolve func(string) (gitmeta.Metadata, bool)) []sessionpicker.Candidate {
+	repositories := make(map[string]gitmeta.Metadata)
 	var candidates []sessionpicker.Candidate
 	for _, live := range discovered {
 		if live.ProviderSessionID == "" || (engine != "" && !strings.EqualFold(engine, live.Engine)) {
@@ -124,28 +125,20 @@ func buildResumeCandidates(discovered []telemetry.Live, engine string, branch fu
 		if !strings.EqualFold(live.Engine, "claude") && !strings.EqualFold(live.Engine, "codex") {
 			continue
 		}
-		branchName := ""
-		if live.CWD != "" && branch != nil {
+		metadata := gitmeta.Metadata{}
+		if live.CWD != "" && resolve != nil {
 			var ok bool
-			branchName, ok = branches[live.CWD]
+			metadata, ok = repositories[live.CWD]
 			if !ok {
-				branchName = branch(live.CWD)
-				branches[live.CWD] = branchName
+				metadata, _ = resolve(live.CWD)
+				repositories[live.CWD] = metadata
 			}
 		}
-		candidates = append(candidates, sessionpicker.Candidate{Live: live, Branch: branchName})
+		candidates = append(candidates, sessionpicker.Candidate{
+			Live: live, Repository: metadata.Repository, Branch: metadata.Branch, Worktree: metadata.Worktree,
+		})
 	}
 	return candidates
-}
-
-func gitBranch(cwd string) string {
-	ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
-	defer cancel()
-	out, err := exec.CommandContext(ctx, "git", "-C", cwd, "branch", "--show-current").Output()
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(out))
 }
 
 func resumeLiveSession(live telemetry.Live) error {
@@ -244,4 +237,22 @@ func emptyDash(value string) string {
 		return "-"
 	}
 	return value
+}
+
+func repositoryColumns(repositories []sessionlist.Repository) (string, string) {
+	if len(repositories) == 0 {
+		return "-", "-"
+	}
+	first := repositories[0]
+	repository := first.Name
+	if first.Worktree != "" && first.Worktree != "." {
+		repository += "/" + first.Worktree
+	}
+	branch := emptyDash(first.Branch)
+	if len(repositories) > 1 {
+		suffix := fmt.Sprintf(" +%d", len(repositories)-1)
+		repository += suffix
+		branch += suffix
+	}
+	return repository, branch
 }

@@ -8,6 +8,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Repository and branch grouping for `orc sessions` and the resume picker,
+  sourced from durable `STATE.yaml.repos` for managed work and a short-lived
+  `git-common-dir` cache for orphaned or unmanaged sessions.
 - Shared multi-field `/` filtering in `orc watch` and `orc tui`, plus an
   interactive `orc sessions resume` picker when no provider session ID is
   supplied; explicit IDs remain available for deterministic scripts.

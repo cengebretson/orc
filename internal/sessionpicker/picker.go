@@ -18,8 +18,10 @@ import (
 var ErrCancelled = errors.New("session selection cancelled")
 
 type Candidate struct {
-	Live   telemetry.Live
-	Branch string
+	Live       telemetry.Live
+	Repository string
+	Branch     string
+	Worktree   string
 }
 
 type Model struct {
@@ -139,7 +141,8 @@ func (m *Model) applyFilter() {
 	for _, candidate := range m.all {
 		live := candidate.Live
 		if searchmatch.Match(query, live.Engine, live.ProviderSessionID, live.Model,
-			live.Effort, live.State, live.CWD, live.Ticket, candidate.Branch) {
+			live.Effort, live.State, live.CWD, live.Ticket, candidate.Repository,
+			candidate.Branch, candidate.Worktree) {
 			visible = append(visible, candidate)
 		}
 	}
@@ -149,9 +152,17 @@ func (m *Model) applyFilter() {
 
 func (c Candidate) summary(now time.Time) string {
 	live := c.Live
-	return fmt.Sprintf("%s  %s  %s  ctx %s  %s  %s",
+	return fmt.Sprintf("%s  %s  %s  ctx %s  %s  %s  %s",
 		emptyDash(live.Engine), emptyDash(live.Model), shortID(live.ProviderSessionID),
-		contextValue(live), emptyDash(c.Branch), relativeTime(now, live.LastActive))
+		contextValue(live), c.repositoryLabel(), emptyDash(c.Branch), relativeTime(now, live.LastActive))
+}
+
+func (c Candidate) repositoryLabel() string {
+	label := emptyDash(c.Repository)
+	if c.Worktree != "" && c.Worktree != "." && label != "-" {
+		label += "/" + c.Worktree
+	}
+	return label
 }
 
 func contextValue(live telemetry.Live) string {

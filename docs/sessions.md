@@ -45,6 +45,15 @@ The default inventory includes:
 `--all` also includes recent `unmanaged` Claude and Codex sessions. This makes
 personal provider sessions visible without claiming Orc owns them.
 
+Inventory rows include repository, relative worktree, and branch metadata.
+Managed rows use `STATE.yaml.repos` directly and never spawn Git for identity.
+Orphaned and unmanaged rows use `git rev-parse --git-common-dir` only when
+durable state is unavailable. Successful and failed Git lookups share a short
+process-local cache, so refreshes do not repeatedly probe the same directory.
+Rows group by kind, repository, and branch while ticket and stage remain their
+primary workflow identity. JSON preserves every managed repository in the
+`repositories` array instead of collapsing multi-repository tickets.
+
 For a single ticket, `orc status <ticket> --json` keeps the existing durable
 state shape and adds a `live` field only when a running pane can be matched to
 provider metadata.
@@ -90,9 +99,10 @@ orc sessions resume <provider-session-id>
 ```
 
 Without an ID, Orc opens a searchable picker over recent Claude and Codex
-metadata. Each row shows provider, model, session ID, context pressure, current
-Git branch when available, CWD, and relative last activity. Search matches those
-same fields. Escape cancels without launching anything.
+metadata. Each row shows provider, model, session ID, context pressure,
+repository/worktree, current Git branch when available, CWD, and relative last
+activity. Search matches those same fields. Escape cancels without launching
+anything.
 
 Resume accepts only a session discovered in recent local provider metadata. It
 uses the recorded working directory, validates that directory and provider

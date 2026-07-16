@@ -373,7 +373,8 @@ Or use the Claude Desktop settings UI. Requires a GitHub PAT with `repo` and `pu
 - `orc sessions` — list managed and orphaned agent sessions with tmux targets and optional provider telemetry
   - `--all` — include recent Claude and Codex sessions not managed by Orc
   - `--json` — emit the inventory as JSON
-  - `orc sessions resume` — search recent sessions interactively by provider, model, branch, CWD, and activity
+  - groups rows by repository and branch; managed rows use `STATE.yaml.repos`, while unmanaged rows use cached Git metadata
+  - `orc sessions resume` — search recent sessions interactively by provider, model, repository, branch, CWD, and activity
   - `orc sessions resume <provider-session-id> --dry` — validate and preview an exact provider resume
   - `orc sessions park --dry` — preview resumable managed sessions; `--yes` snapshots and stops only those sessions
   - `orc sessions unpark --dry` — preview the saved snapshot; `--yes` recreates and resumes it

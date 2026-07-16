@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/cengebretson/orc/internal/featurelist"
+	"github.com/cengebretson/orc/internal/gitmeta"
+	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/telemetry"
 	"github.com/cengebretson/orc/internal/tmux"
 )
@@ -25,18 +27,25 @@ type Target struct {
 	Pane    string `json:"pane,omitempty"`
 }
 
+type Repository struct {
+	Name     string `json:"name"`
+	Branch   string `json:"branch,omitempty"`
+	Worktree string `json:"worktree,omitempty"`
+}
+
 type Session struct {
-	Kind       string          `json:"kind"`
-	Running    bool            `json:"running"`
-	Ticket     string          `json:"ticket,omitempty"`
-	Stage      string          `json:"stage,omitempty"`
-	Status     string          `json:"status,omitempty"`
-	Worker     string          `json:"worker,omitempty"`
-	Engine     string          `json:"engine,omitempty"`
-	FeatureDir string          `json:"feature_dir,omitempty"`
-	Attention  string          `json:"attention,omitempty"`
-	Target     *Target         `json:"target,omitempty"`
-	Live       *telemetry.Live `json:"live,omitempty"`
+	Kind         string          `json:"kind"`
+	Running      bool            `json:"running"`
+	Ticket       string          `json:"ticket,omitempty"`
+	Stage        string          `json:"stage,omitempty"`
+	Status       string          `json:"status,omitempty"`
+	Worker       string          `json:"worker,omitempty"`
+	Engine       string          `json:"engine,omitempty"`
+	FeatureDir   string          `json:"feature_dir,omitempty"`
+	Attention    string          `json:"attention,omitempty"`
+	Repositories []Repository    `json:"repositories,omitempty"`
+	Target       *Target         `json:"target,omitempty"`
+	Live         *telemetry.Live `json:"live,omitempty"`
 }
 
 type Options struct {
@@ -48,6 +57,7 @@ type Options struct {
 	LoadFeatures     func(string, featurelist.Options) ([]*featurelist.Feature, error)
 	ListPanes        func() ([]tmux.Pane, error)
 	Discover         func(string) ([]telemetry.Live, error)
+	ResolveGit       func(string) (gitmeta.Metadata, bool)
 }
 
 func Collect(root string, opts Options) ([]Session, error) {
@@ -103,6 +113,7 @@ func Collect(root string, opts Options) ([]Session, error) {
 		entry := Session{
 			Kind: KindManaged, Ticket: s.Ticket, Stage: s.Stage.Name, Status: s.Status,
 			Worker: feature.WorkerID, Engine: feature.Engine, FeatureDir: feature.FeatureDir,
+			Repositories: durableRepositories(s.Repos),
 		}
 		if s.Runtime.Tmux != nil {
 			entry.Target = &Target{Session: s.Runtime.Tmux.Session, Window: s.Stage.Name, Pane: s.Runtime.Tmux.Pane}
@@ -150,6 +161,7 @@ func Collect(root string, opts Options) ([]Session, error) {
 			value.PaneTarget = pane.ID
 			entry.Live = &value
 		}
+		entry.Repositories = resolvedRepository(opts.ResolveGit, firstNonEmpty(pane.CWD, pane.FeatureDir))
 		out = append(out, entry)
 	}
 
@@ -159,12 +171,21 @@ func Collect(root string, opts Options) ([]Session, error) {
 				continue
 			}
 			value := liveSessions[i]
-			out = append(out, Session{Kind: KindUnmanaged, Engine: value.Engine, Live: &value})
+			out = append(out, Session{
+				Kind: KindUnmanaged, Engine: value.Engine, Live: &value,
+				Repositories: resolvedRepository(opts.ResolveGit, value.CWD),
+			})
 		}
 	}
 	sort.SliceStable(out, func(i, j int) bool {
 		if kindRank(out[i].Kind) != kindRank(out[j].Kind) {
 			return kindRank(out[i].Kind) < kindRank(out[j].Kind)
+		}
+		if repositoryKey(out[i]) != repositoryKey(out[j]) {
+			return repositoryKey(out[i]) < repositoryKey(out[j])
+		}
+		if branchKey(out[i]) != branchKey(out[j]) {
+			return branchKey(out[i]) < branchKey(out[j])
 		}
 		if out[i].Ticket != out[j].Ticket {
 			return out[i].Ticket < out[j].Ticket
@@ -172,6 +193,65 @@ func Collect(root string, opts Options) ([]Session, error) {
 		return lastActive(out[i]).After(lastActive(out[j]))
 	})
 	return out, nil
+}
+
+func durableRepositories(repos map[string]state.Repo) []Repository {
+	keys := make([]string, 0, len(repos))
+	for name := range repos {
+		keys = append(keys, name)
+	}
+	sort.Strings(keys)
+	result := make([]Repository, 0, len(keys))
+	for _, name := range keys {
+		repo := repos[name]
+		resolvedName := name
+		if resolvedName == "" {
+			resolvedName = filepath.Base(firstNonEmpty(repo.Main, repo.Worktree))
+		}
+		worktree := ""
+		if repo.Worktree != "" {
+			worktree = "."
+			if repo.Main == "" || !samePath(repo.Main, repo.Worktree) {
+				worktree = filepath.Base(repo.Worktree)
+			}
+		}
+		result = append(result, Repository{Name: resolvedName, Branch: repo.Branch, Worktree: worktree})
+	}
+	return result
+}
+
+func resolvedRepository(resolve func(string) (gitmeta.Metadata, bool), cwd string) []Repository {
+	if resolve == nil || cwd == "" {
+		return nil
+	}
+	metadata, ok := resolve(cwd)
+	if !ok {
+		return nil
+	}
+	return []Repository{{Name: metadata.Repository, Branch: metadata.Branch, Worktree: metadata.Worktree}}
+}
+
+func repositoryKey(session Session) string {
+	if len(session.Repositories) == 0 {
+		return "~"
+	}
+	return strings.ToLower(session.Repositories[0].Name)
+}
+
+func branchKey(session Session) string {
+	if len(session.Repositories) == 0 {
+		return "~"
+	}
+	return strings.ToLower(session.Repositories[0].Branch)
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func matchFeaturePane(feature *featurelist.Feature, panes []tmux.Pane, used map[string]bool) *tmux.Pane {

@@ -11,8 +11,8 @@ import (
 
 func testCandidates() []Candidate {
 	return []Candidate{
-		{Live: telemetry.Live{Engine: "codex", ProviderSessionID: "codex-123456789", Model: "gpt-5", CWD: "/work/orc", ContextUsed: 50, ContextLimit: 100}, Branch: "feature/search"},
-		{Live: telemetry.Live{Engine: "claude", ProviderSessionID: "claude-456", Model: "opus", CWD: "/work/los", State: "idle"}, Branch: "develop"},
+		{Live: telemetry.Live{Engine: "codex", ProviderSessionID: "codex-123456789", Model: "gpt-5", CWD: "/work/orc", ContextUsed: 50, ContextLimit: 100}, Repository: "orc", Branch: "feature/search", Worktree: "orc-wt"},
+		{Live: telemetry.Live{Engine: "claude", ProviderSessionID: "claude-456", Model: "opus", CWD: "/work/los", State: "idle"}, Repository: "los-app", Branch: "develop"},
 	}
 }
 
@@ -64,7 +64,7 @@ func TestViewShowsResumeMetadata(t *testing.T) {
 	m.height = 20
 	m.now = time.Now()
 	view := m.View()
-	for _, want := range []string{"codex", "gpt-5", "ctx 50%", "feature/search", "/work/orc"} {
+	for _, want := range []string{"codex", "gpt-5", "ctx 50%", "orc/orc-wt", "feature/search", "/work/orc"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("View() missing %q:\n%s", want, view)
 		}
