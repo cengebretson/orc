@@ -179,6 +179,33 @@ Implemented behavior:
 - The overlay affects only rendering. It cannot reorder work, mutate state,
   advance a stage, or terminate a session.
 
+### 7. Tmux popup workflow — implemented
+
+Completed on 2026-07-16.
+
+Recon documents popup bindings for its dashboard, new-session form, resume
+picker, and next-attention command:
+
+- [Recon tmux configuration](https://github.com/gavraz/recon/blob/main/README.md#tmux-config)
+
+With Orc's resume picker in place, the optional bindings cover:
+
+- `orc watch`
+- `orc sessions --all`
+- `orc sessions resume`
+- `orc focus`
+
+These remain user-owned tmux configuration rather than installation-time
+mutation.
+
+Implemented behavior:
+
+- `docs/tmux.conf` provides syntax-checked bindings for watch, session inventory,
+  interactive resume, and attention-driven focus.
+- `docs/tmux.md` explains absolute and per-session workspace selection, popup
+  behavior, a long-running resume pane alternative, and manual verification.
+- Orc does not install, source, or mutate tmux configuration.
+
 ## Remaining recommendations
 
 ### 6. Durable labels and filters
@@ -198,33 +225,6 @@ If arbitrary labels become useful:
 - Mirror labels into tmux metadata only for live reverse lookup.
 
 Do not make tmux environment variables the sole copy of Orc labels.
-
-### 7. Tmux popup workflow — implemented
-
-Completed on 2026-07-16.
-
-Recon documents popup bindings for its dashboard, new-session form, resume
-picker, and next-attention command:
-
-- [Recon tmux configuration](https://github.com/gavraz/recon/blob/main/README.md#tmux-config)
-
-After the resume picker exists, Orc can document similar optional bindings for:
-
-- `orc watch`
-- `orc sessions --all`
-- `orc sessions resume`
-- `orc focus`
-
-These should remain user-owned tmux configuration rather than installation-time
-mutation.
-
-Implemented behavior:
-
-- `docs/tmux.conf` provides syntax-checked bindings for watch, session inventory,
-  interactive resume, and attention-driven focus.
-- `docs/tmux.md` explains absolute and per-session workspace selection, popup
-  behavior, a long-running resume pane alternative, and manual verification.
-- Orc does not install, source, or mutate tmux configuration.
 
 ## Ideas not to copy directly
 

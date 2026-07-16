@@ -236,6 +236,19 @@ func TestCollectDoesNotFallbackToCWDWhenExplicitProviderIDIsMissing(t *testing.T
 	}
 }
 
+func TestCollectDoesNotGuessTelemetryWhenPaneCWDIsEmpty(t *testing.T) {
+	panes := []tmux.Pane{{ID: "%1", Session: "orphan", Window: "shell", Agent: true, ProviderEngine: "codex"}}
+	live := []telemetry.Live{{Engine: "codex", ProviderSessionID: "unrelated", CWD: "/work/elsewhere", LastActive: time.Now()}}
+
+	got, err := Collect("/work", Options{IncludeUnmanaged: true, Features: []*featurelist.Feature{}, Panes: panes, Telemetry: live})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0].Kind != KindOrphaned || got[0].Live != nil || got[1].Kind != KindUnmanaged || got[1].Live.ProviderSessionID != "unrelated" {
+		t.Fatalf("sessions = %#v", got)
+	}
+}
+
 func TestCollectPrefersExactPanePIDWithoutProviderMarker(t *testing.T) {
 	feature := &featurelist.Feature{
 		State:      &state.State{Ticket: "ORC-1", Stage: state.Stage{Name: "develop"}, Runtime: state.Runtime{Tmux: &state.TmuxRuntime{Session: "orc-1", Pane: "%1"}}},

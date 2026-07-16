@@ -21,6 +21,21 @@ func TestWriteScriptCleansUpAfterCommandFailure(t *testing.T) {
 	}
 }
 
+func TestParseDetailedPanesPreservesEmptyAttention(t *testing.T) {
+	row := strings.Join([]string{
+		"%1", "orc-1", "develop", "/work", "codex", "4242", "1",
+		"ORC-1", "develop", "default:bob", "codex", "codex", "provider-1", "/feature", "",
+	}, "\t") + "\n"
+
+	got := parseDetailedPanes([]byte(row))
+	if len(got) != 1 {
+		t.Fatalf("panes = %#v", got)
+	}
+	if got[0].ID != "%1" || got[0].ProviderSessionID != "provider-1" || got[0].Attention != "" {
+		t.Fatalf("pane = %#v", got[0])
+	}
+}
+
 func TestWriteScriptQuotesArguments(t *testing.T) {
 	runDir := t.TempDir()
 	script, err := writeScript(runDir, []string{"printf", "%s", "value with 'quotes'"})

@@ -407,8 +407,19 @@ func ListPanesDetailed() ([]Pane, error) {
 		}
 		return nil, fmt.Errorf("list tmux panes: %w: %s", err, strings.TrimSpace(string(out)))
 	}
+	return parseDetailedPanes(out), nil
+}
+
+func parseDetailedPanes(out []byte) []Pane {
 	var panes []Pane
-	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+	// Remove record terminators only. TrimSpace would also remove the final tab
+	// when @agent_attention is empty and make an otherwise valid pane look short.
+	text := strings.TrimRight(string(out), "\r\n")
+	if text == "" {
+		return nil
+	}
+	for _, line := range strings.Split(text, "\n") {
+		line = strings.TrimSuffix(line, "\r")
 		fields := strings.Split(line, "\t")
 		if len(fields) < 15 || fields[0] == "" {
 			continue
@@ -422,7 +433,7 @@ func ListPanesDetailed() ([]Pane, error) {
 			FeatureDir: fields[13], Attention: fields[14],
 		})
 	}
-	return panes, nil
+	return panes
 }
 
 // AttachHint returns the command string a user should run to attach.

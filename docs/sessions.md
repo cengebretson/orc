@@ -141,3 +141,10 @@ argv, re-applies window and pane identity metadata, and updates
 the provider session ID on the tmux target. Successfully restored entries are
 removed from the snapshot as they complete, so a partial failure can be retried
 without losing the remaining recovery plan.
+
+If a retry finds that a recorded tmux session already exists, Orc reconciles it
+only when the exact agent pane still carries the parked ticket, stage, engine,
+and provider-session identity. A matching pane is treated as already restored,
+its durable runtime target is refreshed, and the stale snapshot entry is
+removed. An unrelated session using the same tmux name remains a hard collision
+and is never adopted.

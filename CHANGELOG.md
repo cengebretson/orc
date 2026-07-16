@@ -30,6 +30,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Managed tmux launches now record and validate exact agent-pane and provider
   identity, recover conservatively from stale panes, and incrementally refresh
   transcript metadata without retaining prompt or response bodies.
+- Tmux pane inventory now preserves sessions without attention metadata, and
+  unpark retries reconcile exact already-restored panes while rejecting unrelated
+  session-name collisions.
 
 ## [0.9.0] - 2026-07-06
 

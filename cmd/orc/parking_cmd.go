@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/cengebretson/orc/internal/parking"
@@ -156,7 +157,18 @@ func runSessionsUnpark(cmd *cobra.Command, args []string) error {
 
 func unparkEntry(entry parking.Entry) error {
 	if tmux.SessionExists(entry.TmuxSession) {
-		return fmt.Errorf("tmux session %s already exists", entry.TmuxSession)
+		panes, err := tmux.ListPanesDetailed()
+		if err != nil {
+			return fmt.Errorf("inspect existing tmux session %s: %w", entry.TmuxSession, err)
+		}
+		pane, ok := restoredPane(entry, panes)
+		if !ok {
+			return fmt.Errorf("tmux session %s already exists without matching parked provider identity", entry.TmuxSession)
+		}
+		if err := state.SetRuntimeTarget(entry.FeatureDir, entry.TmuxSession, pane); err != nil {
+			return err
+		}
+		return nil
 	}
 	binary, argv, err := telemetry.ResumeArgs(entry.Engine, entry.ProviderSessionID, entry.CWD)
 	if err != nil {
@@ -201,6 +213,22 @@ func unparkEntry(entry parking.Entry) error {
 	}
 	created = false
 	return nil
+}
+
+func restoredPane(entry parking.Entry, panes []tmux.Pane) (string, bool) {
+	for _, pane := range panes {
+		engine := pane.ProviderEngine
+		if engine == "" {
+			engine = pane.Engine
+		}
+		if !pane.Agent || pane.Session != entry.TmuxSession || pane.Window != entry.TmuxWindow ||
+			pane.Ticket != entry.Ticket || pane.Stage != entry.Stage ||
+			!strings.EqualFold(engine, entry.Engine) || pane.ProviderSessionID != entry.ProviderSessionID {
+			continue
+		}
+		return pane.ID, true
+	}
+	return "", false
 }
 
 func resumedLaunchArgv(binary string, argv []string, providerSessionID string) []string {

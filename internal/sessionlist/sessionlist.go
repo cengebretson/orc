@@ -360,13 +360,16 @@ func matchTelemetry(engine, cwd string, pane *tmux.Pane, sessions []telemetry.Li
 	if providerID != "" {
 		return telemetry.Live{}, nil, false
 	}
+	if cwd == "" {
+		return telemetry.Live{}, nil, false
+	}
 
 	best := -1
 	for i := range sessions {
 		if used[i] || !engineMatches(providerEngine, sessions[i].Engine) {
 			continue
 		}
-		if cwd != "" && !samePath(cwd, sessions[i].CWD) {
+		if !samePath(cwd, sessions[i].CWD) {
 			continue
 		}
 		if best == -1 || sessions[i].LastActive.After(sessions[best].LastActive) {
