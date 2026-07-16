@@ -5,6 +5,27 @@ Single source of truth for unshipped work. Shipped work belongs in
 
 ## Up next
 
+### Tmux popup workflow
+
+Document optional, user-owned tmux bindings for Orc's completed live-session
+commands:
+
+- Toggle the compact `orc watch` rail.
+- Open `orc sessions --all` in a popup.
+- Open the interactive `orc sessions resume` picker in a popup.
+- Jump directly to `orc focus`.
+
+Keep these as copyable configuration examples. Orc must not install or mutate
+tmux configuration automatically.
+
+Acceptance: the documented bindings use current command flags, cover popup and
+split-pane variants where appropriate, explain workspace selection, and pass a
+manual `tmux source-file` syntax check.
+
+Effort: Small.
+
+## Later
+
 ### Agent completion notification
 
 Add a small notification hook so unattended agent runs can get the user's
