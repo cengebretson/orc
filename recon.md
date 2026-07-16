@@ -199,9 +199,9 @@ If arbitrary labels become useful:
 
 Do not make tmux environment variables the sole copy of Orc labels.
 
-### 7. Tmux popup workflow
+### 7. Tmux popup workflow — implemented
 
-Priority: low-cost polish.
+Completed on 2026-07-16.
 
 Recon documents popup bindings for its dashboard, new-session form, resume
 picker, and next-attention command:
@@ -217,6 +217,14 @@ After the resume picker exists, Orc can document similar optional bindings for:
 
 These should remain user-owned tmux configuration rather than installation-time
 mutation.
+
+Implemented behavior:
+
+- `docs/tmux.conf` provides syntax-checked bindings for watch, session inventory,
+  interactive resume, and attention-driven focus.
+- `docs/tmux.md` explains absolute and per-session workspace selection, popup
+  behavior, a long-running resume pane alternative, and manual verification.
+- Orc does not install, source, or mutate tmux configuration.
 
 ## Ideas not to copy directly
 

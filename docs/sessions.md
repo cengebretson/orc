@@ -90,6 +90,9 @@ If a provider changes transcripts without exposing an exact new identity, as
 some Claude `/clear` versions do, Orc keeps the previous exact association or
 omits telemetry. It does not infer a rollover from CWD alone.
 
+See [Tmux integration](tmux.md) for optional popup bindings for inventory,
+interactive resume, and attention-driven focus.
+
 ## Exact resume
 
 ```sh

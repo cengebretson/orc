@@ -8,6 +8,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Copyable, user-owned tmux popup and split-pane bindings for watch, session
+  inventory, interactive resume, and attention-driven focus.
 - Live provider context pressure in `orc watch` and `orc tui`, with configurable
   green/yellow/red thresholds and explicit unavailable rendering when a provider
   does not report its context limit.

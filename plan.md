@@ -5,24 +5,21 @@ Single source of truth for unshipped work. Shipped work belongs in
 
 ## Up next
 
-### Tmux popup workflow
+### Guided workspace setup
 
-Document optional, user-owned tmux bindings for Orc's completed live-session
-commands:
+Add an optional `orc setup` path for users who prefer a guided workspace setup
+over asking an agent to follow `SETUP.md`.
 
-- Toggle the compact `orc watch` rail.
-- Open `orc sessions --all` in a popup.
-- Open the interactive `orc sessions resume` picker in a popup.
-- Jump directly to `orc focus`.
+- Inspect the current `orc.yaml`, repository paths, and installed workflow packs.
+- Prompt only for missing or invalid setup inputs.
+- Preview proposed file changes before writing them.
+- Preserve hand-edited workspace policy and never overwrite it silently.
 
-Keep these as copyable configuration examples. Orc must not install or mutate
-tmux configuration automatically.
+Acceptance: a fresh scaffold can reach a clean config/readiness state through
+the guided path, an existing configured workspace is left unchanged, and
+non-interactive or cancelled runs do not partially write configuration.
 
-Acceptance: the documented bindings use current command flags, cover popup and
-split-pane variants where appropriate, explain workspace selection, and pass a
-manual `tmux source-file` syntax check.
-
-Effort: Small.
+Effort: Medium.
 
 ## Later
 
@@ -69,8 +66,6 @@ Effort: Medium.
 
 ## Future ideas
 
-- `orc setup`: optional prompt-driven setup for users who do not want to ask an
-  agent to follow `SETUP.md`.
 - User profiles for personal defaults across workspaces.
 - Remote pack installs.
 - Pack update and uninstall.
