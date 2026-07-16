@@ -3,24 +3,6 @@
 Single source of truth for unshipped work. Shipped work belongs in
 `CHANGELOG.md`, not here.
 
-## Up next
-
-### Guided workspace setup
-
-Add an optional `orc setup` path for users who prefer a guided workspace setup
-over asking an agent to follow `SETUP.md`.
-
-- Inspect the current `orc.yaml`, repository paths, and installed workflow packs.
-- Prompt only for missing or invalid setup inputs.
-- Preview proposed file changes before writing them.
-- Preserve hand-edited workspace policy and never overwrite it silently.
-
-Acceptance: a fresh scaffold can reach a clean config/readiness state through
-the guided path, an existing configured workspace is left unchanged, and
-non-interactive or cancelled runs do not partially write configuration.
-
-Effort: Medium.
-
 ## Later
 
 ### Agent completion notification
@@ -77,6 +59,8 @@ Effort: Medium.
 
 ## Not now
 
+- No guided `orc setup` command; setup remains agent-driven through `SETUP.md`,
+  consistent with Orc's agent-first operating model.
 - No hosted Orc service.
 - No required public pack publishing.
 - No generated workspace dependency on a central registry.
