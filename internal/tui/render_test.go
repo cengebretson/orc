@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/cengebretson/orc/internal/config"
+	"github.com/cengebretson/orc/internal/contextpressure"
 	"github.com/cengebretson/orc/internal/doctor"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/workers"
@@ -306,7 +307,7 @@ func TestRenderTable(t *testing.T) {
 	var m Model
 	out := m.renderTable([]*featureRow{live, dead, plain, longName}, 140, 0)
 
-	for _, want := range []string{"Ticket", "Status", "Worker", "Tmux"} {
+	for _, want := range []string{"Ticket", "Status", "Worker", "Context", "Tmux"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("header missing %q", want)
 		}
@@ -343,6 +344,38 @@ func TestRenderTable(t *testing.T) {
 	wideOut := m.renderTable([]*featureRow{longName}, 180, 0)
 	if !strings.Contains(wideOut, "this-is-a-very-long-feature-name-that-should-truncate") {
 		t.Errorf("name column should expand in wider tables:\n%s", ansi.Strip(wideOut))
+	}
+}
+
+func TestRenderContextPressureThresholdsAndUnknownLimit(t *testing.T) {
+	thresholds := contextpressure.Thresholds{Green: 40, Yellow: 70, Red: 90}
+	tests := []struct {
+		name  string
+		used  uint64
+		limit uint64
+		want  string
+	}{
+		{name: "green boundary", used: 40, limit: 100, want: styleHealthOK.Render("40%")},
+		{name: "yellow boundary", used: 70, limit: 100, want: styleHealthWarn.Render("70%")},
+		{name: "red boundary", used: 90, limit: 100, want: styleHealthErr.Render("90%")},
+		{name: "unknown limit", used: 42, limit: 0, want: styleDim.Render("n/a")},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pressure := contextpressure.Evaluate(tt.used, tt.limit, thresholds)
+			if got := renderContextPressure(pressure); got != tt.want {
+				t.Fatalf("renderContextPressure() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRenderTableShowsUnavailableContextLimit(t *testing.T) {
+	row := testRow("STORY-1", "active", "develop")
+	row.context = contextpressure.Evaluate(42, 0, contextpressure.DefaultThresholds())
+	plain := ansi.Strip((Model{}).renderTable([]*featureRow{row}, 140, -1))
+	if !strings.Contains(plain, "n/a") {
+		t.Fatalf("renderTable() missing unavailable context marker:\n%s", plain)
 	}
 }
 

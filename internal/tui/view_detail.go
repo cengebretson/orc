@@ -105,6 +105,10 @@ func (m Model) renderDetailBody() string {
 				styleTmuxDead.Render("not running — "+summary.TmuxRestart)))
 		}
 	}
+	if m.detail.context.Observed {
+		stateLines = append(stateLines, fmt.Sprintf("%s  %s",
+			styleDetailLabel.Render(" Context "), renderContextPressure(m.detail.context)))
+	}
 	if summary.JIT != nil {
 		jit := summary.JIT
 		stateLines = append(stateLines,

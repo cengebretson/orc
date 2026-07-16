@@ -51,6 +51,22 @@ func TestCollectClassifiesManagedOrphanedAndUnmanaged(t *testing.T) {
 	}
 }
 
+func TestManagedTelemetryFromSessionsUsesManagedFeatureDirectory(t *testing.T) {
+	live := telemetry.Live{Engine: "codex", ContextUsed: 70, ContextLimit: 100}
+	got := managedTelemetryFromSessions([]Session{
+		{Kind: KindManaged, FeatureDir: "/work/one/../one", Live: &live},
+		{Kind: KindOrphaned, FeatureDir: "/work/orphan", Live: &live},
+		{Kind: KindManaged, FeatureDir: "/work/no-live"},
+	})
+	value, ok := got["/work/one"]
+	if !ok || value.ContextUsed != 70 || value.ContextLimit != 100 {
+		t.Fatalf("managed telemetry = %#v, want normalized managed feature overlay", got)
+	}
+	if _, ok := got["/work/orphan"]; ok {
+		t.Fatalf("orphaned telemetry should not be projected by feature: %#v", got)
+	}
+}
+
 func TestCollectUsesDurableManagedRepositoriesWithoutGit(t *testing.T) {
 	feature := &featurelist.Feature{
 		State: &state.State{

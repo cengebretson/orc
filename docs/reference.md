@@ -131,6 +131,10 @@ settings:
   auto_next: false       # orc work immediately launches the first stage (same as --next)
   tui_refresh: 60        # dashboard auto-refresh interval in seconds
   theme: catppuccin-mocha
+  context_pressure:      # optional; defaults shown
+    green: 0
+    yellow: 70
+    red: 90
 
 repos:
   - name: my-app
@@ -193,6 +197,11 @@ template (reported as `unchanged from template` — nobody has written the doc
 yet). Pass `orc mark <ticket> next --force` to override the block for human
 review; the skipped artifacts are recorded in the stage result and history. The
 default is `warn`.
+
+`settings.context_pressure` controls the percentage boundaries used to color
+live provider context usage in `orc watch` and `orc tui`. The values must obey
+`0 <= green < yellow < red <= 100`. If the provider does not report a context
+limit, Orc displays `n/a`; this live overlay never changes workflow state.
 
 ## Packs
 

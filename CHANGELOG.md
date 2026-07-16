@@ -8,6 +8,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Live provider context pressure in `orc watch` and `orc tui`, with configurable
+  green/yellow/red thresholds and explicit unavailable rendering when a provider
+  does not report its context limit.
 - Repository and branch grouping for `orc sessions` and the resume picker,
   sourced from durable `STATE.yaml.repos` for managed work and a short-lived
   `git-common-dir` cache for orphaned or unmanaged sessions.

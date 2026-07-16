@@ -70,13 +70,15 @@ func (m Model) renderWorkListWide(b *strings.Builder, width int) {
 	stageW := min(18, max(10, width/5))
 	workerW := min(18, max(8, width/5))
 	stateW := 10
+	contextW := 8
 
-	b.WriteString(mutedStyle.Render(linef("%-2s%-*s  %-*s  %-*s  %-*s  %s",
+	b.WriteString(mutedStyle.Render(linef("%-2s%-*s  %-*s  %-*s  %-*s  %-*s  %s",
 		"",
 		ticketW, "Ticket",
 		stageW, "Stage",
 		workerW, "Worker",
 		stateW, "State",
+		contextW, "Context",
 		"Tmux",
 	)))
 	b.WriteString("\n")
@@ -87,18 +89,20 @@ func (m Model) renderWorkListWide(b *strings.Builder, width int) {
 		if i == m.cursor {
 			prefix = "> "
 		}
-		line := linef("%-2s%-*s  %-*s  %-*s  %-*s  %s",
+		linePrefix := linef("%-2s%-*s  %-*s  %-*s  %-*s  ",
 			prefix,
 			ticketW, truncate(r.ticket, ticketW),
 			stageW, truncate(r.stage, stageW),
 			workerW, truncate(r.worker, workerW),
 			stateW, truncate(stateText, stateW),
-			r.tmuxState,
 		)
 		if i == m.cursor {
+			line := linePrefix + linef("%-*s  %s", contextW, r.context.Label(), r.tmuxState)
 			b.WriteString(selectedStyle.Render(line))
 		} else {
-			b.WriteString(stateStyle(label).Render(line))
+			b.WriteString(stateStyle(label).Render(linePrefix))
+			b.WriteString(padStyledRight(renderContextPressure(r.context), contextW))
+			b.WriteString(stateStyle(label).Render("  " + r.tmuxState))
 		}
 		b.WriteString("\n")
 	}
@@ -185,6 +189,10 @@ func renderRailDetail(r row, width int) string {
 	if r.attention != "" {
 		b.WriteString("\n")
 		b.WriteString(mutedStyle.Render("  " + truncate("attention "+r.attention, max(1, width-2))))
+	}
+	if r.context.Observed {
+		b.WriteString("\n")
+		b.WriteString("  context " + renderContextPressure(r.context))
 	}
 	if r.next != "" {
 		b.WriteString("\n\n")
@@ -280,6 +288,10 @@ func (m Model) workPreviewContent(r row) string {
 	if r.attention != "" {
 		b.WriteString("\n")
 		b.WriteString(mutedStyle.Render("attention " + r.attention))
+	}
+	if r.context.Observed {
+		b.WriteString("\n")
+		b.WriteString("context " + renderContextPressure(r.context))
 	}
 	if r.loadErr != nil {
 		b.WriteString("\n\n")

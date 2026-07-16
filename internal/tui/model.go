@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/cengebretson/orc/internal/config"
+	"github.com/cengebretson/orc/internal/contextpressure"
 	"github.com/cengebretson/orc/internal/doctor"
 	"github.com/cengebretson/orc/internal/searchmatch"
 	"github.com/cengebretson/orc/internal/state"
@@ -140,6 +141,7 @@ type featureRow struct {
 	workerName        string
 	engine            string
 	attention         string
+	context           contextpressure.Pressure
 	tmuxLive          bool
 	hasIssues         bool
 	requiredArtifacts []string

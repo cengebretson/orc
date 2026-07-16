@@ -114,6 +114,8 @@ should display that as blocked/human-needed without requiring any tmux marker.
 - `STATE.yaml`: ticket, slug, workflow, stage, worker, status, next action.
 - tmux: session/window exists or stopped.
 - `tmux-attention`: optional current window marker from `@agent_attention`.
+- Provider telemetry: optional context usage and limit, correlated to the exact
+  managed pane without changing durable state.
 
 Initial state mapping and precedence:
 
@@ -136,6 +138,26 @@ the durable state does not already explain what the user should see.
 Rows are ordered by urgency, with load errors and blocked work first, followed
 by input, review, stopped, ready, pending, active, and done work. Tickets with
 the same urgency remain alphabetically ordered.
+
+## Context pressure
+
+The wide session table and selected-session details display live provider
+context usage as a percentage. The full TUI uses the same classifier in its
+feature table and detail view. Configure the color boundaries in `orc.yaml`:
+
+```yaml
+settings:
+  context_pressure:
+    green: 0
+    yellow: 70
+    red: 90
+```
+
+Values must satisfy `0 <= green < yellow < red <= 100`. When provider telemetry
+is matched but the provider does not report its context limit, the display says
+`n/a` rather than treating the limit as zero. A dash means no live telemetry was
+matched. Context pressure is presentation-only: it does not change priority,
+workflow state, stage advancement, or session lifecycle.
 
 ## tmux-attention integration
 

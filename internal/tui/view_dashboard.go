@@ -779,19 +779,22 @@ func renderRouteChain(chain []routeStep, loops []repairLoop, maxW int) []string 
 
 func (m Model) renderTable(rows []*featureRow, w int, selectedIdx int) string {
 	const (
-		wTicket = 12
-		wStatus = 12
-		wTmux   = 6
+		wTicket  = 12
+		wStatus  = 12
+		wContext = 8
+		wTmux    = 6
 	)
-	// fixed overhead: leading space + static columns + separators (5 × "  ")
-	fixed := 1 + wTicket + wStatus + wTmux + 5*2
+	// fixed overhead: leading space + static columns + separators (6 × "  ")
+	fixed := 1 + wTicket + wStatus + wContext + wTmux + 6*2
 	flex := w - fixed
 	if flex < 48 {
 		flex = 48
 	}
-	wName := flex / 2
+	// Favor the human-readable feature name, then the workflow/stage cell. The
+	// worker column can be narrower without hiding state such as "+ jit".
+	wName := flex/2 + 5
 	remaining := flex - wName
-	wWorkflow := remaining / 2
+	wWorkflow := remaining/2 + 4
 	wWorker := remaining - wWorkflow
 
 	header := " " +
@@ -800,6 +803,7 @@ func (m Model) renderTable(rows []*featureRow, w int, selectedIdx int) string {
 		padRight(styleTableHeader.Render("Status"), wStatus) + "  " +
 		padRight(styleTableHeader.Render("Stage"), wWorkflow) + "  " +
 		padRight(styleTableHeader.Render("Worker"), wWorker) + "  " +
+		padRight(styleTableHeader.Render("Context"), wContext) + "  " +
 		padRight(styleTableHeader.Render("Tmux"), wTmux)
 
 	div := " " + styleDivider.Render(strings.Repeat("─", w-1))
@@ -857,6 +861,7 @@ func (m Model) renderTable(rows []*featureRow, w int, selectedIdx int) string {
 				padRight(truncate(icon+" "+s.Status, wStatus), wStatus) + "  " +
 				padRight(truncate(stageCell, wWorkflow), wWorkflow) + "  " +
 				padRight(truncate(plainWorker, wWorker), wWorker) + "  " +
+				padRight(row.context.Label(), wContext) + "  " +
 				padRight(plainTmux, wTmux)
 			lines = append(lines, styleRowSelected.Width(w).Render(line))
 		} else {
@@ -867,6 +872,7 @@ func (m Model) renderTable(rows []*featureRow, w int, selectedIdx int) string {
 			statusCell := statusStyle(s.Status).Render(icon + " " + s.Status)
 			nameCell := styleDim.Render(truncate(name, wName))
 			workerCell := styleDim.Render(truncate(plainWorker, wWorker))
+			contextCell := renderContextPressure(row.context)
 			var tmuxCell string
 			if s.Runtime.Tmux != nil {
 				if row.tmuxLive {
@@ -883,6 +889,7 @@ func (m Model) renderTable(rows []*featureRow, w int, selectedIdx int) string {
 				padRight(statusCell, wStatus) + "  " +
 				padRight(truncate(stageCell, wWorkflow), wWorkflow) + "  " +
 				padRight(workerCell, wWorker) + "  " +
+				padRight(contextCell, wContext) + "  " +
 				padRight(tmuxCell, wTmux)
 			lines = append(lines, line)
 		}

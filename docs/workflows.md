@@ -18,6 +18,10 @@ settings:
   auto_next: false
   tui_refresh: 60
   theme: catppuccin-mocha
+  context_pressure:
+    green: 0
+    yellow: 70
+    red: 90
 
 repos:
   - name: my-app
@@ -65,6 +69,7 @@ workflows:
 | `tui_refresh` | No | TUI refresh interval in seconds. Defaults to 60 when unset or zero. |
 | `theme` | No | TUI color theme. Defaults to `catppuccin-mocha`. |
 | `quotes` | No | Optional TUI status quotes. |
+| `context_pressure` | No | Green, yellow, and red percentage boundaries for live provider context usage in `orc watch` and `orc tui`. Defaults to `0`, `70`, and `90`; values must satisfy `0 <= green < yellow < red <= 100`. |
 
 ## Repos
 

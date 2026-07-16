@@ -39,6 +39,7 @@ The first Recon-inspired implementation added:
 - Crash-safe, confirmed `orc sessions park` and `orc sessions unpark` flows.
 - Repository and branch grouping from durable managed state plus cached Git
   metadata for orphaned and unmanaged sessions.
+- Configurable live context-pressure warnings in `orc watch` and `orc tui`.
 
 See [docs/sessions.md](docs/sessions.md) and [docs/watch.md](docs/watch.md) for
 the implemented behavior.
@@ -154,11 +155,9 @@ los-app-los-django
   FLYWL-456  feature/flywl-456  review   input
 ```
 
-## Remaining recommendations
+### 5. Context-pressure warnings — implemented
 
-### 5. Context-pressure warnings
-
-Priority: medium-low.
+Completed on 2026-07-16.
 
 Recon uses a colored context bar in its visual dashboard. Orc already exposes
 context usage in session telemetry, so it can add a lighter version:
@@ -168,6 +167,19 @@ context usage in session telemetry, so it can add a lighter version:
 - Treat missing or provider-unknown context limits as unavailable, not zero.
 - Keep context pressure as a live warning. It must never become durable workflow
   status or automatically terminate or advance work.
+
+Implemented behavior:
+
+- Exact managed-session telemetry feeds both watch and TUI without replacing
+  `STATE.yaml` as the durable source of truth.
+- The shared classifier defaults to green at 0%, yellow at 70%, and red at 90%;
+  all three boundaries are configurable and validated in `orc.yaml`.
+- Matched telemetry with no provider context limit renders `n/a`; sessions with
+  no live telemetry render a dash.
+- The overlay affects only rendering. It cannot reorder work, mutate state,
+  advance a stage, or terminate a session.
+
+## Remaining recommendations
 
 ### 6. Durable labels and filters
 

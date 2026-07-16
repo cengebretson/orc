@@ -60,6 +60,30 @@ type Options struct {
 	ResolveGit       func(string) (gitmeta.Metadata, bool)
 }
 
+// ManagedTelemetry returns optional live provider metadata keyed by feature
+// directory. Discovery failures leave the durable feature list untouched.
+func ManagedTelemetry(root string, features []*featurelist.Feature) map[string]telemetry.Live {
+	if len(features) == 0 {
+		return nil
+	}
+	sessions, err := Collect(root, Options{Features: features})
+	if err != nil {
+		return nil
+	}
+	return managedTelemetryFromSessions(sessions)
+}
+
+func managedTelemetryFromSessions(sessions []Session) map[string]telemetry.Live {
+	result := make(map[string]telemetry.Live)
+	for _, session := range sessions {
+		if session.Kind != KindManaged || session.FeatureDir == "" || session.Live == nil {
+			continue
+		}
+		result[filepath.Clean(session.FeatureDir)] = *session.Live
+	}
+	return result
+}
+
 func Collect(root string, opts Options) ([]Session, error) {
 	features := opts.Features
 	if features == nil {

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cengebretson/orc/internal/contextpressure"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -122,6 +123,42 @@ func TestRenderWideUsesSelectionIndicator(t *testing.T) {
 	for _, notWant := range []string{"HISTORY", "implemented watch rail", "requested changes"} {
 		if strings.Contains(view, notWant) {
 			t.Fatalf("renderWide() should keep history on the expanded details page, found %q in:\n%s", notWant, view)
+		}
+	}
+}
+
+func TestRenderContextPressureThresholdsAndUnknownLimit(t *testing.T) {
+	thresholds := contextpressure.Thresholds{Green: 40, Yellow: 70, Red: 90}
+	tests := []struct {
+		name  string
+		used  uint64
+		limit uint64
+		want  string
+	}{
+		{name: "green boundary", used: 40, limit: 100, want: contextGreenStyle.Render("40%")},
+		{name: "yellow boundary", used: 70, limit: 100, want: contextYellowStyle.Render("70%")},
+		{name: "red boundary", used: 90, limit: 100, want: contextRedStyle.Render("90%")},
+		{name: "unknown limit", used: 42, limit: 0, want: mutedStyle.Render("n/a")},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pressure := contextpressure.Evaluate(tt.used, tt.limit, thresholds)
+			if got := renderContextPressure(pressure); got != tt.want {
+				t.Fatalf("renderContextPressure() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRenderWideShowsContextColumnAndUnavailableLimit(t *testing.T) {
+	m := Model{width: 100, rows: []row{{
+		ticket: "PROJ-123", status: "active", tmuxState: "live",
+		context: contextpressure.Evaluate(42, 0, contextpressure.DefaultThresholds()),
+	}}}
+	view := m.renderWide()
+	for _, want := range []string{"Context", "n/a"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("renderWide() missing %q in:\n%s", want, view)
 		}
 	}
 }

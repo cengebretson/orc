@@ -43,6 +43,10 @@ settings:
   default_workflow: hotfix
   artifact_policy: block
   auto_archive: true
+  context_pressure:
+    green: 10
+    yellow: 65
+    red: 85
 repos: []
 `)
 
@@ -61,6 +65,16 @@ repos: []
 	}
 	if got := cfg.DefaultWorkflow(); got != "hotfix" {
 		t.Errorf("DefaultWorkflow() = %q, want \"hotfix\"", got)
+	}
+	if got := cfg.ContextPressureThresholds(); got.Green != 10 || got.Yellow != 65 || got.Red != 85 {
+		t.Errorf("ContextPressureThresholds() = %+v, want 10/65/85", got)
+	}
+}
+
+func TestContextPressureThresholdsDefaults(t *testing.T) {
+	got := (&config.Config{}).ContextPressureThresholds()
+	if got.Green != 0 || got.Yellow != 70 || got.Red != 90 {
+		t.Fatalf("ContextPressureThresholds() = %+v, want 0/70/90", got)
 	}
 }
 

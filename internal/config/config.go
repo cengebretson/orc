@@ -7,6 +7,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/cengebretson/orc/internal/contextpressure"
 	"gopkg.in/yaml.v3"
 )
 
@@ -21,14 +22,21 @@ type Repo struct {
 }
 
 type Settings struct {
-	DefaultWorkflow string   `yaml:"default_workflow"`
-	ArtifactPolicy  string   `yaml:"artifact_policy,omitempty"`
-	AutoArchive     bool     `yaml:"auto_archive"`
-	AutoTmux        bool     `yaml:"auto_tmux"`
-	AutoNext        bool     `yaml:"auto_next"`
-	TuiRefresh      int      `yaml:"tui_refresh"` // seconds; 0 means use default (60)
-	Quotes          []string `yaml:"quotes"`
-	Theme           string   `yaml:"theme"` // e.g. "catppuccin-mocha"; defaults to catppuccin-mocha
+	DefaultWorkflow string                   `yaml:"default_workflow"`
+	ArtifactPolicy  string                   `yaml:"artifact_policy,omitempty"`
+	AutoArchive     bool                     `yaml:"auto_archive"`
+	AutoTmux        bool                     `yaml:"auto_tmux"`
+	AutoNext        bool                     `yaml:"auto_next"`
+	TuiRefresh      int                      `yaml:"tui_refresh"` // seconds; 0 means use default (60)
+	Quotes          []string                 `yaml:"quotes"`
+	Theme           string                   `yaml:"theme"` // e.g. "catppuccin-mocha"; defaults to catppuccin-mocha
+	ContextPressure *ContextPressureSettings `yaml:"context_pressure,omitempty"`
+}
+
+type ContextPressureSettings struct {
+	Green  int `yaml:"green"`
+	Yellow int `yaml:"yellow"`
+	Red    int `yaml:"red"`
 }
 
 // WorkflowDef is a named sequence of stages.
@@ -88,6 +96,18 @@ func (c *Config) ArtifactPolicy() string {
 		return "warn"
 	}
 	return c.Settings.ArtifactPolicy
+}
+
+func (c *Config) ContextPressureThresholds() contextpressure.Thresholds {
+	if c == nil || c.Settings.ContextPressure == nil {
+		return contextpressure.DefaultThresholds()
+	}
+	settings := c.Settings.ContextPressure
+	thresholds := contextpressure.Thresholds{Green: settings.Green, Yellow: settings.Yellow, Red: settings.Red}
+	if !thresholds.Valid() {
+		return contextpressure.DefaultThresholds()
+	}
+	return thresholds
 }
 
 // ResolveWorkflow returns the canonical workflow ID for a workflow or alias.

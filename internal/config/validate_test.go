@@ -66,6 +66,16 @@ func TestValidate_ArtifactPolicy(t *testing.T) {
 	assertValidationError(t, config.Validate(cfg, []string{"fred"}), "settings.artifact_policy", `artifact_policy must be "warn" or "block"`)
 }
 
+func TestValidate_ContextPressureThresholdOrder(t *testing.T) {
+	cfg := &config.Config{Settings: config.Settings{ContextPressure: &config.ContextPressureSettings{Green: 70, Yellow: 70, Red: 90}}}
+	assertValidationError(t, config.Validate(cfg, nil), "settings.context_pressure", "thresholds must satisfy 0 <= green < yellow < red <= 100")
+}
+
+func TestValidate_ContextPressureThresholdRange(t *testing.T) {
+	cfg := &config.Config{Settings: config.Settings{ContextPressure: &config.ContextPressureSettings{Green: 0, Yellow: 70, Red: 101}}}
+	assertValidationError(t, config.Validate(cfg, nil), "settings.context_pressure", "thresholds must satisfy 0 <= green < yellow < red <= 100")
+}
+
 func TestValidate_DefaultWorkflowRequiredWhenWorkflowsExist(t *testing.T) {
 	cfg := &config.Config{
 		Workflows: map[string]config.WorkflowDef{"default": {Stages: []config.StageDef{{Name: "intake", Worker: "fred", Advance: "auto"}}}},

@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/cengebretson/orc/internal/contextpressure"
 	"github.com/cengebretson/orc/internal/worktreesetup"
 )
 
@@ -54,6 +55,13 @@ func Validate(cfg *Config, workerIDs []string) ValidationErrors {
 		errs = append(errs, ValidationError{
 			Path:    "settings.artifact_policy",
 			Message: `artifact_policy must be "warn" or "block"`,
+		})
+	}
+	if settings := cfg.Settings.ContextPressure; settings != nil &&
+		!(contextpressure.Thresholds{Green: settings.Green, Yellow: settings.Yellow, Red: settings.Red}).Valid() {
+		errs = append(errs, ValidationError{
+			Path:    "settings.context_pressure",
+			Message: "thresholds must satisfy 0 <= green < yellow < red <= 100",
 		})
 	}
 

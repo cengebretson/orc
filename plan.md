@@ -5,24 +5,6 @@ Single source of truth for unshipped work. Shipped work belongs in
 
 ## Up next
 
-### Context-pressure presentation
-
-Continue the next Recon-inspired session UX slice described in `recon.md`:
-
-- Display provider context usage in `orc watch` and `orc tui`.
-- Use configurable green, yellow, and red thresholds.
-- Treat missing or unknown provider limits as unavailable rather than zero.
-- Keep context pressure presentation-only; it must not mutate workflow state,
-  terminate a session, or advance a stage.
-
-Acceptance: focused rendering tests cover threshold boundaries and unknown
-limits, configuration validation rejects invalid threshold order, and
-`make check` passes.
-
-Effort: Medium.
-
-## Queued
-
 ### Agent completion notification
 
 Add a small notification hook so unattended agent runs can get the user's

@@ -8,8 +8,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cengebretson/orc/internal/config"
+	"github.com/cengebretson/orc/internal/contextpressure"
 	"github.com/cengebretson/orc/internal/featurelist"
 	"github.com/cengebretson/orc/internal/searchmatch"
+	"github.com/cengebretson/orc/internal/sessionlist"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/tmux"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -48,6 +51,7 @@ type row struct {
 	pane      string
 	tmuxState string
 	attention string
+	context   contextpressure.Pressure
 	history   []historyRow
 	archived  bool
 	loadErr   error
@@ -252,9 +256,17 @@ func collectRows(root, ticket string) ([]row, error) {
 	if err != nil {
 		return nil, err
 	}
+	thresholds := contextpressure.DefaultThresholds()
+	if cfg, loadErr := config.Load(root); loadErr == nil {
+		thresholds = cfg.ContextPressureThresholds()
+	}
+	liveByFeature := sessionlist.ManagedTelemetry(root, features)
 	rows := make([]row, 0, len(features))
 	for _, f := range features {
 		r := rowFromFeature(f)
+		if live, ok := liveByFeature[filepath.Clean(f.FeatureDir)]; ok {
+			r.context = contextpressure.Evaluate(live.ContextUsed, live.ContextLimit, thresholds)
+		}
 		if ticket != "" && !strings.EqualFold(r.ticket, ticket) {
 			continue
 		}
@@ -558,16 +570,19 @@ func min(a, b int) int {
 }
 
 var (
-	titleStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#a6e3a1"))
-	mutedStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#6c7086"))
-	sectionStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#9399b2")).Bold(true)
-	activeStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#89b4fa"))
-	blockedStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#f38ba8"))
-	inputStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#fab387"))
-	reviewStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#cba6f7"))
-	doneStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1"))
-	pendingStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#f9e2af"))
-	selectedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#cba6f7")).Bold(true)
+	titleStyle         = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#a6e3a1"))
+	mutedStyle         = lipgloss.NewStyle().Foreground(lipgloss.Color("#6c7086"))
+	sectionStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("#9399b2")).Bold(true)
+	activeStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("#89b4fa"))
+	blockedStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("#f38ba8"))
+	inputStyle         = lipgloss.NewStyle().Foreground(lipgloss.Color("#fab387"))
+	reviewStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("#cba6f7"))
+	doneStyle          = lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1"))
+	pendingStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("#f9e2af"))
+	selectedStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#cba6f7")).Bold(true)
+	contextGreenStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1"))
+	contextYellowStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#f9e2af"))
+	contextRedStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#f38ba8"))
 )
 
 func stateStyle(label string) lipgloss.Style {
@@ -587,6 +602,23 @@ func stateStyle(label string) lipgloss.Style {
 	default:
 		return mutedStyle
 	}
+}
+
+func renderContextPressure(pressure contextpressure.Pressure) string {
+	style := mutedStyle
+	switch pressure.Level {
+	case contextpressure.LevelGreen:
+		style = contextGreenStyle
+	case contextpressure.LevelYellow:
+		style = contextYellowStyle
+	case contextpressure.LevelRed:
+		style = contextRedStyle
+	}
+	return style.Render(pressure.Label())
+}
+
+func padStyledRight(value string, width int) string {
+	return value + strings.Repeat(" ", max(0, width-lipgloss.Width(value)))
 }
 
 func linef(format string, args ...any) string {

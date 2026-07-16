@@ -407,6 +407,8 @@ Or use the Claude Desktop settings UI. Requires a GitHub PAT with `repo` and `pu
   - `i` — jump to the next live `blocked`, `input`, or `review` session
   - `--tmux-toggle` — open or close the watch rail beside the current tmux pane
   - `--wide` — render the wider table layout
+- Both watch and TUI display matched provider context pressure using configurable
+  green/yellow/red percentage boundaries; unknown provider limits display `n/a`.
 - `orc archive <ticket>` — archive a completed feature, remove worktrees
 - `orc delete <ticket>` — permanently delete a feature folder (only allowed when status is `done` or `archived`)
 - `orc tui` — open the interactive dashboard; `/` uses the same multi-field filter as `orc watch`

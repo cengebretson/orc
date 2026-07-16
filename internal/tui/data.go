@@ -7,8 +7,10 @@ import (
 	"strings"
 
 	"github.com/cengebretson/orc/internal/config"
+	"github.com/cengebretson/orc/internal/contextpressure"
 	"github.com/cengebretson/orc/internal/doctor"
 	"github.com/cengebretson/orc/internal/featurelist"
+	"github.com/cengebretson/orc/internal/sessionlist"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/workers"
 	tea "github.com/charmbracelet/bubbletea"
@@ -147,6 +149,8 @@ func loadData(root string) tea.Cmd {
 func collectFeatures(root string) []*featureRow {
 	workflowCfg, _ := config.Load(root)
 	features, _ := featurelist.Collect(root, featurelist.Options{IncludeArchived: true})
+	liveByFeature := sessionlist.ManagedTelemetry(root, features)
+	thresholds := workflowCfg.ContextPressureThresholds()
 	rows := make([]*featureRow, 0, len(features))
 	for _, f := range features {
 		if f.LoadError != nil {
@@ -158,6 +162,10 @@ func collectFeatures(root string) []*featureRow {
 				hasIssues:  true,
 			})
 			continue
+		}
+		context := contextpressure.Pressure{}
+		if live, ok := liveByFeature[filepath.Clean(f.FeatureDir)]; ok {
+			context = contextpressure.Evaluate(live.ContextUsed, live.ContextLimit, thresholds)
 		}
 		rows = append(rows, &featureRow{
 			s:                 f.State,
@@ -171,6 +179,7 @@ func collectFeatures(root string) []*featureRow {
 			workerName:        f.WorkerName,
 			engine:            f.Engine,
 			attention:         f.Attention,
+			context:           context,
 			tmuxLive:          f.TmuxLive,
 			hasIssues:         f.HasIssues,
 			requiredArtifacts: currentStageArtifacts(workflowCfg, f.Workflow, f.State.Stage.Name),

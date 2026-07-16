@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cengebretson/orc/internal/contextpressure"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -206,6 +207,19 @@ func stalenessStyle(age time.Duration) lipgloss.Style {
 	default:
 		return styleDim
 	}
+}
+
+func renderContextPressure(pressure contextpressure.Pressure) string {
+	style := styleDim
+	switch pressure.Level {
+	case contextpressure.LevelGreen:
+		style = styleHealthOK
+	case contextpressure.LevelYellow:
+		style = styleHealthWarn
+	case contextpressure.LevelRed:
+		style = styleHealthErr
+	}
+	return style.Render(pressure.Label())
 }
 
 func helpItem(key, desc string) string {
