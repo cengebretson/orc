@@ -6,6 +6,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `orc sessions` inventories managed, orphaned, and optional unmanaged Claude
+  and Codex sessions with bounded live telemetry, exact provider-session
+  resume, and crash-safe park/unpark workflows.
+- `orc watch` and `orc focus` provide an attention-aware live session rail and
+  deterministic navigation to the next session needing human input.
+
+### Changed
+
+- Managed tmux launches now record and validate exact agent-pane and provider
+  identity, recover conservatively from stale panes, and incrementally refresh
+  transcript metadata without retaining prompt or response bodies.
+
 ## [0.9.0] - 2026-07-06
 
 ### Fixed

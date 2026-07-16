@@ -71,6 +71,7 @@ type Runtime struct {
 
 type TmuxRuntime struct {
 	Session string `yaml:"session"`
+	Pane    string `yaml:"pane,omitempty"`
 }
 
 type JITRuntime struct {
@@ -496,6 +497,15 @@ func matchFeature(query string, notFound func(q string) error, dirs ...string) (
 func SetRuntime(featureDir, tmuxSession string) error {
 	return Update(featureDir, func(s *State) error {
 		s.Runtime.Tmux = &TmuxRuntime{Session: tmuxSession}
+		return nil
+	})
+}
+
+// SetRuntimeTarget records the exact pane used by the active agent. The pane is
+// optional for compatibility with existing STATE.yaml files.
+func SetRuntimeTarget(featureDir, tmuxSession, pane string) error {
+	return Update(featureDir, func(s *State) error {
+		s.Runtime.Tmux = &TmuxRuntime{Session: tmuxSession, Pane: pane}
 		return nil
 	})
 }

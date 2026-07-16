@@ -1,0 +1,253 @@
+# Lessons from Recon
+
+This document records ideas evaluated from
+[gavraz/recon](https://github.com/gavraz/recon), which is a tmux-native Claude
+Code session dashboard. The comparison was refreshed against Recon's `main`
+branch on 2026-07-13.
+
+Orc and Recon overlap in session management, but their centers of gravity are
+different:
+
+- Recon is primarily a live provider-session browser.
+- Orc is a durable, ticket-oriented workflow orchestrator.
+- `STATE.yaml` remains authoritative in Orc. Provider and tmux data are optional
+  live overlays and must never silently replace durable workflow state.
+
+## Already brought into Orc
+
+The first Recon-inspired implementation added:
+
+- Exact tmux pane identity in `runtime.tmux.pane`.
+- Orc identity metadata on tmux windows and panes.
+- Safe pane validation and stale-pane recovery instead of active-pane guessing.
+- Multi-pane live regression coverage.
+- Attention-aware `orc watch`, urgency sorting, `i` navigation, and `orc focus`.
+- `orc sessions` inventory for managed, stopped, orphaned, and optional
+  unmanaged sessions.
+- Optional Claude and Codex telemetry: provider session ID, model, effort,
+  state, context usage, CWD, PID, and last activity.
+- Exact provider correlation by explicit session ID and pane PID before CWD,
+  including original/current identity merging across provider resume.
+- `@orc_provider_session`, `@orc_provider_engine`, and `ORC_RESUMED_FROM`
+  markers for resumable managed sessions.
+- Provider-as-pane-process launches so tmux exposes an exact provider PID.
+- Bounded head/tail transcript discovery with process-local incremental cursors
+  and shared refresh budgets.
+- An additive `live` overlay in `orc status <ticket> --json`.
+- Guarded provider resume with discovery, active-process protection, CWD
+  validation, exact argv, and dry-run support.
+- Crash-safe, confirmed `orc sessions park` and `orc sessions unpark` flows.
+
+See [docs/sessions.md](docs/sessions.md) and [docs/watch.md](docs/watch.md) for
+the implemented behavior.
+
+## Completed recommendations
+
+### 1. Exact provider-session correlation — implemented
+
+Completed on 2026-07-13.
+
+Orc now uses explicit provider identity and exact pane PID before considering an
+engine plus CWD fallback. Multiple provider sessions can safely share a
+directory without a newer unrelated session taking over a managed pane's live
+overlay.
+
+Recon preserves the original Claude session ID across resumes with a tmux
+environment marker and falls back to process inspection when needed:
+
+- [Recon session discovery](https://github.com/gavraz/recon/blob/main/src/session.rs)
+- [Recon tmux resume implementation](https://github.com/gavraz/recon/blob/main/src/tmux.rs)
+
+Implemented behavior:
+
+- Orc stamps `@orc_provider_session` and `@orc_provider_engine` on resumed
+  managed targets.
+- Unpark sets `ORC_RESUMED_FROM` in both tmux and the provider process.
+- Provider ID and PID matches outrank CWD; CWD is used only when no explicit
+  provider identity exists.
+- Launch scripts remove themselves and `exec` the provider, making it the pane
+  process leader.
+- When a resumed provider reports a different current process-session ID, Orc
+  keeps the original resumable ID, exposes the current value as
+  `observed_session_id`, and merges live state with transcript metadata.
+- Missing or ambiguous explicit identity omits the overlay instead of guessing.
+
+Provider versions that change transcript identity without updating any exact
+process or session signal, including some Claude `/clear` behavior, remain
+intentionally conservative: Orc will not rebind from CWD alone.
+
+### 2. Incremental and tail-based telemetry parsing — implemented
+
+Completed on 2026-07-13.
+
+Recon keeps incremental state for active files and reads only a short tail for
+resume history:
+
+- [Recon live session parser](https://github.com/gavraz/recon/blob/main/src/session.rs)
+- [Recon resume history scanner](https://github.com/gavraz/recon/blob/main/src/history.rs)
+
+Implemented behavior:
+
+- Cache by path, inode, size, and modification time.
+- Continue from the previous byte offset for a growing live transcript.
+- Invalidate safely when a file is truncated, replaced, or becomes malformed.
+- Read a bounded head plus recent tail for the first historical summary.
+- Share a 32 MiB and 250 ms parsing budget across each combined refresh.
+- Retry incomplete records after append without retaining their bodies.
+- Preserve the current rule that prompt and response bodies are neither retained
+  nor printed.
+
+The cache is process-local and metadata-only. New CLI invocations begin with a
+bounded head/tail read; long-running consumers reuse exact cursors.
+
+## Remaining recommendations
+
+### 3. Search and an interactive resume picker
+
+Priority: medium-high. This is the strongest remaining UX improvement.
+
+Recon provides `/` filtering in its dashboard and an interactive resume picker:
+
+- [Recon dashboard behavior](https://github.com/gavraz/recon/blob/main/src/app.rs)
+- [Recon resume picker](https://github.com/gavraz/recon/blob/main/src/history.rs)
+
+Proposed Orc implementation:
+
+- Add `/` filtering to `orc watch` and `orc tui`.
+- Search ticket, slug, stage, worker, repository, branch, attention state, and
+  optional labels.
+- Let `orc sessions resume` without an ID open a picker.
+- Show provider, model, context, branch, CWD, and relative last activity.
+- Retain `orc sessions resume <provider-session-id>` as the deterministic
+  scripting interface.
+
+Filtering should only affect presentation. It must not change focus priority or
+workflow state.
+
+### 4. Git-aware grouping
+
+Priority: medium.
+
+Recon uses `git rev-parse --git-common-dir` to group worktrees under a canonical
+repository and caches branch information:
+
+- [Recon Git metadata](https://github.com/gavraz/recon/blob/main/src/session.rs)
+
+This maps well to Orc, especially for multi-repository tickets:
+
+- Use `STATE.yaml.repos` directly for managed sessions.
+- Inspect Git only for unmanaged sessions or when durable data is absent.
+- Cache unmanaged Git results with a short TTL.
+- Offer grouping and filtering by repository and branch.
+- Show the relative worktree directory without replacing the ticket or stage as
+  the primary identity.
+
+Example:
+
+```text
+los-app-los-django
+  FLYWL-123  feature/flywl-123  develop  working
+  FLYWL-456  feature/flywl-456  review   input
+```
+
+### 5. Context-pressure warnings
+
+Priority: medium-low.
+
+Recon uses a colored context bar in its visual dashboard. Orc already exposes
+context usage in session telemetry, so it can add a lighter version:
+
+- Display context ratio in `orc watch` and `orc tui`.
+- Use configurable green, yellow, and red thresholds.
+- Treat missing or provider-unknown context limits as unavailable, not zero.
+- Keep context pressure as a live warning. It must never become durable workflow
+  status or automatically terminate or advance work.
+
+### 6. Durable labels and filters
+
+Priority: optional. Add only when real workflows need it.
+
+Recon stores repeatable `key:value` tags in the tmux environment and filters JSON
+output by them. Orc already has ticket, workflow, stage, worker, repository, and
+status, so many tags would duplicate existing structure.
+
+If arbitrary labels become useful:
+
+- Store them durably in `STATE.yaml`, for example `priority: high`,
+  `team: frontend`, or `env: staging`.
+- Validate keys and values.
+- Add repeatable `--label key=value` filters to `orc status` and `orc sessions`.
+- Mirror labels into tmux metadata only for live reverse lookup.
+
+Do not make tmux environment variables the sole copy of Orc labels.
+
+### 7. Tmux popup workflow
+
+Priority: low-cost polish.
+
+Recon documents popup bindings for its dashboard, new-session form, resume
+picker, and next-attention command:
+
+- [Recon tmux configuration](https://github.com/gavraz/recon/blob/main/README.md#tmux-config)
+
+After the resume picker exists, Orc can document similar optional bindings for:
+
+- `orc watch`
+- `orc sessions --all`
+- `orc sessions resume`
+- `orc focus`
+
+These should remain user-owned tmux configuration rather than installation-time
+mutation.
+
+## Ideas not to copy directly
+
+### Pane-text status scraping
+
+Recon derives Claude state partly by scraping status-bar text from the pane.
+That is useful for a provider-specific session browser but is brittle across
+provider releases, themes, terminal widths, and localized UI text.
+
+Orc should continue to prefer:
+
+1. Durable `STATE.yaml` workflow state.
+2. Explicit attention markers and provider metadata.
+3. Pane text only as an optional diagnostic fallback, never as authoritative
+   workflow state.
+
+### One-key raw session killing
+
+Killing a tmux session without updating durable state can leave an Orc ticket
+marked active with no process. Orc should keep destructive lifecycle operations
+explicit and confirmed. Parking, archive, and a possible future `sessions stop`
+command should reconcile durable state deliberately.
+
+### Generic session launch as the primary workflow
+
+Recon's `launch` and `new` commands are natural for a general Claude session
+manager. Orc already has `orc work`, `orc next`, and `orc jit`; a competing
+generic launch path would bypass workflow policy and fragment ownership.
+
+### Session-only tags
+
+Ephemeral tmux tags are insufficient for an orchestrator whose state must
+survive process and session loss. Any Orc labels should be durable first and
+mirrored live second.
+
+### Visual novelty as a priority
+
+Recon's Tamagotchi view is distinctive, but Orc should prioritize identity,
+recovery, filtering, and context pressure before adding another visual mode.
+
+## Recommended sequence
+
+1. ~~Exact provider-session and pane identity.~~ Completed 2026-07-13.
+2. ~~Incremental telemetry parsing with total refresh budgets.~~ Completed 2026-07-13.
+3. Search and interactive resume picker.
+4. Git-aware grouping and filters.
+5. Context-pressure presentation.
+6. Labels and popup documentation only when demanded by actual use.
+
+The first four capture nearly all remaining practical value from Recon while
+preserving Orc's defining boundary: policy and durable workflow state live in
+files; tmux and provider telemetry describe only what is happening right now.

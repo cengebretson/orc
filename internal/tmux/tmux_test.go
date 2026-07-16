@@ -43,6 +43,26 @@ func TestWriteScriptQuotesArguments(t *testing.T) {
 	if !strings.Contains(text, shellQuote("value with 'quotes'")) {
 		t.Fatalf("script missing quoted argument:\n%s", text)
 	}
+	if !strings.Contains(text, "trap - EXIT\nexec printf") {
+		t.Fatalf("script must replace itself with the provider command:\n%s", text)
+	}
+}
+
+func TestWriteScriptRejectsEmptyCommand(t *testing.T) {
+	if _, err := writeScript(t.TempDir(), nil); err == nil {
+		t.Fatal("writeScript should reject an empty command")
+	}
+}
+
+func TestSetSessionEnvironmentRejectsUnsafeName(t *testing.T) {
+	for _, name := range []string{"", "-g", "1BAD", "BAD=VALUE", "BAD NAME"} {
+		if err := SetSessionEnvironment("unused", name, "value"); err == nil {
+			t.Errorf("SetSessionEnvironment should reject %q", name)
+		}
+		if _, err := SessionEnvironment("unused", name); err == nil {
+			t.Errorf("SessionEnvironment should reject %q", name)
+		}
+	}
 }
 
 func TestBuildWatchCommandQuotesArguments(t *testing.T) {

@@ -224,6 +224,30 @@ func TestDisplayStateUsesDurableStatusFirst(t *testing.T) {
 			wantIcon:  "●",
 			wantLabel: "active",
 		},
+		{
+			name:      "active input attention needs input",
+			row:       row{status: "active", tmuxState: "live", attention: "input"},
+			wantIcon:  "!",
+			wantLabel: "input",
+		},
+		{
+			name:      "active review attention needs review",
+			row:       row{status: "active", tmuxState: "live", attention: "review"},
+			wantIcon:  "◆",
+			wantLabel: "review",
+		},
+		{
+			name:      "durable paused overrides input attention",
+			row:       row{status: "paused", tmuxState: "live", attention: "input"},
+			wantIcon:  "!",
+			wantLabel: "blocked",
+		},
+		{
+			name:      "stopped overrides attention",
+			row:       row{status: "active", tmuxState: "stopped", attention: "input"},
+			wantIcon:  "x",
+			wantLabel: "stopped",
+		},
 	}
 
 	for _, tt := range tests {
@@ -233,6 +257,27 @@ func TestDisplayStateUsesDurableStatusFirst(t *testing.T) {
 				t.Fatalf("displayState() = %q/%q, want %q/%q", icon, label, tt.wantIcon, tt.wantLabel)
 			}
 		})
+	}
+}
+
+func TestSortRowsPrioritizesAttention(t *testing.T) {
+	rows := []row{
+		{ticket: "ACTIVE", status: "active", tmuxState: "live"},
+		{ticket: "DONE", status: "done", tmuxState: "stopped"},
+		{ticket: "REVIEW", status: "active", tmuxState: "live", attention: "review"},
+		{ticket: "STOPPED", status: "active", tmuxState: "stopped"},
+		{ticket: "INPUT", status: "active", tmuxState: "live", attention: "input"},
+		{ticket: "BLOCKED", status: "paused", tmuxState: "live"},
+	}
+
+	sortRows(rows)
+	got := make([]string, 0, len(rows))
+	for _, r := range rows {
+		got = append(got, r.ticket)
+	}
+	want := []string{"BLOCKED", "INPUT", "REVIEW", "STOPPED", "ACTIVE", "DONE"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("sortRows() = %v, want %v", got, want)
 	}
 }
 
@@ -282,10 +327,10 @@ func TestAttachSelectedBuildsCommand(t *testing.T) {
 	orig := newAttachCmd
 	defer func() { newAttachCmd = orig }()
 	var gotSession, gotWindow string
-	newAttachCmd = func(session, window string) *exec.Cmd {
+	newAttachCmd = func(session, window, pane string) (*exec.Cmd, error) {
 		gotSession = session
 		gotWindow = window
-		return exec.Command("true")
+		return exec.Command("true"), nil
 	}
 
 	m := Model{rows: []row{{
@@ -310,8 +355,8 @@ func TestAttachSelectedBuildsCommand(t *testing.T) {
 func TestWatchUpdateAttachSetsMessage(t *testing.T) {
 	orig := newAttachCmd
 	defer func() { newAttachCmd = orig }()
-	newAttachCmd = func(session, window string) *exec.Cmd {
-		return exec.Command("true")
+	newAttachCmd = func(session, window, pane string) (*exec.Cmd, error) {
+		return exec.Command("true"), nil
 	}
 
 	m := Model{rows: []row{{
@@ -331,5 +376,41 @@ func TestWatchUpdateAttachSetsMessage(t *testing.T) {
 	}
 	if cmd == nil {
 		t.Fatal("cmd = nil, want attach command")
+	}
+}
+
+func TestWatchUpdateFocusesNextAttentionSession(t *testing.T) {
+	orig := newAttachCmd
+	defer func() { newAttachCmd = orig }()
+	var gotSession, gotWindow string
+	newAttachCmd = func(session, window, pane string) (*exec.Cmd, error) {
+		gotSession = session
+		gotWindow = window
+		return exec.Command("true"), nil
+	}
+
+	m := Model{
+		cursor: 0,
+		rows: []row{
+			{ticket: "ACTIVE", session: "ACTIVE", window: "develop", status: "active", tmuxState: "live"},
+			{ticket: "REVIEW", session: "REVIEW", window: "code-review", status: "active", tmuxState: "live", attention: "review"},
+		},
+	}
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'i'}})
+	got, ok := updated.(Model)
+	if !ok {
+		t.Fatalf("Update returned %T, want Model", updated)
+	}
+	if got.cursor != 1 {
+		t.Fatalf("cursor = %d, want 1", got.cursor)
+	}
+	if got.message != "attaching REVIEW:code-review" {
+		t.Fatalf("message = %q", got.message)
+	}
+	if cmd == nil {
+		t.Fatal("cmd = nil, want focus attach command")
+	}
+	if gotSession != "REVIEW" || gotWindow != "code-review" {
+		t.Fatalf("newAttachCmd called with %q/%q", gotSession, gotWindow)
 	}
 }

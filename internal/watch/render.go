@@ -57,7 +57,7 @@ func (m Model) renderRail() string {
 
 	b.WriteString(mutedStyle.Render("enter expand  a attach"))
 	b.WriteString("\n")
-	b.WriteString(mutedStyle.Render("q quit"))
+	b.WriteString(mutedStyle.Render("i focus  q quit"))
 	return b.String()
 }
 
@@ -132,7 +132,7 @@ func (m Model) renderWide() string {
 		b.WriteString(mutedStyle.Render(truncate(m.message, width)))
 		b.WriteString("\n")
 	}
-	b.WriteString(mutedStyle.Render("j/k move  enter preview  a attach  r refresh  q quit"))
+	b.WriteString(mutedStyle.Render("j/k move  enter preview  a attach  i focus  r refresh  q quit"))
 	return strings.TrimRight(b.String(), "\n")
 }
 
@@ -166,6 +166,10 @@ func renderRailDetail(r row, width int) string {
 	if r.tmuxState != "" && r.tmuxState != "-" {
 		b.WriteString("\n")
 		b.WriteString(mutedStyle.Render("  " + truncate("tmux "+r.tmuxState, max(1, width-2))))
+	}
+	if r.attention != "" {
+		b.WriteString("\n")
+		b.WriteString(mutedStyle.Render("  " + truncate("attention "+r.attention, max(1, width-2))))
 	}
 	if r.next != "" {
 		b.WriteString("\n\n")
@@ -257,6 +261,10 @@ func (m Model) workPreviewContent(r row) string {
 	if r.tmuxState != "" && r.tmuxState != "-" {
 		b.WriteString("\n")
 		b.WriteString(mutedStyle.Render("tmux " + r.tmuxState))
+	}
+	if r.attention != "" {
+		b.WriteString("\n")
+		b.WriteString(mutedStyle.Render("attention " + r.attention))
 	}
 	if r.loadErr != nil {
 		b.WriteString("\n\n")

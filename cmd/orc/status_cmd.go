@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/cengebretson/orc/internal/featurelist"
+	"github.com/cengebretson/orc/internal/sessionlist"
 	"github.com/cengebretson/orc/internal/state"
+	"github.com/cengebretson/orc/internal/telemetry"
 	"github.com/cengebretson/orc/internal/ticket"
 	"github.com/cengebretson/orc/internal/ticketview"
 	"github.com/cengebretson/orc/internal/tmux"
@@ -24,6 +26,11 @@ type statusRow struct {
 	session  string
 }
 
+type statusJSONView struct {
+	*state.State
+	Live *telemetry.Live `json:"live,omitempty"`
+}
+
 func runStatus(cmd *cobra.Command, args []string) error {
 	root, err := resolveRoot(globalWorkspace)
 	if err != nil {
@@ -36,7 +43,16 @@ func runStatus(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		if statusJSON {
-			return printJSON(t.State)
+			view := statusJSONView{State: t.State}
+			if sessions, liveErr := sessionlist.Collect(root, sessionlist.Options{}); liveErr == nil {
+				for _, session := range sessions {
+					if session.Ticket == t.State.Ticket && session.Live != nil {
+						view.Live = session.Live
+						break
+					}
+				}
+			}
+			return printJSON(view)
 		}
 		if err := printShow(root, t.FeatureDir, t.State); err != nil {
 			return err

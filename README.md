@@ -369,7 +369,13 @@ Or use the Claude Desktop settings UI. Requires a GitHub PAT with `repo` and `pu
   - `--fix` — remove provably-stale state locks (dead PID or old without a valid PID); live locks are never touched
 - `orc status` — show all features and their current workflow/stage
   - `orc status <ticket>` — show full details for a specific ticket
-  - `--json` — output as JSON for scripting
+  - `--json` — output durable state as JSON for scripting; a matched running provider adds an optional `live` overlay
+- `orc sessions` — list managed and orphaned agent sessions with tmux targets and optional provider telemetry
+  - `--all` — include recent Claude and Codex sessions not managed by Orc
+  - `--json` — emit the inventory as JSON
+  - `orc sessions resume <provider-session-id> --dry` — validate and preview an exact provider resume
+  - `orc sessions park --dry` — preview resumable managed sessions; `--yes` snapshots and stops only those sessions
+  - `orc sessions unpark --dry` — preview the saved snapshot; `--yes` recreates and resumes it
 - `orc report` — time-in-stage across all tickets (avg/median active time, visit counts), derived from history
   - `orc report <ticket>` — per-stage breakdown for one ticket with total cycle time
   - `--archived` — include archived tickets in the aggregate (no-arg) report
@@ -393,6 +399,11 @@ Or use the Claude Desktop settings UI. Requires a GitHub PAT with `repo` and `pu
     (named after the slug, and overridable), drops you on the *current stage's*
     window, and picks `switch-client` vs `attach-session` so it works whether or
     not you're already inside tmux. The TUI's `t` key does the same.
+- `orc focus` — attach to the highest-priority live session that needs human attention
+- `orc watch [ticket]` — open the compact, attention-aware tmux session rail
+  - `i` — jump to the next live `blocked`, `input`, or `review` session
+  - `--tmux-toggle` — open or close the watch rail beside the current tmux pane
+  - `--wide` — render the wider table layout
 - `orc archive <ticket>` — archive a completed feature, remove worktrees
 - `orc delete <ticket>` — permanently delete a feature folder (only allowed when status is `done` or `archived`)
 - `orc tui` — open the interactive dashboard
@@ -423,6 +434,7 @@ Deep reference lives in **[docs/reference.md](docs/reference.md)**:
 - **[Feature folder](docs/reference.md#feature-folder)** — the per-ticket context pack and who reads/writes each file
 - **[orc.yaml](docs/reference.md#orcyaml)** — repos, workflows, loop stages, and settings (configuration deep-dive in **[docs/workflows.md](docs/workflows.md)**)
 - **[STATE.yaml](docs/reference.md#stateyaml)** — the per-ticket state machine, status values, and runtime/lock semantics
+- **[Sessions](docs/sessions.md)** — live telemetry, managed/orphan classification, exact resume, and park/unpark safety
 - **[Workers](docs/reference.md#workers)** — worker definition files, prompt construction, and resolution order
 
 ---

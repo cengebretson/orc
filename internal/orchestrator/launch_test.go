@@ -7,12 +7,14 @@ import (
 
 	"github.com/cengebretson/orc/internal/runner"
 	"github.com/cengebretson/orc/internal/state"
+	"github.com/cengebretson/orc/internal/tmux"
 	"github.com/cengebretson/orc/internal/workers"
 )
 
 func TestLauncherLaunchesInTmux(t *testing.T) {
 	s := &state.State{
-		Slug: "TICKET-1",
+		Ticket: "TICKET-1",
+		Slug:   "TICKET-1",
 		Stage: state.Stage{
 			Name: "develop",
 		},
@@ -27,6 +29,7 @@ func TestLauncherLaunchesInTmux(t *testing.T) {
 	var sent []string
 	var sendEvent []string
 	var history []string
+	var metadata tmux.WindowMetadata
 
 	launcher := Launcher{
 		TmuxAvailable: func() bool { return true },
@@ -36,8 +39,15 @@ func TestLauncherLaunchesInTmux(t *testing.T) {
 			return nil
 		},
 		SetRuntime: func(featureDir, tmuxSession string) error { return nil },
-		SendCommand: func(session, window, featureDir, runDir string, argv []string) error {
+		SendCommand: func(session, window, pane, featureDir, runDir string, argv []string) (string, error) {
 			sent = []string{session, window, runDir}
+			return "%1", nil
+		},
+		SetWindowMetadata: func(session, window string, got tmux.WindowMetadata) error {
+			if session != "TICKET-1" || window != "develop" {
+				t.Fatalf("SetWindowMetadata target = %s:%s", session, window)
+			}
+			metadata = got
 			return nil
 		},
 		AppendHistory: func(featureDir, stage, workerID, result string) error {
@@ -75,8 +85,14 @@ func TestLauncherLaunchesInTmux(t *testing.T) {
 	if !reflect.DeepEqual(sendEvent, []string{"TICKET-1", "develop"}) {
 		t.Errorf("sendEvent = %#v", sendEvent)
 	}
+	if metadata.Ticket != "TICKET-1" || metadata.Stage != "develop" || metadata.Worker != "Dev" || metadata.Engine != "codex" || metadata.FeatureDir != "/feature" {
+		t.Errorf("metadata = %#v", metadata)
+	}
 	if result.AttachHint != "TICKET-1:develop" {
 		t.Errorf("AttachHint = %q", result.AttachHint)
+	}
+	if result.Pane != "%1" {
+		t.Errorf("Pane = %q, want %%1", result.Pane)
 	}
 	if !reflect.DeepEqual(history, []string{"develop", "", "launched in tmux session TICKET-1:develop"}) {
 		t.Errorf("history = %#v", history)
@@ -110,9 +126,9 @@ func TestLauncherAdoptsExistingSessionWhenRuntimeUnset(t *testing.T) {
 			setRuntime = []string{featureDir, tmuxSession}
 			return nil
 		},
-		SendCommand: func(session, window, featureDir, runDir string, argv []string) error {
+		SendCommand: func(session, window, pane, featureDir, runDir string, argv []string) (string, error) {
 			sent = []string{session, window, runDir}
-			return nil
+			return "%1", nil
 		},
 		AppendHistory: func(featureDir, stage, workerID, result string) error { return nil },
 		RunForeground: func(opts LaunchOptions) error {
@@ -162,9 +178,9 @@ func TestLauncherFallsBackToForegroundWhenTmuxCreateFails(t *testing.T) {
 		CreateSession: func(slug, featureDir string, workflows []string) error {
 			return createErr
 		},
-		SendCommand: func(session, window, featureDir, runDir string, argv []string) error {
+		SendCommand: func(session, window, pane, featureDir, runDir string, argv []string) (string, error) {
 			t.Fatal("send should not run after create failure")
-			return nil
+			return "", nil
 		},
 		RunForeground: func(opts LaunchOptions) error {
 			foregroundRan = true
@@ -226,9 +242,9 @@ func TestLauncherUsesExistingTmuxWindowOverride(t *testing.T) {
 			t.Fatal("existing-session launch should not create a session")
 			return nil
 		},
-		SendCommand: func(session, window, featureDir, runDir string, argv []string) error {
+		SendCommand: func(session, window, pane, featureDir, runDir string, argv []string) (string, error) {
 			sent = []string{session, window, runDir}
-			return nil
+			return "%2", nil
 		},
 		AppendHistory: func(featureDir, stage, workerID, result string) error {
 			history = []string{stage, workerID, result}

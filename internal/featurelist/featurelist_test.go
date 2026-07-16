@@ -50,6 +50,12 @@ runtime:
 	features, err := featurelist.Collect(root, featurelist.Options{
 		TmuxAvailable: func() bool { return true },
 		ListSessions:  func() []string { return []string{"TICKET-1"} },
+		WindowAttention: func(session, window string) string {
+			if session != "TICKET-1" || window != "default:code-review" {
+				t.Fatalf("WindowAttention target = %s:%s", session, window)
+			}
+			return "review"
+		},
 	})
 	if err != nil {
 		t.Fatalf("Collect: %v", err)
@@ -72,6 +78,9 @@ runtime:
 	}
 	if !f.TmuxLive {
 		t.Fatal("TmuxLive = false, want true")
+	}
+	if f.Attention != "review" {
+		t.Fatalf("Attention = %q, want review", f.Attention)
 	}
 }
 

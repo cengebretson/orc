@@ -6,6 +6,7 @@ import (
 	"github.com/cengebretson/orc/internal/ticket"
 	"github.com/cengebretson/orc/internal/tmux"
 	"github.com/cengebretson/orc/internal/tui"
+	"github.com/cengebretson/orc/internal/watch"
 	"github.com/spf13/cobra"
 )
 
@@ -41,7 +42,22 @@ func runAttach(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no tmux session for %s — run `orc next %s` to start one", s.Ticket, s.Ticket)
 	}
 
-	return tmux.Attach(session + ":" + s.Stage.Name)
+	pane := ""
+	if s.Runtime.Tmux != nil {
+		pane = s.Runtime.Tmux.Pane
+	}
+	return tmux.AttachTarget(session, s.Stage.Name, pane)
+}
+
+func runFocus(cmd *cobra.Command, args []string) error {
+	root, err := resolveRoot(globalWorkspace)
+	if err != nil {
+		return err
+	}
+	if !tmux.Available() {
+		return fmt.Errorf("tmux is not installed or not in PATH")
+	}
+	return watch.Focus(root)
 }
 
 // resolveWorkflow returns the ticket's workflow name for display purposes.

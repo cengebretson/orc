@@ -20,7 +20,9 @@ type Feature struct {
 	StageLoopLabel string
 	WorkerID       string
 	WorkerName     string
+	Engine         string
 	TmuxLive       bool
+	Attention      string
 	HasIssues      bool
 	LoadError      error
 }
@@ -29,6 +31,7 @@ type Options struct {
 	IncludeArchived bool
 	TmuxAvailable   func() bool
 	ListSessions    func() []string
+	WindowAttention func(session, window string) string
 }
 
 func Collect(root string, opts Options) ([]*Feature, error) {
@@ -37,6 +40,9 @@ func Collect(root string, opts Options) ([]*Feature, error) {
 	}
 	if opts.ListSessions == nil {
 		opts.ListSessions = tmux.ListSessions
+	}
+	if opts.WindowAttention == nil {
+		opts.WindowAttention = tmux.WindowAttention
 	}
 
 	ctx, _ := workspacectx.Load(root)
@@ -55,18 +61,18 @@ func Collect(root string, opts Options) ([]*Feature, error) {
 
 	featuresDir := filepath.Join(root, "features")
 	var out []*Feature
-	if err := collectDir(root, featuresDir, false, cfg, allWorkers, activeSessions, &out); err != nil {
+	if err := collectDir(root, featuresDir, false, cfg, allWorkers, activeSessions, opts.WindowAttention, &out); err != nil {
 		return nil, err
 	}
 	if opts.IncludeArchived {
-		if err := collectDir(root, filepath.Join(featuresDir, "_archive"), true, cfg, allWorkers, activeSessions, &out); err != nil {
+		if err := collectDir(root, filepath.Join(featuresDir, "_archive"), true, cfg, allWorkers, activeSessions, opts.WindowAttention, &out); err != nil {
 			return nil, err
 		}
 	}
 	return out, nil
 }
 
-func collectDir(root, dir string, archived bool, cfg *config.Config, allWorkers []*workers.Worker, activeSessions map[string]bool, out *[]*Feature) error {
+func collectDir(root, dir string, archived bool, cfg *config.Config, allWorkers []*workers.Worker, activeSessions map[string]bool, windowAttention func(session, window string) string, out *[]*Feature) error {
 	entries, err := os.ReadDir(dir)
 	if os.IsNotExist(err) {
 		return nil
@@ -92,6 +98,16 @@ func collectDir(root, dir string, archived bool, cfg *config.Config, allWorkers 
 
 		workflow := resolveWorkflow(cfg, s)
 		workerID := resolveWorkerID(cfg, workflow, s)
+		tmuxLive := s.Runtime.Tmux != nil && activeSessions[s.Runtime.Tmux.Session]
+		attention := ""
+		if tmuxLive && windowAttention != nil {
+			attention = windowAttention(s.Runtime.Tmux.Session, s.Stage.Name)
+		}
+		worker := workers.FindByID(allWorkers, workerID)
+		engine := ""
+		if worker != nil {
+			engine = worker.Engine
+		}
 		*out = append(*out, &Feature{
 			State:          s,
 			FeatureDir:     featureDir,
@@ -100,7 +116,9 @@ func collectDir(root, dir string, archived bool, cfg *config.Config, allWorkers 
 			StageLoopLabel: loopCountSuffix(cfg, workflow, s.Stage.Name, s),
 			WorkerID:       workerID,
 			WorkerName:     resolveWorkerName(allWorkers, workerID),
-			TmuxLive:       s.Runtime.Tmux != nil && activeSessions[s.Runtime.Tmux.Session],
+			Engine:         engine,
+			TmuxLive:       tmuxLive,
+			Attention:      attention,
 			HasIssues:      workerID == "",
 		})
 	}

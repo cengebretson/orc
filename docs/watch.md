@@ -28,6 +28,7 @@ orc watch --interval 2s
 orc watch --wide
 orc watch --tmux-toggle
 orc watch --tmux-toggle --tmux-layout bottom --tmux-size 25%
+orc focus
 ```
 
 `orc watch` defaults to a compact multi-ticket rail. `orc watch PROJ-123`
@@ -127,6 +128,10 @@ Initial state mapping and precedence:
 `paused`, `done`, or `pending`. It is a backup/live overlay for active work where
 the durable state does not already explain what the user should see.
 
+Rows are ordered by urgency, with load errors and blocked work first, followed
+by input, review, stopped, ready, pending, active, and done work. Tickets with
+the same urgency remain alphabetically ordered.
+
 ## tmux-attention integration
 
 `tmux-attention` can provide a low-level tmux notification primitive:
@@ -137,7 +142,7 @@ the durable state does not already explain what the user should see.
 - Claude/Codex hooks that call the CLI.
 - clear-on-view behavior through tmux hooks.
 
-`orc` may consume this state when available:
+`orc watch` consumes this state when available:
 
 ```sh
 tmux show-options -w -t <session>:<window> -v @agent_attention
@@ -154,7 +159,7 @@ authoritative:
 | `orc mark <ticket> start` | `clear` |
 | `orc mark <ticket> resume` | `clear` |
 
-This should be optional and no-op when `tmux-attention` is not installed.
+This integration is optional and is a no-op when `tmux-attention` is not installed.
 
 When `STATE.yaml` says `paused`, watch should show `blocked` even if
 `@agent_attention` is empty or stale. When `STATE.yaml` says `active`,
@@ -164,23 +169,40 @@ Important constraint: `tmux-attention` is currently window-scoped. This fits
 `orc` because workflow stages map to tmux windows. If multiple agent panes share
 one tmux window, the most recent marker wins for that window.
 
+## Tmux metadata
+
+After a successful tmux launch, `orc` stamps the target window with user options
+that identify the work without replacing the durable state contract:
+
+- `@orc_ticket`
+- `@orc_stage`
+- `@orc_worker`
+- `@orc_engine`
+- `@orc_provider_engine`
+- `@orc_provider_session`
+- `@orc_feature_dir`
+
+The exact agent pane is marked `@orc_agent=1` and receives the same identity
+options. These options support live reverse lookup and safe targeting in a
+multi-pane window. `STATE.yaml` remains authoritative if a marker is missing or
+stale. Provider options are a live correlation overlay and are cleared when a
+fresh launch does not have a resumable provider identity.
+
 ## Interactions
 
 `orc watch` should be interactive, implemented as its own small Bubble Tea
 program.
 
-Suggested keybindings:
+Keybindings:
 
 | Key | Action |
 |-----|--------|
 | `j` / `down` | select next ticket |
 | `k` / `up` | select previous ticket |
 | `enter` | preview selected prompt |
-| `s` | send prompt to the selected agent window |
 | `a` | attach/focus selected agent session/window |
-| `n` | preview next prompt |
-| `p` | preview pause/block command |
-| `t` | open full `orc tui` |
+| `i` | attach to the next live session that needs attention |
+| `n` | toggle the selected prompt preview |
 | `r` | refresh immediately |
 | `q` | quit watch pane |
 
@@ -197,6 +219,10 @@ Pressing `a` should focus the selected ticket's tmux target:
 - Outside tmux, use `tmux attach-session -t <session>:<window>`.
 - If no tmux runtime is recorded, or the session is known stopped, show a short
   in-watch status message instead of silently doing nothing.
+
+Pressing `i` cycles to the next live `blocked`, `input`, or `review` row and
+attaches to its exact session/window target. `orc focus` performs the same
+attention-first action non-interactively, choosing the highest-priority target.
 
 ## Prompt actions
 

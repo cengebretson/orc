@@ -141,6 +141,53 @@ var statusCmd = &cobra.Command{
 
 var statusJSON bool
 
+var sessionsCmd = &cobra.Command{
+	Use:   "sessions",
+	Short: "List managed, orphaned, and optional unmanaged agent sessions",
+	Args:  cobra.NoArgs,
+	RunE:  runSessions,
+}
+
+var (
+	sessionsJSON bool
+	sessionsAll  bool
+)
+
+var sessionsResumeCmd = &cobra.Command{
+	Use:   "resume <provider-session-id>",
+	Short: "Resume a discovered Claude or Codex session in the foreground",
+	Args:  cobra.ExactArgs(1),
+	RunE:  runSessionResume,
+}
+
+var (
+	sessionsResumeEngine string
+	sessionsResumeCWD    string
+	sessionsResumeDry    bool
+	sessionsResumeForce  bool
+)
+
+var sessionsParkCmd = &cobra.Command{
+	Use:   "park",
+	Short: "Snapshot and stop resumable Orc-managed tmux sessions",
+	Args:  cobra.NoArgs,
+	RunE:  runSessionsPark,
+}
+
+var sessionsUnparkCmd = &cobra.Command{
+	Use:   "unpark",
+	Short: "Recreate sessions from the last Orc parking snapshot",
+	Args:  cobra.NoArgs,
+	RunE:  runSessionsUnpark,
+}
+
+var (
+	sessionsParkDry   bool
+	sessionsParkYes   bool
+	sessionsUnparkDry bool
+	sessionsUnparkYes bool
+)
+
 var reportCmd = &cobra.Command{
 	Use:   "report [ticket]",
 	Short: "Show time-in-stage derived from ticket history",
@@ -229,6 +276,13 @@ var attachCmd = &cobra.Command{
 	RunE:  runAttach,
 }
 
+var focusCmd = &cobra.Command{
+	Use:   "focus",
+	Short: "Attach to the highest-priority live session that needs attention",
+	Args:  cobra.NoArgs,
+	RunE:  runFocus,
+}
+
 var tuiCmd = &cobra.Command{
 	Use:   "tui",
 	Short: "Open the interactive dashboard",
@@ -314,6 +368,16 @@ func init() {
 	nextCmd.Flags().BoolVar(&nextDry, "dry", false, "Print the launch command without executing it")
 	nextCmd.Flags().StringVar(&nextWorker, "worker", "", "Override the workflow's default worker (worker ID)")
 	statusCmd.Flags().BoolVar(&statusJSON, "json", false, "Output as JSON")
+	sessionsCmd.Flags().BoolVar(&sessionsJSON, "json", false, "Output as JSON")
+	sessionsCmd.Flags().BoolVar(&sessionsAll, "all", false, "Include recent provider sessions not managed by Orc")
+	sessionsResumeCmd.Flags().StringVar(&sessionsResumeEngine, "engine", "", "Provider engine when the session ID is ambiguous: claude or codex")
+	sessionsResumeCmd.Flags().StringVar(&sessionsResumeCWD, "cwd", "", "Override the recorded working directory")
+	sessionsResumeCmd.Flags().BoolVar(&sessionsResumeDry, "dry", false, "Print the exact resume command without running it")
+	sessionsResumeCmd.Flags().BoolVar(&sessionsResumeForce, "force", false, "Resume even when provider metadata reports the session is active")
+	sessionsParkCmd.Flags().BoolVar(&sessionsParkDry, "dry", false, "Preview resumable sessions without writing a snapshot or stopping tmux")
+	sessionsParkCmd.Flags().BoolVar(&sessionsParkYes, "yes", false, "Confirm writing the snapshot and stopping the listed tmux sessions")
+	sessionsUnparkCmd.Flags().BoolVar(&sessionsUnparkDry, "dry", false, "Preview the saved snapshot without creating tmux sessions")
+	sessionsUnparkCmd.Flags().BoolVar(&sessionsUnparkYes, "yes", false, "Confirm recreating the listed tmux sessions")
 	reportCmd.Flags().BoolVar(&reportJSON, "json", false, "Output as JSON")
 	reportCmd.Flags().BoolVar(&reportArchived, "archived", false, "Include archived tickets in the aggregate (no-arg) report")
 	artifactsCmd.Flags().BoolVar(&artifactsAll, "all", false, "Check every required artifact in the ticket workflow")
@@ -359,6 +423,10 @@ func init() {
 	rootCmd.AddCommand(doctorCmd)
 	rootCmd.AddCommand(nextCmd)
 	rootCmd.AddCommand(statusCmd)
+	sessionsCmd.AddCommand(sessionsResumeCmd)
+	sessionsCmd.AddCommand(sessionsParkCmd)
+	sessionsCmd.AddCommand(sessionsUnparkCmd)
+	rootCmd.AddCommand(sessionsCmd)
 	rootCmd.AddCommand(reportCmd)
 	rootCmd.AddCommand(artifactsCmd)
 	rootCmd.AddCommand(workCmd)
@@ -367,6 +435,7 @@ func init() {
 	rootCmd.AddCommand(deleteCmd)
 	rootCmd.AddCommand(jitCmd)
 	rootCmd.AddCommand(attachCmd)
+	rootCmd.AddCommand(focusCmd)
 	rootCmd.AddCommand(tuiCmd)
 	rootCmd.AddCommand(watchCmd)
 	rootCmd.AddCommand(helpAllCmd)
