@@ -40,6 +40,11 @@ recent story history. `--tmux-toggle` is a helper for tmux keybindings. By
 default it opens a 32-column right-side pane; `--tmux-layout bottom` and
 `--tmux-size <size>` can override the split.
 
+Press `/` to filter the rail without changing durable state or session
+priority. The shared matcher covers ticket, slug, workflow, stage, worker,
+engine, repository, branch, status, and attention state. Enter keeps the active
+filter; Escape clears it.
+
 ## Narrow rail view
 
 The default view should assume a narrow vertical split. Avoid tables, headers,

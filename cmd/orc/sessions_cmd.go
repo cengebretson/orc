@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,8 +12,15 @@ import (
 	"time"
 
 	"github.com/cengebretson/orc/internal/sessionlist"
+	"github.com/cengebretson/orc/internal/sessionpicker"
 	"github.com/cengebretson/orc/internal/telemetry"
 	"github.com/spf13/cobra"
+)
+
+var (
+	discoverResumeSessions = telemetry.Discover
+	selectResumeSession    = sessionpicker.Select
+	lookupResumeBranch     = gitBranch
 )
 
 func runSessions(cmd *cobra.Command, args []string) error {
@@ -61,28 +70,86 @@ func runSessions(cmd *cobra.Command, args []string) error {
 }
 
 func runSessionResume(cmd *cobra.Command, args []string) error {
-	id := args[0]
-	discovered, err := telemetry.Discover("")
+	discovered, err := discoverResumeSessions("")
 	if err != nil {
 		return err
 	}
+	var live telemetry.Live
+	if len(args) == 0 {
+		candidates := buildResumeCandidates(discovered, sessionsResumeEngine, lookupResumeBranch)
+		selected, err := selectResumeSession(candidates)
+		if errors.Is(err, sessionpicker.ErrCancelled) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		live = selected.Live
+	} else {
+		live, err = findResumeSession(discovered, args[0], sessionsResumeEngine)
+		if err != nil {
+			return err
+		}
+	}
+	return resumeLiveSession(live)
+}
+
+func findResumeSession(discovered []telemetry.Live, id, engine string) (telemetry.Live, error) {
 	var matches []telemetry.Live
 	for _, live := range discovered {
 		if live.ProviderSessionID != id {
 			continue
 		}
-		if sessionsResumeEngine != "" && !strings.EqualFold(sessionsResumeEngine, live.Engine) {
+		if engine != "" && !strings.EqualFold(engine, live.Engine) {
 			continue
 		}
 		matches = append(matches, live)
 	}
 	if len(matches) == 0 {
-		return fmt.Errorf("provider session %q was not found in recent local Claude or Codex metadata", id)
+		return telemetry.Live{}, fmt.Errorf("provider session %q was not found in recent local Claude or Codex metadata", id)
 	}
 	if len(matches) > 1 {
-		return fmt.Errorf("provider session %q is ambiguous; pass --engine claude or --engine codex", id)
+		return telemetry.Live{}, fmt.Errorf("provider session %q is ambiguous; pass --engine claude or --engine codex", id)
 	}
-	live := matches[0]
+	return matches[0], nil
+}
+
+func buildResumeCandidates(discovered []telemetry.Live, engine string, branch func(string) string) []sessionpicker.Candidate {
+	branches := make(map[string]string)
+	var candidates []sessionpicker.Candidate
+	for _, live := range discovered {
+		if live.ProviderSessionID == "" || (engine != "" && !strings.EqualFold(engine, live.Engine)) {
+			continue
+		}
+		if !strings.EqualFold(live.Engine, "claude") && !strings.EqualFold(live.Engine, "codex") {
+			continue
+		}
+		branchName := ""
+		if live.CWD != "" && branch != nil {
+			var ok bool
+			branchName, ok = branches[live.CWD]
+			if !ok {
+				branchName = branch(live.CWD)
+				branches[live.CWD] = branchName
+			}
+		}
+		candidates = append(candidates, sessionpicker.Candidate{Live: live, Branch: branchName})
+	}
+	return candidates
+}
+
+func gitBranch(cwd string) string {
+	ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "git", "-C", cwd, "branch", "--show-current").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func resumeLiveSession(live telemetry.Live) error {
+	id := live.ProviderSessionID
 	if !sessionsResumeForce && (live.PID > 0 || strings.EqualFold(live.State, "working") || strings.EqualFold(live.State, "active")) {
 		return fmt.Errorf("provider session %q still appears active (state %q, pid %d); use --force only after confirming it is safe to resume", id, live.State, live.PID)
 	}
@@ -93,7 +160,7 @@ func runSessionResume(cmd *cobra.Command, args []string) error {
 	if cwd == "" {
 		return fmt.Errorf("provider session %q has no recorded cwd; pass --cwd", id)
 	}
-	cwd, err = filepath.Abs(cwd)
+	cwd, err := filepath.Abs(cwd)
 	if err != nil {
 		return err
 	}

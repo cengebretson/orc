@@ -100,29 +100,31 @@ Implemented behavior:
 The cache is process-local and metadata-only. New CLI invocations begin with a
 bounded head/tail read; long-running consumers reuse exact cursors.
 
-## Remaining recommendations
+### 3. Search and an interactive resume picker — implemented
 
-### 3. Search and an interactive resume picker
-
-Priority: medium-high. This is the strongest remaining UX improvement.
+Completed on 2026-07-16.
 
 Recon provides `/` filtering in its dashboard and an interactive resume picker:
 
 - [Recon dashboard behavior](https://github.com/gavraz/recon/blob/main/src/app.rs)
 - [Recon resume picker](https://github.com/gavraz/recon/blob/main/src/history.rs)
 
-Proposed Orc implementation:
+Implemented behavior:
 
-- Add `/` filtering to `orc watch` and `orc tui`.
-- Search ticket, slug, stage, worker, repository, branch, attention state, and
-  optional labels.
-- Let `orc sessions resume` without an ID open a picker.
-- Show provider, model, context, branch, CWD, and relative last activity.
-- Retain `orc sessions resume <provider-session-id>` as the deterministic
+- One shared case-insensitive, multi-term matcher drives `/` filtering in
+  `orc watch` and `orc tui`.
+- Existing durable metadata covers ticket, slug, workflow, stage, worker,
+  repository, branch, status, engine, and attention state. Arbitrary labels
+  remain deferred until Orc has a durable label schema.
+- `orc sessions resume` without an ID opens a searchable picker showing
+  provider, model, context, branch, CWD, and relative last activity.
+- `orc sessions resume <provider-session-id>` remains the deterministic
   scripting interface.
 
 Filtering should only affect presentation. It must not change focus priority or
 workflow state.
+
+## Remaining recommendations
 
 ### 4. Git-aware grouping
 
@@ -243,7 +245,7 @@ recovery, filtering, and context pressure before adding another visual mode.
 
 1. ~~Exact provider-session and pane identity.~~ Completed 2026-07-13.
 2. ~~Incremental telemetry parsing with total refresh budgets.~~ Completed 2026-07-13.
-3. Search and interactive resume picker.
+3. ~~Search and interactive resume picker.~~ Completed 2026-07-16.
 4. Git-aware grouping and filters.
 5. Context-pressure presentation.
 6. Labels and popup documentation only when demanded by actual use.

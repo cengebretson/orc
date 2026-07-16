@@ -5,8 +5,65 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
+
+func watchModel(t *testing.T, value tea.Model) Model {
+	t.Helper()
+	model, ok := value.(Model)
+	if !ok {
+		t.Fatalf("model = %T, want watch.Model", value)
+	}
+	return model
+}
+
+func TestWatchSearchFiltersSharedMetadataAndClears(t *testing.T) {
+	searchBox := textinput.New()
+	searchBox.Prompt = "/ "
+	m := Model{
+		searchBox: searchBox,
+		rows: []row{
+			{ticket: "FLYWL-123", search: []string{"FLYWL-123", "develop", "bob", "los-app", "feature/flywl-123", "active"}},
+			{ticket: "FLYWL-456", search: []string{"FLYWL-456", "review", "ada", "los-qa", "feature/flywl-456", "review"}},
+		},
+	}
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	m = watchModel(t, updated)
+	for _, char := range "ada review" {
+		updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{char}})
+		m = watchModel(t, updated)
+	}
+	if len(m.rows) != 1 || m.rows[0].ticket != "FLYWL-456" {
+		t.Fatalf("filtered rows = %#v, want FLYWL-456", m.rows)
+	}
+
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = watchModel(t, updated)
+	if m.searching || m.searchBox.Value() != "ada review" {
+		t.Fatalf("enter should keep filter, searching=%v value=%q", m.searching, m.searchBox.Value())
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = watchModel(t, updated)
+	if m.searchBox.Value() != "" || len(m.rows) != 2 {
+		t.Fatalf("esc should clear filter, value=%q rows=%d", m.searchBox.Value(), len(m.rows))
+	}
+}
+
+func TestWatchRefreshPreservesSelectedTicket(t *testing.T) {
+	searchBox := textinput.New()
+	m := Model{
+		searchBox: searchBox,
+		cursor:    1,
+		rows:      []row{{ticket: "A"}, {ticket: "B"}},
+	}
+	updated, _ := m.Update(dataMsg{rows: []row{{ticket: "B"}, {ticket: "A"}}})
+	m = watchModel(t, updated)
+	if m.cursor != 0 || m.rows[m.cursor].ticket != "B" {
+		t.Fatalf("selection after refresh = cursor %d ticket %q, want B", m.cursor, m.rows[m.cursor].ticket)
+	}
+}
 
 func TestRenderRailIsCompact(t *testing.T) {
 	m := Model{

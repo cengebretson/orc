@@ -3,11 +3,11 @@ package tui
 import (
 	"math/rand"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/cengebretson/orc/internal/config"
 	"github.com/cengebretson/orc/internal/doctor"
+	"github.com/cengebretson/orc/internal/searchmatch"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/workers"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -136,7 +136,10 @@ type featureRow struct {
 	workflowLabel     string
 	stageLabel        string
 	stageLoopLabel    string
+	workerID          string
 	workerName        string
+	engine            string
+	attention         string
 	tmuxLive          bool
 	hasIssues         bool
 	requiredArtifacts []string
@@ -150,6 +153,23 @@ func (f *featureRow) ticketID() string {
 		return f.s.Ticket
 	}
 	return filepath.Base(f.featureDir)
+}
+
+func (f *featureRow) searchFields() []string {
+	fields := []string{
+		f.ticketID(), f.featureDir, f.workflow, f.workflowLabel, f.stage,
+		f.stageLabel, f.stageLoopLabel, f.workerID, f.workerName, f.engine,
+		f.attention,
+	}
+	if f.s == nil {
+		return fields
+	}
+	fields = append(fields, f.s.Ticket, f.s.Slug, f.s.Status, f.s.Workflow,
+		f.s.Stage.Name, f.s.Stage.Worker)
+	for name, repo := range f.s.Repos {
+		fields = append(fields, name, repo.Main, repo.Worktree, repo.Branch)
+	}
+	return fields
 }
 
 // ── model ─────────────────────────────────────────────────────────
@@ -287,7 +307,7 @@ func sectionLabel(key string) string {
 
 // visibleFeatures filters features by the archive toggle and search query.
 func (m Model) visibleFeatures() []*featureRow {
-	query := strings.ToLower(strings.TrimSpace(m.search.Value()))
+	query := m.search.Value()
 	var out []*featureRow
 	for _, f := range m.features {
 		// Broken rows (unparseable state) always show — they need attention and
@@ -295,14 +315,8 @@ func (m Model) visibleFeatures() []*featureRow {
 		if f.s != nil && f.s.Status == "archived" && !m.showArchived {
 			continue
 		}
-		if query != "" {
-			haystack := strings.ToLower(f.ticketID())
-			if f.s != nil {
-				haystack = strings.ToLower(f.s.Ticket + " " + f.s.Slug)
-			}
-			if !strings.Contains(haystack, query) {
-				continue
-			}
+		if !searchmatch.Match(query, f.searchFields()...) {
+			continue
 		}
 		out = append(out, f)
 	}

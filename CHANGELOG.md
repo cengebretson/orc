@@ -8,6 +8,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Shared multi-field `/` filtering in `orc watch` and `orc tui`, plus an
+  interactive `orc sessions resume` picker when no provider session ID is
+  supplied; explicit IDs remain available for deterministic scripts.
 - `orc sessions` inventories managed, orphaned, and optional unmanaged Claude
   and Codex sessions with bounded live telemetry, exact provider-session
   resume, and crash-safe park/unpark workflows.

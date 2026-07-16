@@ -839,4 +839,20 @@ func TestVisibleFeatures(t *testing.T) {
 	if len(vis) != 1 || vis[0].s.Ticket != "AUTH-9" {
 		t.Errorf("search filter: got %d rows, want only AUTH-9", len(vis))
 	}
+
+	story := m.features[0]
+	story.workerID = "ada-reviewer"
+	story.workerName = "Ada"
+	story.engine = "codex"
+	story.attention = "review"
+	story.s.Repos = map[string]state.Repo{
+		"los-app": {Branch: "feature/story-1", Worktree: "/work/los-app"},
+	}
+	for _, query := range []string{"ada review", "los-app feature/story-1", "codex develop"} {
+		m.search.SetValue(query)
+		vis = m.visibleFeatures()
+		if len(vis) != 1 || vis[0].s.Ticket != "STORY-1" {
+			t.Errorf("metadata search %q: got %#v, want only STORY-1", query, vis)
+		}
+	}
 }

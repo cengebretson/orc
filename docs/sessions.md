@@ -84,14 +84,21 @@ omits telemetry. It does not infer a rollover from CWD alone.
 ## Exact resume
 
 ```sh
+orc sessions resume
 orc sessions resume <provider-session-id> --dry
 orc sessions resume <provider-session-id>
 ```
+
+Without an ID, Orc opens a searchable picker over recent Claude and Codex
+metadata. Each row shows provider, model, session ID, context pressure, current
+Git branch when available, CWD, and relative last activity. Search matches those
+same fields. Escape cancels without launching anything.
 
 Resume accepts only a session discovered in recent local provider metadata. It
 uses the recorded working directory, validates that directory and provider
 binary, and passes argv directly without shell interpolation. Use `--engine`
 when an ID is ambiguous and `--cwd` only when the recorded directory moved.
+Supplying the provider session ID keeps the command deterministic for scripts.
 
 Sessions reported `active` or `working` are rejected by default. `--force`
 exists for the case where provider metadata is stale; verify that the original

@@ -5,6 +5,24 @@ Single source of truth for unshipped work. Shipped work belongs in
 
 ## Up next
 
+### Git-aware session grouping
+
+Continue the next Recon-inspired session UX slice described in `recon.md`:
+
+- Group managed sessions from durable `STATE.yaml.repos` metadata.
+- Resolve unmanaged worktrees through `git rev-parse --git-common-dir` only
+  when durable repository identity is unavailable.
+- Cache unmanaged Git metadata briefly and expose repository/branch grouping
+  without replacing ticket and stage as the primary identity.
+- Reuse the current shared matcher for repository and branch filters.
+
+Acceptance: managed grouping requires no Git subprocesses, unmanaged grouping
+handles linked worktrees, and focused tests cover cache expiry and Git failures.
+
+Effort: Medium.
+
+## Queued
+
 ### Agent completion notification
 
 Add a small notification hook so unattended agent runs can get the user's

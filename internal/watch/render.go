@@ -12,6 +12,10 @@ func (m Model) renderRail() string {
 		b.WriteString(mutedStyle.Render(truncate(m.ticket, inner)))
 	}
 	b.WriteString("\n\n")
+	if m.searching || m.searchBox.Value() != "" {
+		b.WriteString(m.renderFilter(inner))
+		b.WriteString("\n\n")
+	}
 
 	if m.loadErr != nil {
 		b.WriteString(blockedStyle.Render("! load error"))
@@ -55,9 +59,9 @@ func (m Model) renderRail() string {
 		b.WriteString("\n")
 	}
 
-	b.WriteString(mutedStyle.Render("enter expand  a attach"))
+	b.WriteString(mutedStyle.Render("/ filter  enter expand"))
 	b.WriteString("\n")
-	b.WriteString(mutedStyle.Render("i focus  q quit"))
+	b.WriteString(mutedStyle.Render("a attach  i focus  q quit"))
 	return b.String()
 }
 
@@ -112,6 +116,10 @@ func (m Model) renderWide() string {
 		b.WriteString(mutedStyle.Render("  " + m.lastLoad.Format("15:04:05")))
 	}
 	b.WriteString("\n\n")
+	if m.searching || m.searchBox.Value() != "" {
+		b.WriteString(m.renderFilter(width))
+		b.WriteString("\n\n")
+	}
 
 	if m.loadErr != nil {
 		b.WriteString(blockedStyle.Render("load error: "))
@@ -132,8 +140,15 @@ func (m Model) renderWide() string {
 		b.WriteString(mutedStyle.Render(truncate(m.message, width)))
 		b.WriteString("\n")
 	}
-	b.WriteString(mutedStyle.Render("j/k move  enter preview  a attach  i focus  r refresh  q quit"))
+	b.WriteString(mutedStyle.Render("/ filter  j/k move  enter preview  a attach  i focus  r refresh  q quit"))
 	return strings.TrimRight(b.String(), "\n")
+}
+
+func (m Model) renderFilter(width int) string {
+	if m.searching {
+		return truncate(m.searchBox.View(), width)
+	}
+	return mutedStyle.Render(truncate(linef("/ %s  (%d/%d)", m.searchBox.Value(), len(m.rows), len(m.allRows)), width))
 }
 
 func (m Model) renderPreview() string {

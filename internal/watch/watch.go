@@ -9,8 +9,10 @@ import (
 	"time"
 
 	"github.com/cengebretson/orc/internal/featurelist"
+	"github.com/cengebretson/orc/internal/searchmatch"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/tmux"
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -49,6 +51,7 @@ type row struct {
 	history   []historyRow
 	archived  bool
 	loadErr   error
+	search    []string
 }
 
 type historyRow struct {
@@ -64,6 +67,7 @@ type Model struct {
 	interval time.Duration
 	wide     bool
 
+	allRows  []row
 	rows     []row
 	cursor   int
 	width    int
@@ -72,8 +76,10 @@ type Model struct {
 	loadErr  error
 	message  string
 
-	preview  bool
-	viewport viewport.Model
+	preview   bool
+	viewport  viewport.Model
+	searching bool
+	searchBox textinput.Model
 }
 
 func Run(root string, opts Options) error {
@@ -81,11 +87,16 @@ func Run(root string, opts Options) error {
 	if interval <= 0 {
 		interval = defaultInterval
 	}
+	searchBox := textinput.New()
+	searchBox.Placeholder = "filter sessions..."
+	searchBox.Prompt = "/ "
+	searchBox.CharLimit = 96
 	m := Model{
-		root:     root,
-		ticket:   opts.Ticket,
-		interval: interval,
-		wide:     opts.Wide,
+		root:      root,
+		ticket:    opts.Ticket,
+		interval:  interval,
+		wide:      opts.Wide,
+		searchBox: searchBox,
 	}
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	_, err := p.Run()
@@ -103,14 +114,28 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.viewport.Width = max(1, msg.Width-2)
 		m.viewport.Height = max(1, msg.Height-2)
+		m.searchBox.Width = max(8, msg.Width-6)
 		m.refreshPreview()
 		return m, nil
 	case tickMsg:
 		return m, tea.Batch(loadData(m.root, m.ticket), tickEvery(m.interval))
 	case dataMsg:
-		m.rows = msg.rows
+		selectedTicket := ""
+		if selected, ok := m.selectedWork(); ok {
+			selectedTicket = selected.ticket
+		}
+		m.allRows = msg.rows
+		m.applyFilter(false)
 		m.loadErr = msg.err
 		m.lastLoad = time.Now()
+		if selectedTicket != "" {
+			for i := range m.rows {
+				if m.rows[i].ticket == selectedTicket {
+					m.cursor = i
+					break
+				}
+			}
+		}
 		if m.cursor >= m.itemCount() {
 			m.cursor = max(0, m.itemCount()-1)
 		}
@@ -122,13 +147,51 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case tea.KeyMsg:
+		if m.searching {
+			switch msg.String() {
+			case "ctrl+c":
+				return m, tea.Quit
+			case "esc":
+				m.searching = false
+				m.searchBox.Blur()
+				m.searchBox.SetValue("")
+				m.applyFilter(true)
+				return m, nil
+			case "enter":
+				m.searching = false
+				m.searchBox.Blur()
+				m.cursor = 0
+				return m, nil
+			default:
+				var cmd tea.Cmd
+				m.searchBox, cmd = m.searchBox.Update(msg)
+				m.applyFilter(true)
+				return m, cmd
+			}
+		}
 		switch msg.String() {
-		case "ctrl+c", "q", "esc":
-			if m.preview && msg.String() == "esc" {
+		case "ctrl+c", "q":
+			return m, tea.Quit
+		case "esc":
+			if m.preview {
 				m.preview = false
 				return m, nil
 			}
+			if m.searchBox.Value() != "" {
+				m.searchBox.SetValue("")
+				m.applyFilter(true)
+				return m, nil
+			}
 			return m, tea.Quit
+		case "/":
+			if !m.preview {
+				if m.allRows == nil {
+					m.allRows = append([]row(nil), m.rows...)
+				}
+				m.searching = true
+				m.searchBox.Focus()
+				return m, textinput.Blink
+			}
 		case "j", "down":
 			if !m.preview && m.cursor < m.itemCount()-1 {
 				m.cursor++
@@ -213,10 +276,12 @@ func sortRows(rows []row) {
 
 func rowFromFeature(f *featurelist.Feature) row {
 	if f.LoadError != nil || f.State == nil {
+		ticket := filepath.Base(f.FeatureDir)
 		return row{
-			ticket:  filepath.Base(f.FeatureDir),
+			ticket:  ticket,
 			status:  "error",
 			loadErr: f.LoadError,
+			search:  []string{ticket, f.FeatureDir, "error"},
 		}
 	}
 	s := f.State
@@ -226,6 +291,13 @@ func rowFromFeature(f *featurelist.Feature) row {
 	}
 	if worker == "" {
 		worker = s.Stage.Worker
+	}
+	searchFields := []string{
+		s.Ticket, s.Slug, s.Status, s.Workflow, s.Stage.Name, s.Stage.Worker,
+		f.Workflow, f.WorkerID, f.WorkerName, f.Engine, f.Attention,
+	}
+	for name, repo := range s.Repos {
+		searchFields = append(searchFields, name, repo.Main, repo.Worktree, repo.Branch)
 	}
 	return row{
 		ticket:    s.Ticket,
@@ -240,6 +312,7 @@ func rowFromFeature(f *featurelist.Feature) row {
 		attention: f.Attention,
 		history:   historyRows(s.History),
 		archived:  f.Archived,
+		search:    searchFields,
 	}
 }
 
@@ -430,6 +503,23 @@ func (m *Model) refreshPreview() {
 
 func (m Model) itemCount() int {
 	return len(m.rows)
+}
+
+func (m *Model) applyFilter(resetCursor bool) {
+	if m.allRows == nil {
+		return
+	}
+	query := m.searchBox.Value()
+	rows := make([]row, 0, len(m.allRows))
+	for _, candidate := range m.allRows {
+		if searchmatch.Match(query, candidate.search...) {
+			rows = append(rows, candidate)
+		}
+	}
+	m.rows = rows
+	if resetCursor {
+		m.cursor = 0
+	}
 }
 
 func (m Model) selectedWork() (row, bool) {

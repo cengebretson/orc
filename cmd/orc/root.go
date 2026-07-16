@@ -154,9 +154,9 @@ var (
 )
 
 var sessionsResumeCmd = &cobra.Command{
-	Use:   "resume <provider-session-id>",
+	Use:   "resume [provider-session-id]",
 	Short: "Resume a discovered Claude or Codex session in the foreground",
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.MaximumNArgs(1),
 	RunE:  runSessionResume,
 }
 
