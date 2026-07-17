@@ -82,12 +82,14 @@ func TestSetSessionEnvironmentRejectsUnsafeName(t *testing.T) {
 
 func TestBuildWatchCommandQuotesArguments(t *testing.T) {
 	cmd := buildWatchCommand(WatchToggleOptions{
-		ExecPath: "/tmp/orc bin/orc",
-		Root:     "/tmp/work space",
-		Ticket:   "PROJ-123",
-		Interval: "2s",
-		Wide:     true,
-		View:     "pet",
+		ExecPath:  "/tmp/orc bin/orc",
+		Root:      "/tmp/work space",
+		Ticket:    "PROJ-123",
+		Interval:  "2s",
+		Wide:      true,
+		View:      "pet",
+		PetSize:   "micro",
+		PetLayout: "column",
 	})
 
 	for _, want := range []string{
@@ -97,6 +99,8 @@ func TestBuildWatchCommandQuotesArguments(t *testing.T) {
 		"--interval 2s",
 		"--wide",
 		"--view pet",
+		"--pet-size micro",
+		"--pet-layout column",
 	} {
 		if !strings.Contains(cmd, want) {
 			t.Fatalf("buildWatchCommand() missing %q in %q", want, cmd)
@@ -104,6 +108,20 @@ func TestBuildWatchCommandQuotesArguments(t *testing.T) {
 	}
 	if strings.Contains(cmd, "--tmux-toggle") {
 		t.Fatalf("buildWatchCommand() must not recurse with --tmux-toggle: %q", cmd)
+	}
+}
+
+func TestBuildWatchCommandOmitsDefaultPetOptions(t *testing.T) {
+	cmd := buildWatchCommand(WatchToggleOptions{
+		ExecPath:  "orc",
+		View:      "rail",
+		PetSize:   "normal",
+		PetLayout: "responsive",
+	})
+	for _, flag := range []string{"--view", "--pet-size", "--pet-layout", "--tmux-toggle"} {
+		if strings.Contains(cmd, flag) {
+			t.Fatalf("buildWatchCommand() included default-only flag %q in %q", flag, cmd)
+		}
 	}
 }
 

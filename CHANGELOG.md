@@ -9,9 +9,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - A toggleable `orc watch` Tamagotchi view with animated little orcs, responsive
-  pet cards, deterministic identity, attention and context-pressure moods, and
-  the same filtering, preview, attach, focus, and refresh controls as the
-  default rail.
+  pet cards with a focus-only outline, optional three-row micro sprites and
+  vertical-column layout, deterministic identity, attention and
+  context-pressure moods, and the same filtering, preview, attach, focus, and
+  refresh controls as the default rail.
 
 ## [0.10.1] - 2026-07-17
 

@@ -301,6 +301,8 @@ var (
 	watchInterval   string
 	watchWide       bool
 	watchView       string
+	watchPetSize    string
+	watchPetLayout  string
 	watchTmuxToggle bool
 	watchTmuxLayout string
 	watchTmuxSize   string
@@ -398,6 +400,8 @@ func init() {
 	watchCmd.Flags().StringVar(&watchInterval, "interval", "5s", "Refresh interval")
 	watchCmd.Flags().BoolVar(&watchWide, "wide", false, "Render the wider table layout")
 	watchCmd.Flags().StringVar(&watchView, "view", "rail", "Initial watch view: rail or pet")
+	watchCmd.Flags().StringVar(&watchPetSize, "pet-size", "normal", "Initial pet sprite size: normal or micro")
+	watchCmd.Flags().StringVar(&watchPetLayout, "pet-layout", "responsive", "Initial pet card layout: responsive or column")
 	watchCmd.Flags().BoolVar(&watchTmuxToggle, "tmux-toggle", false, "Toggle a narrow watch pane in the current tmux window")
 	watchCmd.Flags().StringVar(&watchTmuxLayout, "tmux-layout", "right", "Tmux toggle split layout: right or bottom")
 	watchCmd.Flags().StringVar(&watchTmuxSize, "tmux-size", "32", "Tmux toggle pane size, e.g. 32 or 25%")

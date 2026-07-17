@@ -35,10 +35,12 @@ type attachDoneMsg struct {
 }
 
 type Options struct {
-	Ticket   string
-	Interval time.Duration
-	Wide     bool
-	Mode     Mode
+	Ticket    string
+	Interval  time.Duration
+	Wide      bool
+	Mode      Mode
+	PetSize   PetSize
+	PetLayout PetLayout
 }
 
 type row struct {
@@ -89,6 +91,8 @@ type Model struct {
 	message    string
 	petFrame   int
 	petTicking bool
+	petSize    PetSize
+	petLayout  PetLayout
 
 	preview   bool
 	viewport  viewport.Model
@@ -105,6 +109,14 @@ func Run(root string, opts Options) error {
 	if err != nil {
 		return err
 	}
+	petSize, err := ParsePetSize(string(opts.PetSize))
+	if err != nil {
+		return err
+	}
+	petLayout, err := ParsePetLayout(string(opts.PetLayout))
+	if err != nil {
+		return err
+	}
 	searchBox := textinput.New()
 	searchBox.Placeholder = "filter sessions..."
 	searchBox.Prompt = "/ "
@@ -115,6 +127,8 @@ func Run(root string, opts Options) error {
 		interval:   interval,
 		wide:       opts.Wide,
 		mode:       mode,
+		petSize:    petSize,
+		petLayout:  petLayout,
 		petTicking: mode == ModePet,
 		searchBox:  searchBox,
 	}
@@ -236,6 +250,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if !m.petTicking {
 				m.petTicking = true
 				return m, petTick()
+			}
+			return m, nil
+		case "s":
+			if m.preview || m.mode != ModePet {
+				return m, nil
+			}
+			if normalizePetSize(m.petSize) == PetSizeMicro {
+				m.petSize = PetSizeNormal
+			} else {
+				m.petSize = PetSizeMicro
+			}
+			return m, nil
+		case "l":
+			if m.preview || m.mode != ModePet {
+				return m, nil
+			}
+			if normalizePetLayout(m.petLayout) == PetLayoutColumn {
+				m.petLayout = PetLayoutResponsive
+			} else {
+				m.petLayout = PetLayoutColumn
 			}
 			return m, nil
 		case "j", "down":

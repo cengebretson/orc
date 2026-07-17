@@ -442,14 +442,16 @@ func AttachHint(session, window string) string {
 }
 
 type WatchToggleOptions struct {
-	Root     string
-	Ticket   string
-	Interval string
-	Wide     bool
-	View     string
-	Layout   string
-	Size     string
-	ExecPath string
+	Root      string
+	Ticket    string
+	Interval  string
+	Wide      bool
+	View      string
+	PetSize   string
+	PetLayout string
+	Layout    string
+	Size      string
+	ExecPath  string
 }
 
 // ToggleWatchPane closes an existing watch pane in the current tmux window, or
@@ -548,6 +550,12 @@ func buildWatchCommand(opts WatchToggleOptions) string {
 	}
 	if opts.View != "" && opts.View != "rail" {
 		argv = append(argv, "--view", opts.View)
+	}
+	if opts.PetSize != "" && opts.PetSize != "normal" {
+		argv = append(argv, "--pet-size", opts.PetSize)
+	}
+	if opts.PetLayout != "" && opts.PetLayout != "responsive" {
+		argv = append(argv, "--pet-layout", opts.PetLayout)
 	}
 	return shellJoin(argv)
 }

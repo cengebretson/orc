@@ -25,6 +25,62 @@ const (
 	ModePet  Mode = "pet"
 )
 
+// PetSize selects the creature sprite density without changing card metadata.
+type PetSize string
+
+const (
+	PetSizeNormal PetSize = "normal"
+	PetSizeMicro  PetSize = "micro"
+)
+
+// ParsePetSize validates a pet sprite size.
+func ParsePetSize(value string) (PetSize, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", string(PetSizeNormal):
+		return PetSizeNormal, nil
+	case string(PetSizeMicro):
+		return PetSizeMicro, nil
+	default:
+		return "", fmt.Errorf("unsupported pet size %q (use normal or micro)", value)
+	}
+}
+
+// PetLayout controls whether pet cards respond to terminal width or stay in a
+// single vertical column.
+type PetLayout string
+
+const (
+	PetLayoutResponsive PetLayout = "responsive"
+	PetLayoutColumn     PetLayout = "column"
+)
+
+// ParsePetLayout validates a pet card layout. Vertical is accepted as a
+// readable alias for the canonical column value.
+func ParsePetLayout(value string) (PetLayout, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", string(PetLayoutResponsive):
+		return PetLayoutResponsive, nil
+	case string(PetLayoutColumn), "vertical":
+		return PetLayoutColumn, nil
+	default:
+		return "", fmt.Errorf("unsupported pet layout %q (use responsive or column)", value)
+	}
+}
+
+func normalizePetSize(size PetSize) PetSize {
+	if size == PetSizeMicro {
+		return PetSizeMicro
+	}
+	return PetSizeNormal
+}
+
+func normalizePetLayout(layout PetLayout) PetLayout {
+	if layout == PetLayoutColumn {
+		return PetLayoutColumn
+	}
+	return PetLayoutResponsive
+}
+
 // ParseMode validates a watch presentation name.
 func ParseMode(value string) (Mode, error) {
 	switch strings.ToLower(strings.TrimSpace(value)) {
@@ -158,44 +214,79 @@ func petAccent(r row, selected bool) lipgloss.Color {
 
 var petFrameSets = map[petState][][]string{
 	petEgg: {
-		{"           ", "    ▄▄     ", "  ▄████▄   ", " ████████  ", " ████████  ", "  ▀████▀   ", "    ▀▀     "},
-		{"           ", "     ▄▄    ", "   ▄████▄  ", "  ███▀████ ", "  ████████ ", "   ▀████▀  ", "     ▀▀    "},
+		{"    ▄▄     ", "  ▄████▄   ", " ████████  ", "  ▀████▀   ", "    ▀▀     "},
+		{"     ▄▄    ", "   ▄████▄  ", "  ███▀████ ", "   ▀████▀  ", "     ▀▀    "},
 	},
 	petWorking: {
-		{" ⚒         ✦ ", " ◢▄       ▄◣ ", "▟███████████▙", "█   ◕   ◕   █", "█   ▴ ▿ ▴   █", "▀█▄       ▄█▀", "  ▀███▀███▀  "},
-		{"   ✦         ", "  ◢▄       ▄◣", " ▟███████████▙", " █   ◕   ◕   █", " █   ▴ ▿ ▴   █", " ▀█▄       ▄█▀", "   ▀██▀ ▀██▀  "},
+		{"⚒ ◢▄   ▄◣ ✦", "▟█████████▙", "█  ◕   ◕  █", "█  ▴ ▿ ▴  █", " ▀█▀   ▀█▀ "},
+		{"✦ ◢▄   ▄◣ ⚒", "▟█████████▙", "█  ◕   ◕  █", "█  ▴ ▿ ▴  █", "  ▀█▀ ▀█▀  "},
 	},
 	petIdle: {
-		{"          zZ  ", " ◢▄       ▄◣ ", "▟███████████▙", "█   ─   ─   █", "█   ▴ ─ ▴   █", "▀█▄       ▄█▀", "  ▀███▀███▀  "},
+		{"zZ ◢▄   ▄◣  ", "▟█████████▙", "█  ─   ─  █", "█  ▴ ─ ▴  █", " ▀█▀   ▀█▀ "},
 	},
 	petInput: {
-		{"    ! ! !    ", " ◢▄       ▄◣ ", "▟███████████▙", "█   ◉   ◉   █", "█   ▴ △ ▴   █", "▀█▄       ▄█▀", "  ▀███▀███▀  "},
-		{"     !!!     ", "◢▄           ▄◣", "▟███████████▙", "█   ◉   ◉   █", "█   ▴ △ ▴   █", "▀█▄       ▄█▀", " ▀██▀     ▀██▀"},
+		{"!! ◢▄   ▄◣ !", "▟█████████▙", "█  ◉   ◉  █", "█  ▴ △ ▴  █", " ▀█▀   ▀█▀ "},
+		{"!  ◢▄   ▄◣!!", "▟█████████▙", "█  ◉   ◉  █", "█  ▴ △ ▴  █", "  ▀█▀ ▀█▀  "},
 	},
 	petBlocked: {
-		{"    . . .    ", " ◢▄       ▄◣ ", "▟███████████▙", "█   ×   ×   █", "█   ▴ ─ ▴   █", "▀█▄       ▄█▀", "  ▀███▀███▀  "},
+		{".. ◢▄   ▄◣ .", "▟█████████▙", "█  ×   ×  █", "█  ▴ ─ ▴  █", " ▀█▀   ▀█▀ "},
 	},
 	petOffline: {
-		{"             ", "  ◢▄     ▄◣  ", " ▟█████████▙ ", " █   · ·   █ ", " █  ▴ ─ ▴  █ ", "  ▀███████▀  ", "    ·   ·    "},
+		{"  ◢▄   ▄◣  ", " ▟███████▙ ", " █  · ·  █ ", " █ ▴ ─ ▴ █ ", "  ▀█▀ ▀█▀  "},
 	},
 	petDone: {
-		{" ✦    ⚔    ✦ ", " ◢▄       ▄◣ ", "▟███████████▙", "█   ^   ^   █", "█   ▴ ▿ ▴   █", "▀█▄       ▄█▀", " ▀██▀     ▀██▀"},
-		{"    ✦ ✦     ", "  ◢▄       ▄◣", " ▟███████████▙", " █   ^   ^   █", " █   ▴ ▿ ▴   █", " ▀█▄       ▄█▀", "   ▀███▀███▀  "},
+		{"✦ ◢▄ ⚔ ▄◣ ✦", "▟█████████▙", "█  ^   ^  █", "█  ▴ ▿ ▴  █", " ▀█▀   ▀█▀ "},
+		{"  ◢▄ ✦ ▄◣  ", "▟█████████▙", "█  ^   ^  █", "█  ▴ ▿ ▴  █", "  ▀█▀ ▀█▀  "},
 	},
 	petError: {
-		{"      +      ", " ◢▄       ▄◣ ", "▟███████████▙", "█   x   x   █", "█   ▴ ~ ▴   █", "▀█▄       ▄█▀", "  ▀███▀███▀  "},
+		{"+  ◢▄   ▄◣ +", "▟█████████▙", "█  x   x  █", "█  ▴ ~ ▴  █", " ▀█▀   ▀█▀ "},
 	},
 }
 
-func petFrames(state petState) [][]string {
-	if frames := petFrameSets[state]; len(frames) > 0 {
-		return frames
-	}
-	return petFrameSets[petError]
+var microPetFrameSets = map[petState][][]string{
+	petEgg: {
+		{"   ▄▄    ", " ▄████▄  ", "  ▀██▀   "},
+		{"    ▄▄   ", "  ▄████▄ ", "   ▀██▀  "},
+	},
+	petWorking: {
+		{"⚒◢▄   ▄◣✦", "█  ◕▿◕  █", " ▀█   █▀ "},
+		{"✦◢▄   ▄◣⚒", "█  ◕▿◕  █", "  ▀█ █▀  "},
+	},
+	petIdle: {
+		{"z◢▄   ▄◣Z", "█  ── ─  █", " ▀█   █▀ "},
+	},
+	petInput: {
+		{"!◢▄   ▄◣!", "█  ◉△◉  █", " ▀█   █▀ "},
+		{"!!◢▄ ▄◣!!", "█  ◉△◉  █", "  ▀█ █▀  "},
+	},
+	petBlocked: {
+		{".◢▄   ▄◣.", "█  ×─×  █", " ▀█   █▀ "},
+	},
+	petOffline: {
+		{" ◢▄   ▄◣ ", "█  ·─·  █", "  ▀█ █▀  "},
+	},
+	petDone: {
+		{"✦◢▄ ⚔ ▄◣✦", "█  ^▿^  █", " ▀█   █▀ "},
+		{" ◢▄ ✦ ▄◣ ", "█  ^▿^  █", "  ▀█ █▀  "},
+	},
+	petError: {
+		{"+◢▄   ▄◣+", "█  x~x  █", " ▀█   █▀ "},
+	},
 }
 
-func renderPetSprite(r row, frame int, width int) string {
-	frames := petFrames(petStateFor(r))
+func petFrames(state petState, size PetSize) [][]string {
+	frameSets := petFrameSets
+	if normalizePetSize(size) == PetSizeMicro {
+		frameSets = microPetFrameSets
+	}
+	if frames := frameSets[state]; len(frames) > 0 {
+		return frames
+	}
+	return frameSets[petError]
+}
+
+func renderPetSprite(r row, frame int, width int, size PetSize) string {
+	frames := petFrames(petStateFor(r), size)
 	phase := int(petHash(r) % uint32(len(frames)))
 	sprite := strings.Join(frames[(frame+phase)%len(frames)], "\n")
 	return lipgloss.NewStyle().
@@ -225,7 +316,7 @@ func renderPetContext(r row, width int) string {
 	return mutedStyle.Render("ctx ") + style.Render(bar+" "+r.context.Label())
 }
 
-func renderPetCard(r row, selected bool, width, frame int) string {
+func renderPetCard(r row, selected bool, width, frame int, size PetSize) string {
 	contentWidth := max(16, width-4)
 	// lipgloss Width includes the card's horizontal padding, so reserve those
 	// cells before truncating styled metadata to keep narrow cards single-line.
@@ -243,7 +334,7 @@ func renderPetCard(r row, selected bool, width, frame int) string {
 
 	lines := []string{
 		mutedStyle.Render(truncatePet("⌂ "+room, lineWidth)),
-		renderPetSprite(r, frame, contentWidth),
+		renderPetSprite(r, frame, contentWidth, size),
 		selectedStyle.Render(truncatePet(name, lineWidth)),
 		stateStyleForPet(r).Render(truncatePet(petStateLabel(r), lineWidth)),
 	}
@@ -255,10 +346,14 @@ func renderPetCard(r row, selected bool, width, frame int) string {
 	}
 	lines = append(lines, renderPetContext(r, contentWidth))
 
+	border := lipgloss.HiddenBorder()
+	if selected {
+		border = lipgloss.RoundedBorder()
+	}
 	style := lipgloss.NewStyle().
 		Width(contentWidth).
 		Padding(0, 1).
-		Border(lipgloss.RoundedBorder()).
+		Border(border).
 		BorderForeground(petAccent(r, selected))
 	if selected {
 		style = style.Bold(true)
@@ -286,6 +381,8 @@ func stateStyleForPet(r row) lipgloss.Style {
 func (m Model) renderPets() string {
 	width := max(24, m.width)
 	height := m.height
+	size := normalizePetSize(m.petSize)
+	layout := normalizePetLayout(m.petLayout)
 	if height <= 0 {
 		height = 24
 	}
@@ -293,6 +390,16 @@ func (m Model) renderPets() string {
 	b.WriteString(titleStyle.Render("ORC PETS"))
 	if m.ticket != "" {
 		b.WriteString(" " + selectedStyle.Render(m.ticket))
+	}
+	var modes []string
+	if size != PetSizeNormal {
+		modes = append(modes, string(size))
+	}
+	if layout != PetLayoutResponsive {
+		modes = append(modes, string(layout))
+	}
+	if len(modes) > 0 {
+		b.WriteString(mutedStyle.Render("  " + strings.Join(modes, " · ")))
 	}
 	if !m.lastLoad.IsZero() {
 		b.WriteString(mutedStyle.Render("  " + m.lastLoad.Format("15:04:05")))
@@ -308,22 +415,27 @@ func (m Model) renderPets() string {
 	}
 	if len(m.rows) == 0 {
 		b.WriteString("\n" + mutedStyle.Render("No creatures are awake."))
-		b.WriteString("\n\n" + mutedStyle.Render("v rail  / filter  r refresh  q quit"))
+		b.WriteString("\n\n" + mutedStyle.Render("v rail  s size  l layout  / filter  r refresh  q quit"))
 		return b.String()
 	}
 
-	cols := 1
-	if width >= 72 {
-		cols = 2
+	const (
+		minCardWidth = 28
+		maxColumns   = 4
+		gap          = 1
+	)
+	cols := min(maxColumns, max(1, (width+gap)/(minCardWidth+gap)))
+	if layout == PetLayoutColumn {
+		cols = 1
 	}
-	if width >= 120 {
-		cols = 3
-	}
-	gap := 2
 	cardWidth := max(20, (width-gap*(cols-1))/cols)
+	cardHeight := 13
+	if size == PetSizeMicro {
+		cardHeight = 11
+	}
 	rowsPerPage := 1
-	if width >= 56 {
-		rowsPerPage = max(1, (height-6)/13)
+	if width >= 56 || layout == PetLayoutColumn {
+		rowsPerPage = max(1, (height-6)/cardHeight)
 	}
 	perPage := max(1, cols*rowsPerPage)
 	page := m.cursor / perPage
@@ -337,7 +449,7 @@ func (m Model) renderPets() string {
 			if len(cards) > 0 {
 				cards = append(cards, strings.Repeat(" ", gap))
 			}
-			cards = append(cards, renderPetCard(m.rows[j], j == m.cursor, cardWidth, m.petFrame))
+			cards = append(cards, renderPetCard(m.rows[j], j == m.cursor, cardWidth, m.petFrame, size))
 		}
 		gridRows = append(gridRows, lipgloss.JoinHorizontal(lipgloss.Top, cards...))
 	}
@@ -349,7 +461,7 @@ func (m Model) renderPets() string {
 		b.WriteString("\n")
 	}
 	pageCount := (len(m.rows) + perPage - 1) / perPage
-	footer := "v rail  / filter  j/k move  enter preview  a attach  i focus  q quit"
+	footer := "v rail  s size  l layout  / filter  j/k move  enter preview  a attach  i focus  q quit"
 	if pageCount > 1 {
 		footer += fmt.Sprintf("  page %d/%d", page+1, pageCount)
 	}
