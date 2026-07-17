@@ -6,6 +6,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Replaced the monochrome ASCII little-orc sprites in `orc watch --view pet`
+  with true-color half-block pixel art (flared ears, tusks, a mohawk tuft),
+  rendered two pixel rows per terminal line so every mood reads distinctly at
+  a glance; per-agent identity color still rides the same deterministic hash
+  as before. Celebrating throws its arms overhead on the animation tick, and
+  needs-input shows a "?" above its head instead of relying on brow flecks
+  alone.
+
+### Removed
+
+- Removed the three-row micro pet sprite size (`s` key, `--pet-size` flag)
+  from `orc watch --view pet`. A detailed pixel-art creature doesn't hold up
+  at that resolution; there is now a single sprite size.
+
 ## [0.11.0] - 2026-07-17
 
 ### Added

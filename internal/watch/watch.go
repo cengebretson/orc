@@ -39,7 +39,6 @@ type Options struct {
 	Interval  time.Duration
 	Wide      bool
 	Mode      Mode
-	PetSize   PetSize
 	PetLayout PetLayout
 }
 
@@ -91,7 +90,6 @@ type Model struct {
 	message    string
 	petFrame   int
 	petTicking bool
-	petSize    PetSize
 	petLayout  PetLayout
 
 	preview   bool
@@ -109,10 +107,6 @@ func Run(root string, opts Options) error {
 	if err != nil {
 		return err
 	}
-	petSize, err := ParsePetSize(string(opts.PetSize))
-	if err != nil {
-		return err
-	}
 	petLayout, err := ParsePetLayout(string(opts.PetLayout))
 	if err != nil {
 		return err
@@ -127,7 +121,6 @@ func Run(root string, opts Options) error {
 		interval:   interval,
 		wide:       opts.Wide,
 		mode:       mode,
-		petSize:    petSize,
 		petLayout:  petLayout,
 		petTicking: mode == ModePet,
 		searchBox:  searchBox,
@@ -250,16 +243,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if !m.petTicking {
 				m.petTicking = true
 				return m, petTick()
-			}
-			return m, nil
-		case "s":
-			if m.preview || m.mode != ModePet {
-				return m, nil
-			}
-			if normalizePetSize(m.petSize) == PetSizeMicro {
-				m.petSize = PetSizeNormal
-			} else {
-				m.petSize = PetSizeMicro
 			}
 			return m, nil
 		case "l":

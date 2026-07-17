@@ -22,10 +22,6 @@ func runWatch(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	petSize, err := watch.ParsePetSize(watchPetSize)
-	if err != nil {
-		return err
-	}
 	petLayout, err := watch.ParsePetLayout(watchPetLayout)
 	if err != nil {
 		return err
@@ -38,7 +34,6 @@ func runWatch(cmd *cobra.Command, args []string) error {
 			Interval:  watchInterval,
 			Wide:      watchWide,
 			View:      string(mode),
-			PetSize:   string(petSize),
 			PetLayout: string(petLayout),
 			Layout:    watchTmuxLayout,
 			Size:      watchTmuxSize,
@@ -55,7 +50,6 @@ func runWatch(cmd *cobra.Command, args []string) error {
 		Interval:  interval,
 		Wide:      watchWide,
 		Mode:      mode,
-		PetSize:   petSize,
 		PetLayout: petLayout,
 	})
 }

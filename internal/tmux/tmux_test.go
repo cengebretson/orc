@@ -88,7 +88,6 @@ func TestBuildWatchCommandQuotesArguments(t *testing.T) {
 		Interval:  "2s",
 		Wide:      true,
 		View:      "pet",
-		PetSize:   "micro",
 		PetLayout: "column",
 	})
 
@@ -99,7 +98,6 @@ func TestBuildWatchCommandQuotesArguments(t *testing.T) {
 		"--interval 2s",
 		"--wide",
 		"--view pet",
-		"--pet-size micro",
 		"--pet-layout column",
 	} {
 		if !strings.Contains(cmd, want) {
@@ -115,10 +113,9 @@ func TestBuildWatchCommandOmitsDefaultPetOptions(t *testing.T) {
 	cmd := buildWatchCommand(WatchToggleOptions{
 		ExecPath:  "orc",
 		View:      "rail",
-		PetSize:   "normal",
 		PetLayout: "responsive",
 	})
-	for _, flag := range []string{"--view", "--pet-size", "--pet-layout", "--tmux-toggle"} {
+	for _, flag := range []string{"--view", "--pet-layout", "--tmux-toggle"} {
 		if strings.Contains(cmd, flag) {
 			t.Fatalf("buildWatchCommand() included default-only flag %q in %q", flag, cmd)
 		}

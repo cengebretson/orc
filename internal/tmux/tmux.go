@@ -447,7 +447,6 @@ type WatchToggleOptions struct {
 	Interval  string
 	Wide      bool
 	View      string
-	PetSize   string
 	PetLayout string
 	Layout    string
 	Size      string
@@ -550,9 +549,6 @@ func buildWatchCommand(opts WatchToggleOptions) string {
 	}
 	if opts.View != "" && opts.View != "rail" {
 		argv = append(argv, "--view", opts.View)
-	}
-	if opts.PetSize != "" && opts.PetSize != "normal" {
-		argv = append(argv, "--pet-size", opts.PetSize)
 	}
 	if opts.PetLayout != "" && opts.PetLayout != "responsive" {
 		argv = append(argv, "--pet-layout", opts.PetLayout)

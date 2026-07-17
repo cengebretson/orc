@@ -29,20 +29,6 @@ func TestParseMode(t *testing.T) {
 }
 
 func TestParsePetPresentationOptions(t *testing.T) {
-	for input, want := range map[string]PetSize{
-		"":       PetSizeNormal,
-		"normal": PetSizeNormal,
-		"MICRO":  PetSizeMicro,
-	} {
-		got, err := ParsePetSize(input)
-		if err != nil || got != want {
-			t.Fatalf("ParsePetSize(%q) = %q, %v; want %q", input, got, err, want)
-		}
-	}
-	if _, err := ParsePetSize("tiny"); err == nil {
-		t.Fatal("ParsePetSize(tiny) should fail")
-	}
-
 	for input, want := range map[string]PetLayout{
 		"":           PetLayoutResponsive,
 		"responsive": PetLayoutResponsive,
@@ -132,27 +118,20 @@ func TestWatchTogglesPetViewWithoutChangingPreview(t *testing.T) {
 	}
 }
 
-func TestWatchTogglesPetSizeAndLayout(t *testing.T) {
+func TestWatchTogglesPetLayout(t *testing.T) {
 	m := Model{mode: ModePet, width: 100, height: 24}
 
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
-	m = watchModel(t, updated)
-	if m.petSize != PetSizeMicro {
-		t.Fatalf("s toggle size = %q, want micro", m.petSize)
-	}
-	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'l'}})
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'l'}})
 	m = watchModel(t, updated)
 	if m.petLayout != PetLayoutColumn {
 		t.Fatalf("l toggle layout = %q, want column", m.petLayout)
 	}
 
 	m.preview = true
-	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
-	m = watchModel(t, updated)
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'l'}})
 	m = watchModel(t, updated)
-	if m.petSize != PetSizeMicro || m.petLayout != PetLayoutColumn {
-		t.Fatalf("preview toggles should be inert, size=%q layout=%q", m.petSize, m.petLayout)
+	if m.petLayout != PetLayoutColumn {
+		t.Fatalf("preview toggle should be inert, layout=%q", m.petLayout)
 	}
 }
 
@@ -168,7 +147,7 @@ func TestRenderPetsNarrowShowsSelectedLittleOrc(t *testing.T) {
 		},
 	}
 	view := m.renderPets()
-	for _, want := range []string{"ORC PETS", "ORC-TWO", "needs input", "◢", "▴", "v rail"} {
+	for _, want := range []string{"ORC PETS", "ORC-TWO", "needs input", "▀", "v rail"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("renderPets() missing %q:\n%s", want, view)
 		}
@@ -253,13 +232,12 @@ func TestRenderPetsWideFitsThreeLittleOrcs(t *testing.T) {
 	}
 }
 
-func TestRenderPetsMicroColumnUsesVerticalSpace(t *testing.T) {
+func TestRenderPetsColumnLayoutUsesVerticalSpace(t *testing.T) {
 	m := Model{
 		mode:      ModePet,
-		petSize:   PetSizeMicro,
 		petLayout: PetLayoutColumn,
 		width:     100,
-		height:    50,
+		height:    60,
 		rows: []row{
 			{ticket: "ORC-ONE", status: "active", tmuxState: "live"},
 			{ticket: "ORC-TWO", status: "active", tmuxState: "live"},
@@ -268,38 +246,40 @@ func TestRenderPetsMicroColumnUsesVerticalSpace(t *testing.T) {
 		},
 	}
 	view := m.renderPets()
-	for _, want := range []string{"micro · column", "ORC-ONE", "ORC-TWO", "ORC-THREE", "ORC-FOUR", "s size", "l layout"} {
+	for _, want := range []string{"column", "ORC-ONE", "ORC-TWO", "ORC-THREE", "ORC-FOUR", "l layout"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("renderPets() missing %q:\n%s", want, view)
 		}
 	}
 	if strings.Contains(view, "page 1/") {
-		t.Fatalf("50-row micro column should fit four little orcs without paging:\n%s", view)
+		t.Fatalf("60-row column layout should fit four little orcs without paging:\n%s", view)
 	}
 	if got := lipgloss.Width(view); got > m.width {
-		t.Fatalf("micro column width = %d; want <= %d:\n%s", got, m.width, view)
+		t.Fatalf("column layout width = %d; want <= %d:\n%s", got, m.width, view)
 	}
 }
 
 func TestPetFramesStayCompact(t *testing.T) {
-	tests := []struct {
-		name      string
-		frameSets map[petState][][]string
-		height    int
-	}{
-		{name: "normal", frameSets: petFrameSets, height: 5},
-		{name: "micro", frameSets: microPetFrameSets, height: 3},
-	}
-	for _, tt := range tests {
-		for state, frames := range tt.frameSets {
-			for frameIndex, frame := range frames {
-				if len(frame) != tt.height {
-					t.Errorf("%s %s frame %d height = %d; want %d", tt.name, state, frameIndex, len(frame), tt.height)
-				}
-				for lineIndex, line := range frame {
-					if width := lipgloss.Width(line); width > 13 {
-						t.Errorf("%s %s frame %d line %d width = %d; want <= 13", tt.name, state, frameIndex, lineIndex, width)
-					}
+	// Input gets two extra rows so its "?" cue has room to read clearly above
+	// the head — the most visually aggressive mood is allowed to be the
+	// tallest card in the grid.
+	heightByState := map[petState]int{petInput: 6}
+	const defaultHeight = 5
+	hue := petHues[0]
+	for state, frames := range petPixelFrames {
+		wantHeight := defaultHeight
+		if override, ok := heightByState[state]; ok {
+			wantHeight = override
+		}
+		for frameIndex, grid := range frames {
+			rendered := renderPixelSprite(grid, hue)
+			lines := strings.Split(rendered, "\n")
+			if len(lines) != wantHeight {
+				t.Errorf("%s frame %d height = %d; want %d", state, frameIndex, len(lines), wantHeight)
+			}
+			for lineIndex, line := range lines {
+				if width := lipgloss.Width(line); width > 13 {
+					t.Errorf("%s frame %d line %d width = %d; want <= 13", state, frameIndex, lineIndex, width)
 				}
 			}
 		}
@@ -308,11 +288,11 @@ func TestPetFramesStayCompact(t *testing.T) {
 
 func TestPetAnimationIsDeterministicByState(t *testing.T) {
 	working := row{ticket: "ORC-ONE", status: "active", tmuxState: "live", liveState: "working"}
-	if renderPetSprite(working, 0, 20, PetSizeNormal) == renderPetSprite(working, 1, 20, PetSizeNormal) {
+	if renderPetSprite(working, 0, 20) == renderPetSprite(working, 1, 20) {
 		t.Fatal("working orc should animate between frames")
 	}
 	idle := row{ticket: "ORC-TWO", status: "active", tmuxState: "live", liveState: "idle"}
-	if renderPetSprite(idle, 0, 20, PetSizeMicro) != renderPetSprite(idle, 1, 20, PetSizeMicro) {
+	if renderPetSprite(idle, 0, 20) != renderPetSprite(idle, 1, 20) {
 		t.Fatal("sleeping orc should remain still")
 	}
 }

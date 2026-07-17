@@ -27,7 +27,6 @@ orc watch PROJ-123
 orc watch --interval 2s
 orc watch --wide
 orc watch --view pet
-orc watch --view pet --pet-size micro
 orc watch --view pet --pet-layout column
 orc watch --tmux-toggle
 orc watch --view pet --tmux-toggle
@@ -42,10 +41,9 @@ column in the session list rather than as a separate list. Pressing `enter`
 opens the selected story details page in both compact and wide layouts, including
 recent story history. Pressing `v` toggles the same rows and controls into an
 animated little-orc pet view; `--view pet` starts there directly. In pet mode,
-`s` toggles the five-row and three-row sprites, while `l` toggles the responsive
-grid and a vertical column. The matching startup flags are `--pet-size micro`
-and `--pet-layout column`. `--tmux-toggle` is a helper for tmux keybindings. By
-default it opens a 32-column right-side pane; `--tmux-layout bottom` and
+`l` toggles the responsive grid and a vertical column; the matching startup
+flag is `--pet-layout column`. `--tmux-toggle` is a helper for tmux keybindings.
+By default it opens a 32-column right-side pane; `--tmux-layout bottom` and
 `--tmux-size <size>` can override the split.
 
 See [Tmux integration](tmux.md) for copyable watch popup and split bindings,
@@ -66,9 +64,8 @@ Each ticket gets a deterministic green or teal little orc. Pointed ears, tusks,
 skin tone, and animation phase make the creature recognizable across refreshes.
 The compact grid automatically fits one to four pets per row as the terminal
 widens; a 100-column view fits three without dropping status or context details.
-Micro size reduces the creature to three rows so tall panes can show more cards.
-Column layout forces one card per row, including in wide panes. Both settings
-are presentation-only and can be toggled without restarting watch.
+Column layout forces one card per row, including in wide panes; it is
+presentation-only and can be toggled without restarting watch.
 Only the selected pet draws a rounded border; unselected cards retain the same
 footprint so the grid does not jump as focus moves.
 The visual state comes from Orc's existing durable and live signals:
@@ -279,7 +276,6 @@ Keybindings:
 | `i` | attach to the next live session that needs attention |
 | `n` | toggle the selected prompt preview |
 | `v` | toggle the rail and little-orc pet view |
-| `s` | toggle normal and micro pet sprites (pet view only) |
 | `l` | toggle responsive and column pet layouts (pet view only) |
 | `r` | refresh immediately |
 | `q` | quit watch pane |
@@ -474,11 +470,16 @@ rendering and tmux-target tests.
 
 `v` toggles between the default rail and an animated Tamagotchi-style view;
 `--view pet` selects it at startup and is forwarded through `--tmux-toggle`.
-`s` / `--pet-size micro` select a three-row sprite, while `l` /
-`--pet-layout column` force a vertical card stack; startup choices are also
-forwarded through `--tmux-toggle`.
+`l` / `--pet-layout column` force a vertical card stack; startup choices are
+also forwarded through `--tmux-toggle`.
 Both modes share data, selection, filtering, preview, attach, focus, refresh,
 and exit behavior. Animation runs only while the pet view is active.
+
+Sprites were later redrawn as true-color half-block pixel art. An optional
+three-row micro sprite size shipped alongside the original ASCII sprites but
+was removed once pixel art replaced them — a detailed creature (ears, tusks,
+mohawk) doesn't hold up at that resolution, so there is now a single sprite
+size.
 
 ### Post-v1: direct prompt sending
 
@@ -517,9 +518,8 @@ confirmation.
   table.
 - The optional little-orc view is selected with `v` or `--view pet`; the rail
   remains the default and its refresh path does not run animation ticks.
-- Pet size and layout are presentation-only: `s` / `--pet-size` control normal
-  versus micro sprites, and `l` / `--pet-layout` control responsive versus
-  column card placement.
+- Pet layout is presentation-only: `l` / `--pet-layout` control responsive
+  versus column card placement.
 - `STATE.yaml` remains authoritative. `@agent_attention` is a live urgency hint,
   never durable workflow state.
 - Attach and focus target the current tmux context only. Remote-client movement
