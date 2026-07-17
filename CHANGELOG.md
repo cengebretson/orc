@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-07-17
+
 ### Fixed
 
 - Session-resume picker tests no longer depend on a locally installed Codex
@@ -233,7 +235,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Bubble Tea TUI dashboard with health, workflow, stage, and portrait views.
 - `orc doctor --fix` to clear stale state locks.
 
-[Unreleased]: https://github.com/cengebretson/orc/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/cengebretson/orc/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/cengebretson/orc/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/cengebretson/orc/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/cengebretson/orc/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/cengebretson/orc/compare/v0.7.2...v0.8.0
