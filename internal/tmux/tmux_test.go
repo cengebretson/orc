@@ -87,6 +87,7 @@ func TestBuildWatchCommandQuotesArguments(t *testing.T) {
 		Ticket:   "PROJ-123",
 		Interval: "2s",
 		Wide:     true,
+		View:     "pet",
 	})
 
 	for _, want := range []string{
@@ -95,6 +96,7 @@ func TestBuildWatchCommandQuotesArguments(t *testing.T) {
 		"watch PROJ-123",
 		"--interval 2s",
 		"--wide",
+		"--view pet",
 	} {
 		if !strings.Contains(cmd, want) {
 			t.Fatalf("buildWatchCommand() missing %q in %q", want, cmd)

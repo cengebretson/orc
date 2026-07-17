@@ -446,6 +446,7 @@ type WatchToggleOptions struct {
 	Ticket   string
 	Interval string
 	Wide     bool
+	View     string
 	Layout   string
 	Size     string
 	ExecPath string
@@ -544,6 +545,9 @@ func buildWatchCommand(opts WatchToggleOptions) string {
 	}
 	if opts.Wide {
 		argv = append(argv, "--wide")
+	}
+	if opts.View != "" && opts.View != "rail" {
+		argv = append(argv, "--view", opts.View)
 	}
 	return shellJoin(argv)
 }

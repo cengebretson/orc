@@ -18,6 +18,10 @@ func runWatch(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		ticket = args[0]
 	}
+	mode, err := watch.ParseMode(watchView)
+	if err != nil {
+		return err
+	}
 
 	if watchTmuxToggle {
 		return tmux.ToggleWatchPane(tmux.WatchToggleOptions{
@@ -25,6 +29,7 @@ func runWatch(cmd *cobra.Command, args []string) error {
 			Ticket:   ticket,
 			Interval: watchInterval,
 			Wide:     watchWide,
+			View:     string(mode),
 			Layout:   watchTmuxLayout,
 			Size:     watchTmuxSize,
 		})
@@ -39,5 +44,6 @@ func runWatch(cmd *cobra.Command, args []string) error {
 		Ticket:   ticket,
 		Interval: interval,
 		Wide:     watchWide,
+		Mode:     mode,
 	})
 }

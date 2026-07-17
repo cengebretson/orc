@@ -260,10 +260,12 @@ Ephemeral tmux tags are insufficient for an orchestrator whose state must
 survive process and session loss. Any Orc labels should be durable first and
 mirrored live second.
 
-### Visual novelty as a priority
+### Visual novelty before operational basics
 
-Recon's Tamagotchi view is distinctive, but Orc should prioritize identity,
-recovery, filtering, and context pressure before adding another visual mode.
+Recon's Tamagotchi view is distinctive, but Orc first prioritized identity,
+recovery, filtering, and context pressure. With those foundations complete,
+`orc watch` now offers an optional little-orc pet view while retaining the rail
+as its default and sharing the same operational controls.
 
 ## Recommended sequence
 
@@ -273,6 +275,8 @@ recovery, filtering, and context pressure before adding another visual mode.
 4. ~~Git-aware grouping and filters.~~ Completed 2026-07-16.
 5. ~~Context-pressure presentation.~~ Completed 2026-07-16.
 6. Durable labels remain optional and deferred until demanded by real use.
+7. ~~Optional Tamagotchi view after the operational foundations.~~ Completed
+   2026-07-17 with toggleable little-orc watch pets.
 7. ~~Tmux popup documentation.~~ Completed 2026-07-16.
 
 All practical v1 recommendations from Recon are complete. Durable labels are the

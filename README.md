@@ -405,6 +405,8 @@ Or use the Claude Desktop settings UI. Requires a GitHub PAT with `repo` and `pu
 - `orc watch [ticket]` — open the compact, attention-aware tmux session rail
   - `/` — filter by ticket, slug, stage, worker, repository, branch, workflow/status, or attention state
   - `i` — jump to the next live `blocked`, `input`, or `review` session
+  - `v` — toggle the default rail and animated little-orc pet view
+  - `--view pet` — start directly in the Tamagotchi-style pet view
   - `--tmux-toggle` — open or close the watch rail beside the current tmux pane
   - `--wide` — render the wider table layout
 - Both watch and TUI display matched provider context pressure using configurable

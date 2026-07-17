@@ -26,7 +26,9 @@ orc watch
 orc watch PROJ-123
 orc watch --interval 2s
 orc watch --wide
+orc watch --view pet
 orc watch --tmux-toggle
+orc watch --view pet --tmux-toggle
 orc watch --tmux-toggle --tmux-layout bottom --tmux-size 25%
 orc focus
 ```
@@ -36,7 +38,9 @@ focuses a single ticket and can show a little more context. `--wide` may render 
 table-like session view when the pane is wide enough, with worker shown as a
 column in the session list rather than as a separate list. Pressing `enter`
 opens the selected story details page in both compact and wide layouts, including
-recent story history. `--tmux-toggle` is a helper for tmux keybindings. By
+recent story history. Pressing `v` toggles the same rows and controls into an
+animated little-orc pet view; `--view pet` starts there directly. `--tmux-toggle`
+is a helper for tmux keybindings. By
 default it opens a 32-column right-side pane; `--tmux-layout bottom` and
 `--tmux-size <size>` can override the split.
 
@@ -47,6 +51,36 @@ Press `/` to filter the rail without changing durable state or session
 priority. The shared matcher covers ticket, slug, workflow, stage, worker,
 engine, repository, branch, status, and attention state. Enter keeps the active
 filter; Escape clears it.
+
+## Little-orc pet view
+
+Pet mode is an additive presentation over the same selected row, filtering,
+preview, attach, focus, and refresh behavior as the rail. It never mutates
+durable state or launches an agent. The rail remains the default.
+
+Each ticket gets a deterministic green or teal little orc. Pointed ears, tusks,
+skin tone, and animation phase make the creature recognizable across refreshes.
+The visual state comes from Orc's existing durable and live signals:
+
+| Orc signal | Little-orc behavior |
+|---|---|
+| `pending` or `ready` | Wobbling egg |
+| Active live work | Hammering, bouncing orc |
+| Live provider reports idle/waiting | Sleeping orc |
+| Input or review attention | Alert, pulsing orc |
+| Paused or blocked | Stuck, unhappy orc |
+| Active ticket with stopped tmux | Faded offline orc |
+| Done | Celebrating orc |
+| Invalid state | Orc needing care |
+
+Yellow and red context pressure add tired and exhausted labels without replacing
+the underlying state. Narrow panes show the selected creature; wider terminals
+use a responsive card grid with repository/worktree room labels. `j`/`k`, `/`,
+`enter`, `a`, `i`, `r`, `Esc`, and `q` retain their rail meanings.
+
+Animation uses an independent low-cost terminal tick only while pet mode is
+visible. Toggling back with `v` stops that tick; the default rail keeps its
+existing data-refresh cadence.
 
 ## Narrow rail view
 
@@ -422,6 +456,13 @@ Selection, expandable prompt/history details, exact-pane attach, next-attention
 focus, shared filtering, and immediate refresh are implemented and covered by
 rendering and tmux-target tests.
 
+### Phase 4: optional little-orc pet view — completed
+
+`v` toggles between the default rail and an animated Tamagotchi-style view;
+`--view pet` selects it at startup and is forwarded through `--tmux-toggle`.
+Both modes share data, selection, filtering, preview, attach, focus, refresh,
+and exit behavior. Animation runs only while the pet view is active.
+
 ### Post-v1: direct prompt sending
 
 Directly sending previewed prompt text to an agent pane is intentionally outside
@@ -457,6 +498,8 @@ confirmation.
 - Prompt preview expands inside the rail and returns with `Esc` or `enter`.
 - The compact/wide layout responds to terminal width; `--wide` forces the wider
   table.
+- The optional little-orc view is selected with `v` or `--view pet`; the rail
+  remains the default and its refresh path does not run animation ticks.
 - `STATE.yaml` remains authoritative. `@agent_attention` is a live urgency hint,
   never durable workflow state.
 - Attach and focus target the current tmux context only. Remote-client movement

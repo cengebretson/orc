@@ -38,24 +38,31 @@ type Options struct {
 	Ticket   string
 	Interval time.Duration
 	Wide     bool
+	Mode     Mode
 }
 
 type row struct {
-	ticket    string
-	stage     string
-	worker    string
-	status    string
-	next      string
-	session   string
-	window    string
-	pane      string
-	tmuxState string
-	attention string
-	context   contextpressure.Pressure
-	history   []historyRow
-	archived  bool
-	loadErr   error
-	search    []string
+	ticket     string
+	stage      string
+	worker     string
+	status     string
+	next       string
+	session    string
+	window     string
+	pane       string
+	tmuxState  string
+	attention  string
+	context    contextpressure.Pressure
+	room       string
+	branch     string
+	engine     string
+	model      string
+	providerID string
+	liveState  string
+	history    []historyRow
+	archived   bool
+	loadErr    error
+	search     []string
 }
 
 type historyRow struct {
@@ -70,15 +77,18 @@ type Model struct {
 	ticket   string
 	interval time.Duration
 	wide     bool
+	mode     Mode
 
-	allRows  []row
-	rows     []row
-	cursor   int
-	width    int
-	height   int
-	lastLoad time.Time
-	loadErr  error
-	message  string
+	allRows    []row
+	rows       []row
+	cursor     int
+	width      int
+	height     int
+	lastLoad   time.Time
+	loadErr    error
+	message    string
+	petFrame   int
+	petTicking bool
 
 	preview   bool
 	viewport  viewport.Model
@@ -91,24 +101,34 @@ func Run(root string, opts Options) error {
 	if interval <= 0 {
 		interval = defaultInterval
 	}
+	mode, err := ParseMode(string(opts.Mode))
+	if err != nil {
+		return err
+	}
 	searchBox := textinput.New()
 	searchBox.Placeholder = "filter sessions..."
 	searchBox.Prompt = "/ "
 	searchBox.CharLimit = 96
 	m := Model{
-		root:      root,
-		ticket:    opts.Ticket,
-		interval:  interval,
-		wide:      opts.Wide,
-		searchBox: searchBox,
+		root:       root,
+		ticket:     opts.Ticket,
+		interval:   interval,
+		wide:       opts.Wide,
+		mode:       mode,
+		petTicking: mode == ModePet,
+		searchBox:  searchBox,
 	}
 	p := tea.NewProgram(m, tea.WithAltScreen())
-	_, err := p.Run()
+	_, err = p.Run()
 	return err
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(loadData(m.root, m.ticket), tickEvery(m.interval))
+	commands := []tea.Cmd{loadData(m.root, m.ticket), tickEvery(m.interval)}
+	if m.mode == ModePet {
+		commands = append(commands, petTick())
+	}
+	return tea.Batch(commands...)
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -123,6 +143,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case tickMsg:
 		return m, tea.Batch(loadData(m.root, m.ticket), tickEvery(m.interval))
+	case petTickMsg:
+		if m.mode != ModePet {
+			m.petTicking = false
+			return m, nil
+		}
+		m.petFrame++
+		m.petTicking = true
+		return m, petTick()
 	case dataMsg:
 		selectedTicket := ""
 		if selected, ok := m.selectedWork(); ok {
@@ -196,6 +224,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.searchBox.Focus()
 				return m, textinput.Blink
 			}
+		case "v":
+			if m.preview {
+				return m, nil
+			}
+			if m.mode == ModePet {
+				m.mode = ModeRail
+				return m, nil
+			}
+			m.mode = ModePet
+			if !m.petTicking {
+				m.petTicking = true
+				return m, petTick()
+			}
+			return m, nil
 		case "j", "down":
 			if !m.preview && m.cursor < m.itemCount()-1 {
 				m.cursor++
@@ -238,6 +280,9 @@ func (m Model) View() string {
 	if m.preview {
 		return m.renderPreview()
 	}
+	if m.mode == ModePet {
+		return m.renderPets()
+	}
 	if m.wide || m.width >= 56 {
 		return m.renderWide()
 	}
@@ -266,6 +311,12 @@ func collectRows(root, ticket string) ([]row, error) {
 		r := rowFromFeature(f)
 		if live, ok := liveByFeature[filepath.Clean(f.FeatureDir)]; ok {
 			r.context = contextpressure.Evaluate(live.ContextUsed, live.ContextLimit, thresholds)
+			r.providerID = live.ProviderSessionID
+			r.liveState = live.State
+			r.model = live.Model
+			if live.Engine != "" {
+				r.engine = live.Engine
+			}
 		}
 		if ticket != "" && !strings.EqualFold(r.ticket, ticket) {
 			continue
@@ -297,6 +348,7 @@ func rowFromFeature(f *featurelist.Feature) row {
 		}
 	}
 	s := f.State
+	room, branch := featureRoom(s)
 	worker := f.WorkerName
 	if worker == "" {
 		worker = f.WorkerID
@@ -322,6 +374,9 @@ func rowFromFeature(f *featurelist.Feature) row {
 		pane:      tmuxPane(s),
 		tmuxState: tmuxState(s, f.TmuxLive),
 		attention: f.Attention,
+		room:      room,
+		branch:    branch,
+		engine:    f.Engine,
 		history:   historyRows(s.History),
 		archived:  f.Archived,
 		search:    searchFields,
