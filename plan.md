@@ -3,6 +3,19 @@
 Single source of truth for unshipped work. Shipped work belongs in
 `CHANGELOG.md`, not here.
 
+## Release candidate
+
+The core v1 feature scope is complete. The remaining release gates are
+operational rather than feature work:
+
+- Run the automated, fresh-workspace, and live-session checks in
+  [`docs/release.md`](docs/release.md).
+- Promote the intended entries from `[Unreleased]`, update `VERSION`, and verify
+  the tag-driven release artifacts and checksums.
+
+Direct prompt sending from `orc watch`, notifications, durable arbitrary labels,
+remote pack lifecycle, and remote tmux control are explicitly post-v1.
+
 ## Later
 
 ### Agent completion notification
@@ -48,6 +61,10 @@ Effort: Medium.
 
 ## Future ideas
 
+- Explicit, confirmed prompt sending from `orc watch` to an exact agent pane.
+- Structured confirm/choice/text human responses.
+- Durable arbitrary labels and `--label key=value` filters.
+- Remote tmux client selection for standalone watch/focus processes.
 - User profiles for personal defaults across workspaces.
 - Remote pack installs.
 - Pack update and uninstall.

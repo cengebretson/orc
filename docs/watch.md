@@ -401,68 +401,63 @@ Add tmux helpers as needed:
 - Mark/find/close a watch pane.
 - Send prompt text safely to an agent target.
 
-## Phased plan
+## Delivery status
 
-### Phase 1: passive watch rail
+### Phase 1: passive watch rail — completed
 
-- Add `orc watch`.
-- Render compact multi-session and single-ticket views.
-- Show a small selected-session detail section below the compact list.
-- Refresh on an interval.
-- Show durable `STATE.yaml` state as the primary status.
-- Show tmux liveness as `live` or `stopped` for configured sessions.
-- Optionally read `@agent_attention` as a backup/live overlay for active work.
-- Quit with `q` or Ctrl-C.
+The compact multi-session and single-ticket views refresh on an interval, keep
+durable `STATE.yaml` state primary, layer tmux liveness and attention on top, and
+provide selected-session details plus clean `q`/Ctrl-C exit behavior.
 
-### Phase 2: tmux toggle
+### Phase 2: tmux toggle — completed
 
-- Add `orc watch --tmux-toggle`.
-- Add tmux pane marker/finder.
-- Document a tmux binding.
-- Ensure repeated toggles do not create duplicate watch panes.
+`orc watch --tmux-toggle` uses exact pane markers to open or close one watch pane
+with configurable right/bottom layout and size. Repeated toggles do not create
+duplicate watch panes, and the user-owned binding is documented in
+[`docs/tmux.md`](tmux.md).
 
-### Phase 3: prompt preview and attach
+### Phase 3: prompt preview and attach — completed
 
-- Add selection.
-- Add expanded story details with prompt and recent history.
-- Add attach/focus action.
-- Keep send-to-agent out until target detection is solid.
+Selection, expandable prompt/history details, exact-pane attach, next-attention
+focus, shared filtering, and immediate refresh are implemented and covered by
+rendering and tmux-target tests.
 
-### Phase 4: send-to-agent
+### Post-v1: direct prompt sending
 
-- Add explicit prompt send action.
-- Confirm target session/window/pane before sending when ambiguous.
-- Add tests for shell quoting and tmux target resolution.
+Directly sending previewed prompt text to an agent pane is intentionally outside
+the v1 boundary. `orc next` and `orc jit` remain the canonical launch surfaces;
+watch selection, preview, or attach never sends text by itself. A future send
+action must be explicit, confirmed, routed through the shared exact-pane helper,
+and covered for shell quoting and ambiguous targets.
 
-### Phase 5: notification emission
+### Later: notification emission
 
-- Optionally emit `tmux-attention` markers from `orc mark`.
-- Reuse the broader notification plan for configurable event hooks.
+Configurable completion and blocker hooks are tracked in [`plan.md`](../plan.md).
+They may optionally mirror tmux-attention markers after durable state is written,
+but notifications do not block v1.
 
-### Future: remote tmux controller
+### Post-v1: remote tmux controller
 
-- Add attached-client discovery with `tmux list-clients`.
-- Add optional `--tmux-client <client>` for standalone watch windows.
-- Let attach/focus switch another tmux client when explicitly configured or when
-  exactly one client is attached.
+Remote attached-client discovery and `--tmux-client <client>` selection remain
+deferred. Standalone watch/focus processes do not guess which other tmux client
+to move.
 
-### Future: structured human replies
+### Post-v1: structured human replies
 
-- Extend `STATE.yaml next_action` with optional response metadata.
-- Render choice/confirm/text reply screens in `orc watch`.
-- Send the configured response value to the agent only after explicit user
-  confirmation.
+Choice, confirmation, and text response schemas may eventually extend
+`STATE.yaml next_action`. Any value sent to an agent must require explicit human
+confirmation.
 
-## Open questions
+## Resolved v1 behavior
 
-- Should `orc watch` default to all active tickets, or infer the current ticket
-  from the tmux session/window when possible?
-- Should `q` only quit the watch process, or close the watch pane when running
-  inside a pane opened by `--tmux-toggle`?
-- Should prompt preview replace the rail temporarily, or open in a wider tmux
-  popup/pane?
-- Should `--wide` be automatic based on terminal width?
-- Should `orc watch` show `@agent_attention` as the primary label for active
-  tickets, or as a secondary hint next to the durable status?
-- Should standalone `orc watch` infer a single attached tmux client for remote
-  focus, or require `--tmux-client` to avoid surprising focus changes?
+- `orc watch` without a ticket shows all active work; an optional ticket scopes
+  the rail explicitly.
+- `q` exits the watch process. A pane created by `--tmux-toggle` closes naturally
+  when that process exits.
+- Prompt preview expands inside the rail and returns with `Esc` or `enter`.
+- The compact/wide layout responds to terminal width; `--wide` forces the wider
+  table.
+- `STATE.yaml` remains authoritative. `@agent_attention` is a live urgency hint,
+  never durable workflow state.
+- Attach and focus target the current tmux context only. Remote-client movement
+  remains explicit post-v1 work.

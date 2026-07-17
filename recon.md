@@ -271,9 +271,11 @@ recovery, filtering, and context pressure before adding another visual mode.
 2. ~~Incremental telemetry parsing with total refresh budgets.~~ Completed 2026-07-13.
 3. ~~Search and interactive resume picker.~~ Completed 2026-07-16.
 4. ~~Git-aware grouping and filters.~~ Completed 2026-07-16.
-5. Context-pressure presentation.
-6. Labels and popup documentation only when demanded by actual use.
+5. ~~Context-pressure presentation.~~ Completed 2026-07-16.
+6. Durable labels remain optional and deferred until demanded by real use.
+7. ~~Tmux popup documentation.~~ Completed 2026-07-16.
 
-The first four capture nearly all remaining practical value from Recon while
-preserving Orc's defining boundary: policy and durable workflow state live in
-files; tmux and provider telemetry describe only what is happening right now.
+All practical v1 recommendations from Recon are complete. Durable labels are the
+only remaining optional idea. Orc preserves its defining boundary: policy and
+durable workflow state live in files; tmux and provider telemetry describe only
+what is happening right now.

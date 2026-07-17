@@ -8,6 +8,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- A release-readiness runbook covering v1 scope, automated gates, disposable
+  workspace QA, live session recovery, and tag/artifact verification.
 - Copyable, user-owned tmux popup and split-pane bindings for watch, session
   inventory, interactive resume, and attention-driven focus.
 - Live provider context pressure in `orc watch` and `orc tui`, with configurable
@@ -33,6 +35,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Tmux pane inventory now preserves sessions without attention metadata, and
   unpark retries reconcile exact already-restored panes while rejecting unrelated
   session-name collisions.
+- Roadmap and watch documentation now distinguish the completed v1 surface from
+  explicitly deferred post-v1 work.
 
 ## [0.9.0] - 2026-07-06
 
