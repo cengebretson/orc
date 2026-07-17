@@ -77,6 +77,7 @@ func TestRunSessionResumeWithoutIDUsesPicker(t *testing.T) {
 	originalDiscover := discoverResumeSessions
 	originalSelect := selectResumeSession
 	originalRepository := lookupResumeRepository
+	originalBinary := lookupResumeBinary
 	originalDry := sessionsResumeDry
 	originalForce := sessionsResumeForce
 	originalEngine := sessionsResumeEngine
@@ -85,6 +86,7 @@ func TestRunSessionResumeWithoutIDUsesPicker(t *testing.T) {
 		discoverResumeSessions = originalDiscover
 		selectResumeSession = originalSelect
 		lookupResumeRepository = originalRepository
+		lookupResumeBinary = originalBinary
 		sessionsResumeDry = originalDry
 		sessionsResumeForce = originalForce
 		sessionsResumeEngine = originalEngine
@@ -97,6 +99,9 @@ func TestRunSessionResumeWithoutIDUsesPicker(t *testing.T) {
 	}
 	lookupResumeRepository = func(string) (gitmeta.Metadata, bool) {
 		return gitmeta.Metadata{Repository: "orc", Branch: "feature/picker", Worktree: "orc-wt"}, true
+	}
+	lookupResumeBinary = func(string) (string, error) {
+		return "/usr/bin/codex", nil
 	}
 	selectResumeSession = func(candidates []sessionpicker.Candidate) (sessionpicker.Candidate, error) {
 		if len(candidates) != 1 || candidates[0].Repository != "orc" || candidates[0].Branch != "feature/picker" {

@@ -21,6 +21,7 @@ var (
 	discoverResumeSessions = telemetry.Discover
 	selectResumeSession    = sessionpicker.Select
 	lookupResumeRepository = gitmeta.Resolve
+	lookupResumeBinary     = exec.LookPath
 )
 
 func runSessions(cmd *cobra.Command, args []string) error {
@@ -165,7 +166,7 @@ func resumeLiveSession(live telemetry.Live) error {
 	if err != nil {
 		return err
 	}
-	if _, err := exec.LookPath(binary); err != nil {
+	if _, err := lookupResumeBinary(binary); err != nil {
 		return fmt.Errorf("%s is not installed or not in PATH", binary)
 	}
 	if sessionsResumeDry {

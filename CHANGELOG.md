@@ -6,6 +6,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Session-resume picker tests no longer depend on a locally installed Codex
+  binary, keeping the release suite portable to clean CI runners.
+
 ## [0.10.0] - 2026-07-17
 
 ### Added
