@@ -57,7 +57,7 @@ func Run(root string) *Report {
 	report := &Report{Root: root}
 
 	// root-level docs
-	for _, f := range []string{"AGENTS.md", "TOOLS.md", "RULES.md", "ROUTER.md"} {
+	for _, f := range []string{"AGENTS.md", "TOOLS.md", "RULES.md", "orc.yaml"} {
 		report.Results = append(report.Results, checkFile(root, f))
 	}
 

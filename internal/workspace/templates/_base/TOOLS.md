@@ -1,104 +1,61 @@
 # TOOLS.md
 
-## Tool Policy
+This file records verified ways to access external systems and preferred local
+tools. It does not grant permission; read `RULES.md` before mutating anything.
+Repository-specific build and test commands belong in that repository's own
+instructions or in `orc.yaml` agent hints.
 
-Read this file before choosing commands, MCP servers, scripts, or external apps.
-For repo-specific tools (package manager, test runner, docker), check the repo's
-own instruction files.
+## External Systems
 
----
+Record exact, working access methods. Ticket retrieval is configured here;
+repository routing is configured in `orc.yaml`.
 
-## Ticket System
+| Capability | System | Preferred access | Fallback | Scope or notes |
+|---|---|---|---|---|
+| Ticket read/write | <!-- Jira, Linear, GitHub Issues, none --> | <!-- verified MCP/app/CLI --> | <!-- verified fallback or none --> | <!-- projects/keys --> |
+| Source control and PRs | <!-- GitHub, GitLab, Bitbucket --> | <!-- verified MCP/app/CLI --> | <!-- verified fallback or none --> | <!-- orgs/default target --> |
+| CI/CD | <!-- system or none --> | <!-- verified access --> | <!-- fallback --> | <!-- read/trigger scope --> |
 
-<!-- Configure your ticket system here. Agents will use this to fetch and update tickets. -->
+Never record tokens or secret values here. Name the authentication mechanism
+only when agents need it, such as “GitHub app” or “CLI OAuth profile.”
 
-- **System:** <!-- jira | linear | github-issues | shortcut | none -->
-- **Access:** <!-- e.g. use the `jira-mcp` MCP server -->
-- **Project keys:** <!-- e.g. FLYWL, DLOS -->
-- **Ticket URL format:** <!-- e.g. https://yourcompany.atlassian.net/browse/{ticket} -->
+## Engine Integrations
 
----
+List integrations that setup verified as available to each engine. Do not list
+aspirational or merely installed integrations as usable.
 
-## Source Control
+| Engine | Available MCP servers, apps, plugins, or skills |
+|---|---|
+| Claude | <!-- verified names or none --> |
+| Codex | <!-- verified names or none --> |
 
-<!-- Configure your source control here. Agents will use this to open PRs and check CI. -->
+Prefer an available structured integration over scraping text or constructing
+raw API calls. If the preferred access fails, report the fallback before using
+it.
 
-- **System:** <!-- github | gitlab | bitbucket -->
-- **Access:** <!-- e.g. use the `github-mcp` MCP server -->
-- **Org / repo:** <!-- e.g. myorg/myrepo -->
-- **Default branch:** <!-- e.g. main -->
-- **PR target:** <!-- e.g. main or release branch -->
+## Local CLI Tools
 
-Agents may use local `git` commands for read-only inspection and ticket worktree
-creation. Use the configured source-control access above for remote actions such
-as opening PRs, reading CI status, or posting comments.
+Setup should keep only tools verified on `PATH` and add workspace-specific
+wrappers when relevant.
 
----
+| Tool | Use |
+|---|---|
+| `rg` | Recursive text search |
+| `fd` | File discovery |
+| `jq` | JSON parsing and transformation |
+| `yq` | YAML, TOML, and JSON queries |
+| `ast-grep` | Syntax-aware code search and rewrites |
+| `shellcheck` | Shell script validation |
 
-## MCP Servers
+Use repository-defined package managers, task runners, and validation commands
+instead of inventing replacements. If a listed tool is unavailable, use a safe
+installed fallback and note the substitution.
 
-<!-- Filled in during setup. Record the MCP servers each engine should use. -->
-<!-- MCP servers are configured at the user level (~/.claude/mcp.json or the -->
-<!-- Codex equivalent), not per-workspace — list only their names here. -->
+## Local Git
 
-- **Claude:** <!-- e.g. github, jira-mcp -->
-- **Codex:** <!-- e.g. github -->
+Local Git is appropriate for inspection, ticket worktrees, diffs, and other
+actions allowed by `RULES.md`. If `orc.yaml` defines `repos[].worktree_setup`,
+use the command Orc supplies rather than raw `git worktree add`.
 
----
-
-## CLI Tools
-
-Prefer these tools over naive alternatives when they are installed — they are
-faster, safer, and produce output that is easier to parse and reason about.
-
-| Use this   | Instead of      | For                                                  |
-|------------|-----------------|------------------------------------------------------|
-| `rg`       | `grep`          | Fast recursive text search                           |
-| `fd`       | `find`          | File finding with simpler syntax                     |
-| `jq`       | manual parsing  | Parsing and transforming JSON                        |
-| `yq`       | manual editing  | Reading and editing YAML, TOML, JSON in pipelines    |
-| `ast-grep` | `grep` / regex  | Searching or rewriting code by structure             |
-| `sd`       | `sed`           | Find-and-replace with clean syntax                   |
-| `bat`      | `cat`           | Viewing files with syntax highlighting               |
-| `delta`    | `diff`          | Reviewing diffs with syntax highlighting             |
-
----
-
-## Git and Worktrees
-
-Use worktrees for ticket implementation so the main repo checkout stays clean.
-Unless a repo-specific instruction says otherwise, create worktrees under:
-
-```
-worktrees/<repo-name>/<ticket-slug>/
-```
-
-Recommended local commands:
-
-| Command | Purpose |
-|---------|---------|
-| `git status --short` | Check for local changes |
-| `git branch --show-current` | Confirm current branch |
-| `git worktree list` | See existing worktrees |
-| `git worktree add <path> -b <branch>` | Create a ticket worktree and branch when no repo-specific setup command is configured |
-| `git diff --stat` | Summarize local changes |
-| `git diff` | Review local changes |
-
-If `orc.yaml` defines `repos[].worktree_setup`, use the setup command that
-`orc next` prints instead of raw `git worktree add`.
-
-After creating or using a worktree, update `STATE.yaml` through the process in
-`ORC.md` so later stages know where repo work happened.
-
----
-
-## Approval Required
-
-Read `RULES.md` for the full approval policy. In general, ask before:
-
-| Action                       | Why                             |
-|------------------------------|---------------------------------|
-| Writing to the ticket system | Visible to stakeholders         |
-| Opening or merging PRs       | Affects shared branches         |
-| Triggering CI/CD             | May affect shared environments  |
-| Posting external comments    | Hard to retract                 |
+Remote Git and pull-request actions use the verified source-control access above
+and remain subject to `RULES.md`.

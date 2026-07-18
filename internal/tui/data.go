@@ -123,10 +123,10 @@ func loadData(root string) tea.Cmd {
 			repos = cfg.Repos
 		}
 
-		// routes: ROUTER.md as a single item
-		routerPath := filepath.Join(root, "ROUTER.md")
-		if _, err := os.Stat(routerPath); err == nil {
-			si["routes"] = []sectionItem{{label: "ROUTER.md", path: routerPath}}
+		// routes: repository routing now lives in orc.yaml
+		configPath := filepath.Join(root, config.Filename)
+		if _, err := os.Stat(configPath); err == nil {
+			si["routes"] = []sectionItem{{label: config.Filename, path: configPath}}
 		}
 
 		return dataMsg{

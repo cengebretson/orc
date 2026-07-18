@@ -66,6 +66,24 @@ func TestValidate_ArtifactPolicy(t *testing.T) {
 	assertValidationError(t, config.Validate(cfg, []string{"fred"}), "settings.artifact_policy", `artifact_policy must be "warn" or "block"`)
 }
 
+func TestValidate_TuiRefreshCannotBeNegative(t *testing.T) {
+	cfg := &config.Config{Settings: config.Settings{TuiRefresh: -1}}
+	assertValidationError(t, config.Validate(cfg, nil), "settings.tui_refresh", "tui_refresh must be zero or greater")
+}
+
+func TestValidate_RepoIdentity(t *testing.T) {
+	cfg := &config.Config{Repos: []config.Repo{
+		{},
+		{Name: "app", Path: "../app"},
+		{Name: "app", Path: "../app/../app"},
+	}}
+	errs := config.Validate(cfg, nil)
+	assertValidationError(t, errs, "repos[0].name", "repo name is required")
+	assertValidationError(t, errs, "repos[0].path", "repo path is required")
+	assertValidationError(t, errs, "repos[2].name", `duplicate repo name "app"`)
+	assertValidationError(t, errs, "repos[2].path", `duplicate repo path "../app/../app"`)
+}
+
 func TestValidate_ContextPressureThresholdOrder(t *testing.T) {
 	cfg := &config.Config{Settings: config.Settings{ContextPressure: &config.ContextPressureSettings{Green: 70, Yellow: 70, Red: 90}}}
 	assertValidationError(t, config.Validate(cfg, nil), "settings.context_pressure", "thresholds must satisfy 0 <= green < yellow < red <= 100")
@@ -171,6 +189,26 @@ func TestValidate_LoopOnMaxValidValues(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestValidate_RepoRoutingValues(t *testing.T) {
+	cfg := &config.Config{
+		Repos: []config.Repo{{Name: "app", Path: "../app"}},
+		Routing: []config.RepoRoute{
+			{Labels: []string{"frontend", " "}, Repos: []string{"app", "app", "missing"}},
+			{Labels: []string{"FRONTEND"}, Components: []string{"web", "WEB"}},
+			{},
+		},
+	}
+	errs := config.Validate(cfg, nil)
+
+	assertValidationError(t, errs, "routing[0].labels[1]", "routing value is required")
+	assertValidationError(t, errs, "routing[0].repos[1]", `duplicate repo "app"`)
+	assertValidationError(t, errs, "routing[0].repos[2]", `repo "missing" not found`)
+	assertValidationError(t, errs, "routing[1].labels[0]", `routing value "FRONTEND" is already used`)
+	assertValidationError(t, errs, "routing[1].components[1]", `routing value "WEB" is already used`)
+	assertValidationError(t, errs, "routing[1].repos", "route must select at least one repo")
+	assertValidationError(t, errs, "routing[2]", "route must define at least one label or component")
 }
 
 func assertValidationError(t *testing.T, errs config.ValidationErrors, path, message string) {

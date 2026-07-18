@@ -577,9 +577,9 @@ func printSetupNextSteps(root string, dryRun bool) {
 		fmt.Println("Next:")
 	}
 	fmt.Printf("  cd %s\n", root)
-	fmt.Println(`  claude "Read SETUP.md and follow the setup instructions"`)
+	fmt.Println(`  claude "Read SETUP.md and perform the workspace setup"`)
 	fmt.Println("  # or:")
-	fmt.Println(`  codex "Read SETUP.md and follow the setup instructions"`)
+	fmt.Println(`  codex "Read SETUP.md and perform the workspace setup"`)
 	fmt.Println("  orc doctor")
 }
 
@@ -588,6 +588,6 @@ func writeGitignore(root string, force bool) {
 	if _, err := os.Stat(dest); err == nil && !force {
 		return
 	}
-	content := "worktrees/\n"
+	content := "projects/\nworktrees/\n"
 	_ = os.WriteFile(dest, []byte(content), 0644)
 }

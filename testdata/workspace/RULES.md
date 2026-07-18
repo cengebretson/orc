@@ -1,104 +1,57 @@
 # RULES.md
 
-## Permission and Approval Rules
+This file owns permission and approval policy. State transitions belong in
+`ORC.md`, routing in `orc.yaml`, and tool selection in `TOOLS.md`.
 
-Ask before doing any action that is destructive, external, costly,
-security-sensitive, or hard to undo.
+## Ask Before Acting
 
-### Always ask first
+Pause the ticket with the exact proposed action before asking for approval to:
 
-- Deleting files, branches, worktrees, or feature context folders.
-- Rewriting Git history: rebase, force-push, reset, or amend published commits.
-- Installing or upgrading dependencies.
-- Running commands that modify production, staging, Jira, GitHub PRs, or CI state.
-- Starting long-running background agents or services.
-- Running broad test suites or commands expected to take more than 10 minutes.
-- Reading or changing secrets, credentials, env files, auth tokens, or private config.
-- Sending notifications or comments to external systems.
-- Changing shared workspace rules, templates, or setup scripts.
+- Delete files, branches, worktrees, or feature context.
+- Rewrite Git history, force-push, reset, or amend published commits.
+- Push to a remote, open or merge a PR, post comments, change tickets, trigger
+  CI/CD, or otherwise modify an external system.
+- Change dependency manifests or lockfiles, or install global/system software.
+- Modify production, staging, shared infrastructure, permissions, or billing.
+- Read, copy, expose, or change secrets, credentials, tokens, private config, or
+  environment files.
+- Start a persistent service or background agent that will outlive the session.
+- Run an unusually costly operation or a command expected to take over 10
+  minutes.
+- Change shared workspace contracts, templates, setup scripts, or approval
+  policy outside the explicit task.
 
-### Usually okay without asking
+Approval applies only to the action and scope presented. A prior approval does
+not authorize a broader follow-up action.
 
-- Reading files.
-- Searching the repo.
-- Creating or editing files inside the current ticket context.
-- Running targeted local validation for files just changed.
-- Creating draft plans, summaries, or proposed commands.
-- Updating `STATE.yaml` to reflect work just completed, unless the update changes
-  ownership, closes a ticket, or marks external status.
+## Allowed Without Additional Approval
 
-### Ask if unclear
+Within the active ticket and stage, agents may:
 
-If an action could surprise the human, ask before doing it.
-If an action affects another person, another system, or shared state, ask before doing it.
+- Read and search workspace and repository files.
+- Create or edit ticket artifacts and implementation files.
+- Create a ticket branch and worktree at the configured workspace path.
+- Run documented worktree setup, including installing already-declared project
+  dependencies inside the isolated worktree.
+- Run targeted local formatting, linting, builds, and tests.
+- Inspect local Git state and create local commits when the stage requires it.
+- Draft plans, summaries, patches, PR text, and proposed external updates.
+- Use `orc mark` and edit only the agent-writable `STATE.yaml` context fields
+  listed in `ORC.md`.
 
----
+These permissions do not override repository-specific instructions or a more
+restrictive current-stage rule.
 
-## State Update Rule
+## Workspace Exceptions
 
-Every agent or script that performs work for a feature must keep
-`features/<ticket-slug>/STATE.yaml` current.
+Setup should record confirmed deviations from the defaults here. Write explicit
+actions and scope; do not use vague grants such as “full access.”
 
-Update `STATE.yaml` whenever any of these change:
+- <!-- e.g. Agents may push ticket branches to org/repo after local checks. -->
 
-- `status`
-- `stage.name`
-- `stage.worker`
-- `next_action`
-- required or completed outputs
-- active repo/worktree paths
-- tmux session or window names
-- human attention requirements
-- blocker state
-- completion state
+## When Unclear
 
-Before ending an agent session, update `STATE.yaml` so `orc status`,
-`orc next`, and `orc stuck` reflect reality.
-
----
-
-## Worktree Location
-
-All agent-created Git worktrees should live under the workspace-level `worktrees/` folder.
-
-Shape:
-
-```
-worktrees/
-  <repo-name>/
-    <ticket-slug>/
-```
-
-Do not create ad hoc worktrees inside product repos unless a repo-specific rule explicitly
-requires it. Record the active worktree path in `features/<ticket-slug>/STATE.yaml`.
-
----
-
-## Stage Quality
-
-The stage files in `stages/` are the intelligence of the system — they define
-what agents do, when they're done, and how they hand off to the next step.
-
-A stage doc should have:
-- **Clear exit criteria** — the agent knows exactly when it's done
-- **Explicit output definitions** — which files get written and where
-- **Unambiguous signals** — structured fields like `verdict:` that downstream
-  stages can read without interpretation
-- **Exact commands** — `orc mark ... advance`, `orc mark ... wait`, or `orc mark ... block` for every outcome,
-  with no ambiguity about which to use
-
-The sample workflows are a starting point. Tune them to your stack, review
-standards, and team process. They are plain markdown files — edit one and the
-next agent session picks up the new instructions immediately. No deploys, no
-code changes required.
-
----
-
-## Cost-Aware Worker Selection
-
-Prefer the lowest-cost worker that is allowed for the workflow/stage and capable of the task.
-Escalate model, thinking level, or service tier only when the state, workflow, or human says
-the complexity requires it.
-
-Ask before using high-cost workers for routine implementation, lint fixes, or small test fixes.
-Record cost-tier escalation in `STATE.yaml` history.
+Ask when an action could materially surprise the human, affect another person,
+or change shared or external state. For ticket work, first run
+`orc mark <ticket> pause "<decision or approval needed>"` so state reflects who
+must act next.

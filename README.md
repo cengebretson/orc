@@ -100,8 +100,9 @@ completion script.
 
 ## Dependencies
 
-`orc` itself has no runtime dependencies beyond Go. Two optional tools unlock
-additional features:
+Release binaries do not require Go. A working Orc workspace needs `git` plus at
+least one configured agent CLI (`claude` or `codex`); building from source needs
+Go 1.24.2 or newer. Two optional tools unlock additional features:
 
 | Tool | Purpose | Install |
 |------|---------|---------|
@@ -129,9 +130,10 @@ art, then to built-in ASCII art if chafa is not installed. Set
 orc init
 ```
 
-Run it and answer two questions: workspace path (default: current directory)
-and which starter pack to install. A pack is a reusable bundle of workflows,
-stages, workers, and aliases. `default` is assumed.
+Run it and confirm the workspace path (default: current directory). Orc installs
+the `default` starter pack; a pack is a reusable bundle of workflows, stages,
+workers, and aliases. Use `--skip-default-pack` when you want only the base
+workspace scaffold.
 
 `orc init` installs the chosen pack into `packs/<name>/`, copies its runtime
 workers and stages into `workers/` and `stages/`, and merges its workflow
@@ -152,18 +154,19 @@ orc pack show default                              # inspect one installed pack
 
 ### 2. Run setup
 
-Let an agent configure the workspace for your ticketing system, source control,
-and preferred agents:
+Let an agent configure the workspace for your ticketing system, repositories,
+workflow, and preferred agent engines:
 
 ```bash
 cd ~/my-workspace
-claude "Read SETUP.md and follow the setup instructions"
-# or: codex "Read SETUP.md and follow the setup instructions"
+claude "Read SETUP.md and perform the workspace setup"
+# or: codex "Read SETUP.md and perform the workspace setup"
 ```
 
-The agent will ask about your ticket system (Jira, GitHub Issues, etc.), repos,
-and which Claude/Codex model to use for each stage. It creates worker files and
-updates `ROUTER.md` with the right ticket system retrieval instructions.
+The agent inspects the installed pack, local repositories, repo instructions,
+and available tools first. It then asks once for the preferences it cannot infer,
+makes the workspace edits itself, and runs `orc doctor` to verify them. You should
+not need to copy configuration snippets or work through a field-by-field wizard.
 
 ### 3. Check readiness
 
@@ -439,7 +442,7 @@ These are called by agents at the end of each session. They are hidden from `orc
 Deep reference lives in **[docs/reference.md](docs/reference.md)**:
 
 - **[Workspace layout](docs/reference.md#workspace-layout)** — the full file tree `orc init` scaffolds
-- **[Workspace files](docs/reference.md#workspace-files)** — owner and purpose of each root file (`AGENTS.md`, `ROUTER.md`, `RULES.md`, …)
+- **[Workspace files](docs/reference.md#workspace-files)** — owner and purpose of each root file (`AGENTS.md`, `ORC.md`, `RULES.md`, …)
 - **[Feature folder](docs/reference.md#feature-folder)** — the per-ticket context pack and who reads/writes each file
 - **[orc.yaml](docs/reference.md#orcyaml)** — repos, workflows, loop stages, and settings (configuration deep-dive in **[docs/workflows.md](docs/workflows.md)**)
 - **[STATE.yaml](docs/reference.md#stateyaml)** — the per-ticket state machine, status values, and runtime/lock semantics

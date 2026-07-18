@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -19,6 +20,14 @@ type Repo struct {
 	Purpose       string   `yaml:"purpose"`
 	WorktreeSetup string   `yaml:"worktree_setup,omitempty"`
 	AgentHints    []string `yaml:"agent_hints,omitempty"`
+}
+
+// RepoRoute maps unambiguous ticket signals to one or more repositories.
+// Workflow selection remains independent under settings/workflows.
+type RepoRoute struct {
+	Labels     []string `yaml:"labels,omitempty"`
+	Components []string `yaml:"components,omitempty"`
+	Repos      []string `yaml:"repos"`
 }
 
 type Settings struct {
@@ -73,6 +82,7 @@ type StageDef struct {
 
 type Config struct {
 	Repos     []Repo                 `yaml:"repos"`
+	Routing   []RepoRoute            `yaml:"routing,omitempty"`
 	Settings  Settings               `yaml:"settings"`
 	Aliases   Aliases                `yaml:"aliases,omitempty"`
 	Workflows map[string]WorkflowDef `yaml:"workflows"`
@@ -293,7 +303,9 @@ func Load(root string) (*Config, error) {
 		return nil, fmt.Errorf("reading %s: %w", Filename, err)
 	}
 	var cfg Config
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
+	decoder := yaml.NewDecoder(bytes.NewReader(data))
+	decoder.KnownFields(true)
+	if err := decoder.Decode(&cfg); err != nil {
 		return nil, fmt.Errorf("parsing %s: %w", Filename, err)
 	}
 	if cfg.Workflows == nil {

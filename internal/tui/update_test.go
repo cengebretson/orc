@@ -610,7 +610,7 @@ func TestUpdateWindowSize(t *testing.T) {
 }
 
 func TestUpdateWindowSizeReflowsFileViewer(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "ROUTER.md")
+	path := filepath.Join(t.TempDir(), "RULES.md")
 	long := "word " // a paragraph that must re-wrap when the width changes
 	if err := os.WriteFile(path, []byte(strings.Repeat(long, 60)), 0644); err != nil {
 		t.Fatal(err)

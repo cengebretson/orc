@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -51,6 +52,13 @@ func Validate(cfg *Config, workerIDs []string) ValidationErrors {
 	errs = append(errs, validateAliasTargets("aliases.stages", cfg.Aliases.Stages)...)
 	errs = append(errs, validateAliasTargets("aliases.workers", cfg.Aliases.Workers)...)
 	errs = append(errs, validateRepos(cfg.Repos)...)
+	errs = append(errs, validateRepoRoutes(cfg.Routing, cfg.Repos)...)
+	if cfg.Settings.TuiRefresh < 0 {
+		errs = append(errs, ValidationError{
+			Path:    "settings.tui_refresh",
+			Message: "tui_refresh must be zero or greater",
+		})
+	}
 	if cfg.Settings.ArtifactPolicy != "" && cfg.Settings.ArtifactPolicy != "warn" && cfg.Settings.ArtifactPolicy != "block" {
 		errs = append(errs, ValidationError{
 			Path:    "settings.artifact_policy",
@@ -181,8 +189,35 @@ func validateArtifactPaths(path string, artifacts []string) ValidationErrors {
 
 func validateRepos(repos []Repo) ValidationErrors {
 	var errs ValidationErrors
+	names := make(map[string]int, len(repos))
+	paths := make(map[string]int, len(repos))
 	for i, repo := range repos {
 		repoPath := fmt.Sprintf("repos[%d]", i)
+		name := strings.TrimSpace(repo.Name)
+		path := strings.TrimSpace(repo.Path)
+		if name == "" {
+			errs = append(errs, ValidationError{Path: repoPath + ".name", Message: "repo name is required"})
+		} else if previous, ok := names[name]; ok {
+			errs = append(errs, ValidationError{
+				Path:    repoPath + ".name",
+				Message: fmt.Sprintf("duplicate repo name %q also used at repos[%d].name", name, previous),
+			})
+		} else {
+			names[name] = i
+		}
+		if path == "" {
+			errs = append(errs, ValidationError{Path: repoPath + ".path", Message: "repo path is required"})
+		} else {
+			clean := filepath.Clean(path)
+			if previous, ok := paths[clean]; ok {
+				errs = append(errs, ValidationError{
+					Path:    repoPath + ".path",
+					Message: fmt.Sprintf("duplicate repo path %q also used at repos[%d].path", path, previous),
+				})
+			} else {
+				paths[clean] = i
+			}
+		}
 		if strings.TrimSpace(repo.WorktreeSetup) == "" {
 			continue
 		}
@@ -192,6 +227,60 @@ func validateRepos(repos []Repo) ValidationErrors {
 				Message: fmt.Sprintf("unknown placeholder(s): %s", strings.Join(unknown, ", ")),
 			})
 		}
+	}
+	return errs
+}
+
+func validateRepoRoutes(routes []RepoRoute, repos []Repo) ValidationErrors {
+	var errs ValidationErrors
+	repoNames := make(map[string]bool, len(repos))
+	for _, repo := range repos {
+		repoNames[repo.Name] = true
+	}
+	seenLabels := make(map[string]string)
+	seenComponents := make(map[string]string)
+	for i, route := range routes {
+		routePath := fmt.Sprintf("routing[%d]", i)
+		if len(route.Labels) == 0 && len(route.Components) == 0 {
+			errs = append(errs, ValidationError{Path: routePath, Message: "route must define at least one label or component"})
+		}
+		errs = append(errs, validateRouteSignals(routePath+".labels", route.Labels, seenLabels)...)
+		errs = append(errs, validateRouteSignals(routePath+".components", route.Components, seenComponents)...)
+		if len(route.Repos) == 0 {
+			errs = append(errs, ValidationError{Path: routePath + ".repos", Message: "route must select at least one repo"})
+		}
+		seenRepos := map[string]int{}
+		for j, name := range route.Repos {
+			path := fmt.Sprintf("%s.repos[%d]", routePath, j)
+			name = strings.TrimSpace(name)
+			if name == "" {
+				errs = append(errs, ValidationError{Path: path, Message: "repo name is required"})
+			} else if previous, ok := seenRepos[name]; ok {
+				errs = append(errs, ValidationError{Path: path, Message: fmt.Sprintf("duplicate repo %q also used at %s.repos[%d]", name, routePath, previous)})
+			} else if !repoNames[name] {
+				errs = append(errs, ValidationError{Path: path, Message: fmt.Sprintf("repo %q not found in repos", name)})
+			}
+			seenRepos[name] = j
+		}
+	}
+	return errs
+}
+
+func validateRouteSignals(path string, values []string, seen map[string]string) ValidationErrors {
+	var errs ValidationErrors
+	for i, value := range values {
+		valuePath := fmt.Sprintf("%s[%d]", path, i)
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			errs = append(errs, ValidationError{Path: valuePath, Message: "routing value is required"})
+			continue
+		}
+		key := strings.ToLower(trimmed)
+		if previous, ok := seen[key]; ok {
+			errs = append(errs, ValidationError{Path: valuePath, Message: fmt.Sprintf("routing value %q is already used at %s", trimmed, previous)})
+			continue
+		}
+		seen[key] = valuePath
 	}
 	return errs
 }

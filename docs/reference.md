@@ -9,13 +9,14 @@ the getting-started guide, command list, and concepts, see the
 
 ```
 my-workspace/
-  AGENTS.md          shared context and routing rules (Claude + Codex)
+  AGENTS.md          shared agent entrypoint (Claude + Codex)
   CLAUDE.md          imports AGENTS.md (Claude entrypoint)
-  ROUTER.md          which repo owns each task, worktree paths
   TOOLS.md           approved tools, MCP servers, external systems
   RULES.md           approval, state update, and cost rules
   SETUP.md           one-time setup — run with your agent after init
-  .gitignore         excludes worktrees/
+  .gitignore         excludes projects/ and worktrees/
+
+  projects/          preferred main repo checkouts; external paths also work
 
   features/
     _template/       copied for each new ticket
@@ -56,7 +57,7 @@ my-workspace/
       stages/          source stage docs copied into stages/default/
       workers/         source worker docs copied into workers/default/
 
-  orc.yaml           workspace config — repos, workflows, loop stages, settings
+  orc.yaml           workspace config — repo routing, workflows, loop stages, settings
   ORC.md             agent state contract — read at session start
 
   worktrees/         git worktrees for ticket branches (gitignored)
@@ -68,14 +69,13 @@ The root files are the shared context every agent reads before starting work. Ea
 
 | File | Owner | Purpose |
 |------|-------|---------|
-| `AGENTS.md` | shared | Entry point for all agents — routing, session protocol, repo commands. Add team conventions at the bottom. |
+| `AGENTS.md` | shared | Entry point for all agents — contract map, repository command boundaries, and cross-repo team conventions. |
 | `CLAUDE.md` | orc | Imports `AGENTS.md`. Claude's entrypoint — do not edit. |
 | `ORC.md` | orc | State contract — status values, `orc mark` commands, STATE.yaml rules. Do not add team conventions here. |
-| `ROUTER.md` | user | Ticket system details, repo purposes, worktree layout. Fill in during setup. |
 | `TOOLS.md` | user | Approved tools, MCP servers, CLI commands, external systems. Fill in during setup. |
 | `RULES.md` | user | What requires human approval before agents act — PR gates, cost limits, destructive operations. |
 | `SETUP.md` | orc | One-time setup guide. Run with your agent after `orc init` to configure repos, workers, and tool policy. |
-| `orc.yaml` | user | Workflow config — repos, stage order, workers, loop stages, settings. |
+| `orc.yaml` | user | Routing and workflow config — repos, ticket metadata routes, stages, workers, loops, and settings. |
 
 `AGENTS.md` is the entry point — it fans out to everything else. `ORC.md` and `CLAUDE.md` are orc-managed and should not be edited directly. Everything else is yours to configure and extend.
 
@@ -138,11 +138,18 @@ settings:
 
 repos:
   - name: my-app
-    path: ../my-app
+    path: /Users/example/workspace/my-app
     purpose: Application code, APIs, tests
-    worktree_setup: "../my-app/scripts/setup-worktree.sh -b {{branch}} --path {{worktree_path}}"
+    worktree_setup: "{{repo_path}}/scripts/setup-worktree.sh -b {{branch}} --path {{worktree_path}}"
     agent_hints:
       - Use the repo Makefile before direct tool commands.
+
+routing:
+  - labels: [application]
+    components: [web]
+    repos: [my-app]
+  - labels: [full-stack]
+    repos: [my-app, shared-api]
 
 workflows:
   default:standard:
@@ -179,6 +186,13 @@ workflows:
 If it is not set, `orc work` returns an error. `advance: auto` tells agents to
 run `orc mark <ticket> next` when a stage is complete; `advance: manual` tells agents to
 run `orc mark <ticket> pause` so a human can review before continuing.
+
+Routing rules map exact ticket labels or components to one or more configured
+repository names. Ticket prefixes are intentionally not repository selectors:
+one ticket namespace may span many repos. Intake records the resolved selection
+in `STATE.yaml.repos`. Multiple matching rules are ambiguous and must pause;
+intentional cross-repo work is expressed by one rule naming multiple repos.
+Repository purpose is the fallback when no rule matches.
 
 Repos may define `worktree_setup` when raw `git worktree add` is not enough.
 `orc next` resolves supported placeholders and prints the command for the agent

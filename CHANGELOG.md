@@ -6,6 +6,39 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Made `orc watch` truncate Unicode text by terminal cell width, preventing
+  broken UTF-8 and misaligned rows for non-ASCII ticket and session metadata.
+- Made `orc.yaml` reject unknown keys, missing or duplicate repository
+  identities, duplicate repository paths, and negative TUI refresh intervals so
+  agent-authored setup mistakes fail visibly instead of falling back silently.
+
+### Changed
+
+- Streamlined the generated `SETUP.md` into an agent-run discovery, confirmation,
+  configuration, and verification workflow that asks users only for decisions
+  the agent cannot safely discover.
+- Tightened the generated `ORC.md` state contract by separating orc-owned
+  lifecycle fields from agent-writable handoff context and removing duplicated,
+  drift-prone command and artifact guidance.
+- Moved repository routing into validated `orc.yaml` rules that map exact ticket
+  labels or components to one or multiple repositories, while keeping workflow
+  selection independent. `ORC.md` makes routing a precondition for any
+  repository-dependent stage, including custom workflows without intake;
+  `TOOLS.md` owns ticket retrieval and `RULES.md` contains only approval policy.
+- Changed generated `orc.yaml` repository examples to use setup-discovered
+  absolute paths instead of assuming repositories are workspace siblings;
+  existing relative paths remain supported.
+- Reduced generated `AGENTS.md` to a stable workspace entrypoint that delegates
+  routing, lifecycle, permissions, and tools to their owning contracts instead
+  of duplicating those instructions.
+
+### Removed
+
+- Removed generated `ROUTER.md`; its structured repository-routing role now
+  belongs to `orc.yaml`, eliminating a second routing source of truth.
+
 ## [0.12.0] - 2026-07-17
 
 ### Changed

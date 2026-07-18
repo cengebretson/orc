@@ -70,8 +70,8 @@ new workspace, let an agent follow the same setup path users receive:
 
 ```sh
 cd "$QA_ROOT"
-codex "Read SETUP.md and follow the setup instructions"
-# or: claude "Read SETUP.md and follow the setup instructions"
+codex "Read SETUP.md and perform the workspace setup"
+# or: claude "Read SETUP.md and perform the workspace setup"
 ```
 
 Point setup at a disposable Git repository, then return to the Orc checkout or

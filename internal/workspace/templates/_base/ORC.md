@@ -1,166 +1,159 @@
 # ORC.md — Agent State Contract
 
-<!-- This file defines the orc state contract. Do not add team conventions or
-     custom instructions here — put those in AGENTS.md under Team Conventions.
-     Editing this file may break agent session protocol and state transitions. -->
+<!-- This file defines orc's durable state contract. Put team conventions and
+     repository commands in AGENTS.md, and approval policy in RULES.md. -->
 
-Read this file at the start of every session.
+Read this file at the start of every ticket session. Also read:
 
-Also read:
-- `RULES.md` — what requires human approval before acting
-- `AGENTS.md` — routing, tool policy, and repo commands
-
----
+- `RULES.md` for actions that require human approval
+- `AGENTS.md` for shared workspace and repository command conventions
+- the current stage file under `stages/<pack>/`
 
 ## Session Protocol
 
-**Start every session:**
-```
-orc status <ticket> --json
-```
-Then mark the ticket active based on its current status:
-- `pending` or `ready` → `orc mark <ticket> start`
-- `paused` → `orc mark <ticket> resume`
+1. Inspect durable state: `orc status <ticket> --json`.
+2. Read `TICKET.md` and the current stage file. Before implementation, also read
+   `SPEC.md`, `PLAN.md`, and relevant prior-stage outputs.
+3. Enter the session:
+   - `pending` or `ready`: `orc mark <ticket> start`
+   - `paused`: `orc mark <ticket> resume`
+   - `active`: continue only if this is the same active session; otherwise pause
+     and resolve the ownership conflict
+4. Do the stage work and keep the feature context current.
+5. End with exactly one durable transition:
 
-Read the current stage file. Namespaced stage IDs map to nested paths:
-`default:develop` is `stages/default/develop.md`.
-
-**End every session with exactly one of:**
-```
-orc mark <ticket> next --result "<what was done>"                          # stage complete
-orc mark <ticket> next --stage <stage> --worker <worker> --result "<what was done>" # explicit jump or override
-orc mark <ticket> pause "<what you need from the human or what is blocking>"  # human needed
-orc mark <ticket> done --result "<what was done>"                             # final stage
-```
-Never end a session without updating state. Never hand-edit STATE.yaml directly.
-
-**Before any human interaction:**
-Run `orc mark <ticket> pause "<what you need>"` before asking a human for input,
-approval, or a decision. State must reflect reality even if the session ends
-before the human responds. Do not ask, post, or request anything from a human
-until STATE.yaml shows `paused`.
-
----
-
-## Resource Names and Aliases
-
-Orc resources use canonical IDs:
-
-- Workflows: `<pack>:<workflow>`
-- Stages: `<pack>:<stage>`
-- Workers: `<pack>:<worker>`
-
-`orc.yaml` may define aliases such as `develop` for `default:develop`. Orc
-commands may accept either aliases or canonical IDs, but state and validation may
-store canonical IDs. Always resolve files through the namespaced runtime paths:
-
-- `stages/default/develop.md` for stage `default:develop`
-- `workers/default/bob.md` for worker `default:bob`
-
-Do not create root-level runnable files like `workers/bob.md` or
-`stages/develop.md`.
-
----
-
-## orc mark — Command Reference
-
-```
-orc mark <ticket> start                                               # begin fresh session (pending or ready)
-orc mark <ticket> resume                                              # continue a paused session
-orc mark <ticket> next --result "<what was done>"                     # stage complete, move to next
-orc mark <ticket> next --stage <stage> --worker <worker>             # jump to a specific stage
-orc mark <ticket> pause "<what you need or what is blocking>"        # human needed (input, approval, or blocker)
-orc mark <ticket> done [--result "<what was done>"]                  # all stages complete
+```text
+orc mark <ticket> next --result "<what was done>"
+orc mark <ticket> next --stage <stage> --worker <worker> --result "<what was done>"
+orc mark <ticket> pause "<what the human must decide or what is blocking>"
+orc mark <ticket> done --result "<what was done>"
 ```
 
-Use `start` for a fresh session on a `pending` or `ready` ticket.
-Use `resume` to pick up a `paused` ticket — it clears the human-directed next action so you can write fresh context.
-Use `next` when the stage exit criteria are met. If no stages remain, status is automatically set to `done`.
-Use `pause` when you need a human decision, approval, information, or when an external condition prevents progress.
-Use `done` to explicitly close active, ready, or paused work.
+Never leave an active session without recording its outcome. Before asking a
+human for input, approval, or a decision, pause the ticket with the specific
+request so durable state reflects who must act next.
 
-Transition guards:
-- `start` is allowed only from `pending` or `ready`.
-- `resume` is allowed only from `paused`.
-- `next` is rejected while a ticket is still `pending`; start the session first.
-- `next --stage` must name a configured workflow or loop stage, by alias or canonical ID.
-- `next --worker` must name a worker, by alias or canonical ID, whose file exists under `workers/<pack>/`.
-- `done` is rejected from `pending`.
-- Invalid `orc.yaml` blocks `next`.
+Use `next` only when the stage exit criteria are met. If required artifacts are
+missing, pause instead of using `--force`; that override is for humans. Use
+`done` only when the workflow is genuinely complete.
 
----
+## State Ownership
 
-## Status Values
+`STATE.yaml` is the durable handoff between sessions. Orc owns lifecycle state;
+agents own the work context that orc cannot infer.
+
+Never hand-edit these orc-owned fields:
+
+- `schema_version`, `ticket`, `slug`, `status`, `workflow`
+- `stage`, `stage_counts`, `runtime`, `history`
+
+Change lifecycle state only with `orc mark`, `orc jit`, `orc archive`, and other
+orc commands. In particular, never add history entries or alter JIT/runtime
+handles manually.
+
+Agents and humans may directly update only these context fields when the work
+requires it:
+
+- `repos`: repository main paths, worktrees, and branches
+- `inputs`: new context supplied for the current work
+- `outputs`: required and completed stage outputs
+- `next_action`: who acts next, what they should do, and the correct `cwd`
+
+Do not edit `STATE.yaml` while `STATE.yaml.lock` exists. Keep direct edits
+minimal and preserve all other fields. After an edit, run
+`orc doctor <ticket>` to validate the state file.
+
+`orc mark` records transition history automatically. Important statuses are:
 
 | Status | Meaning |
-|--------|---------|
-| `pending` | Session not yet started for the current stage — set by `orc work` and after each `orc mark next` |
-| `ready` | Human-set: stage complete and cleared for the next session |
-| `active` | Agent is actively working |
-| `paused` | Human needed — input, approval, or external blocker |
-| `done` | All stages complete (or explicitly closed) |
-| `archived` | Feature folder moved to `_archive/` |
+|---|---|
+| `pending` | Current stage has not started |
+| `ready` | Work is cleared to start; accepted as a startable compatibility state |
+| `active` | An agent session is working |
+| `paused` | A human action or external condition is required |
+| `done` | Workflow is complete or explicitly closed |
+| `archived` | Feature folder has been archived |
 
-Use `orc mark <ticket> pause "<reason>"` for all cases where a human needs to act. The reason captures the details.
+If a command times out on the state lock, run `orc doctor <ticket>` and inspect
+whether the recorded process is still active. Do not remove an active lock. Orc
+can recover locks whose process is dead or whose metadata is stale.
 
----
+## Resource IDs
 
-## STATE.yaml Update Rules
+Canonical resource IDs are namespaced:
 
-`STATE.yaml` is the durable state contract for the feature. Missing
-`schema_version` means legacy v1.
+- workflows: `<pack>:<workflow>`
+- stages: `<pack>:<stage>`
+- workers: `<pack>:<worker>`
 
-| Field | Owner | Notes |
-|-------|-------|-------|
-| `schema_version` | `orc-owned` | State file contract version. New files use v1. |
-| `ticket` | `orc-owned` | Stable ticket identifier. |
-| `slug` | `orc-owned` | Feature folder slug. |
-| `status` | `orc-owned` / `agent-writable` | Agents update this through `orc mark`. |
-| `workflow` | `orc-owned` | Workflow selected when the feature is created. |
-| `stage` | `orc-owned` | Current stage name and assigned worker. Change through `orc mark next`. |
-| `stage_counts` | `orc-owned` | Retry and loop counts maintained by `orc`. |
-| `runtime` | `orc-owned` | Runtime handles such as tmux session or active JIT task. |
-| `repos` | `orc-owned` / `agent-writable` | Repo main paths, worktrees, and branches used for this feature. |
-| `inputs` | `human-editable` / `agent-writable` | Context available to the current stage. |
-| `outputs` | `agent-writable` | Required and completed stage outputs. |
-| `next_action` | `agent-writable` | Who should act next, what they should do, and where commands should run. |
-| `history` | `orc-owned` | Append-only summary of starts, transitions, pauses, and completions. |
+Commands may accept aliases configured in `orc.yaml`, but state may store the
+canonical ID. Resolve runnable files through namespaced paths: for example,
+`default:develop` maps to `stages/default/develop.md`. Do not create runnable
+root files such as `stages/develop.md` or `workers/bob.md`.
 
-`orc mark` writes a history entry automatically for every transition (start, resume, next, pause, done). Do not write history entries manually.
+`next --stage` must name a configured workflow or loop stage. `next --worker`
+must name a configured worker whose file exists. Invalid configuration blocks
+the transition.
 
-Agents are responsible for keeping these fields current as work progresses:
+## Feature Context and Handoffs
 
-- `next_action` — set the worker, prompt, and cwd for whoever picks up next
-- `repos` — record worktree path and branch when created or changed
+Each ticket has a context pack at `features/<ticket-slug>/`. Core files are:
 
-`stage.name` and `stage.worker` are updated by `orc mark next`. Do not hand-edit them.
+| Path | Purpose |
+|---|---|
+| `STATE.yaml` | Durable lifecycle and handoff state |
+| `TICKET.md` | Ticket description and acceptance criteria |
+| `SPEC.md` | Scope, constraints, and open questions |
+| `PLAN.md` | Implementation approach and repository context |
+| `DECISIONS.md` | Non-obvious choices and rejected alternatives |
 
-### STATE.yaml.lock
+The feature folder is the handoff medium. Stage instructions and
+`required_artifacts` in `orc.yaml` are authoritative for stage-specific output
+paths. Read relevant prior outputs before starting. If a required input is
+missing, pause with a precise request.
 
-`orc` creates `STATE.yaml.lock` while it is writing state. Do not edit
-`STATE.yaml` while the lock exists. If an `orc` command times out waiting for the
-lock, run `orc doctor` and check whether the recorded PID is still active.
+The default pack uses friendly output folders such as `develop/`,
+`code-review/`, `pr-open/`, `pr-repair/`, and `qa-automation/`. These are paths,
+not canonical resource IDs; do not create folders such as `default:develop/`.
 
-Locks with a dead PID, unreadable PID, or old timestamp are treated as stale and
-may be removed by `orc` during the next state update. Active locks mean another
-`orc` process is still writing state.
+With `settings.artifact_policy: block`, `orc mark <ticket> next` rejects missing,
+empty, or unchanged template artifacts. `orc validate` reports artifact
+problems. Agents do not bypass these checks with `--force`.
 
----
+## Repository Routing
+
+Repository routing is a workflow-independent precondition for repository work.
+The default intake stage resolves it early, but custom workflows are not
+required to contain an intake stage.
+
+Before a stage reads or changes repository code:
+
+1. Use the repositories already recorded in `STATE.yaml.repos` when they fully
+   cover the stage's work.
+2. If that selection is empty or incomplete, resolve it from `orc.yaml`:
+   - honor explicit configured repository names in trusted ticket context;
+   - match exact ticket labels or components against `routing` rules;
+   - otherwise compare the ticket scope with repository `purpose` and
+     `agent_hints`.
+3. Persist every selected repository as a key in the agent-writable
+   `STATE.yaml.repos` field before running repository commands.
+4. If multiple routing rules match or the fallback remains ambiguous, pause
+   with the routing decision needed. Do not silently merge rules or guess.
+
+One routing rule may explicitly select multiple repositories. Ticket ID prefixes
+identify ticket namespaces, not repository ownership, and must not be used as a
+repository selector. Workflow selection is independent of repository routing.
 
 ## Worktrees
 
-Agents may create Git worktrees when a stage requires repository changes. Worktrees
-are created by agents, but they must be tracked in `STATE.yaml` so later stages
-and `orc archive` know what happened.
+When a stage requires repository changes, create worktrees under:
 
-Create worktrees under the workspace:
-
-```
+```text
 worktrees/<repo-name>/<ticket-slug>/
 ```
 
-Use repo names from `orc.yaml`. When you create or use a worktree, update
-`STATE.yaml`:
+Use repository names from `orc.yaml`. Immediately record the main repository,
+worktree, and branch in the agent-writable `repos` field:
 
 ```yaml
 repos:
@@ -170,75 +163,20 @@ repos:
     branch: <branch-name>
 ```
 
-Rules:
+Run repository-specific commands from the worktree. Set `next_action.cwd` to the
+worktree when the next session should continue there. Do not manually delete a
+tracked worktree during feature work; `orc archive` handles cleanup. If the
+repository, branch, or path is unclear, pause and ask.
 
-- Use the worktree as `cwd` for repo-specific package, test, and git commands.
-- Set `next_action.cwd` to the worktree path when the next agent should continue there.
-- Record the branch and worktree path before ending the session.
-- Do not manually delete worktrees during feature work; `orc archive` handles cleanup.
-- If the correct repo, branch, or worktree path is unclear, use `orc mark ... pause` and ask.
+## Decisions
 
----
+Record a non-obvious choice in `DECISIONS.md` when it is made:
 
-## Feature Folder
-
-Every ticket has a context pack at `features/<ticket-slug>/`:
-
-| File | Purpose |
-|------|---------|
-| `STATE.yaml` | Durable state — status, stage, worker, next action, history |
-| `TICKET.md` | Ticket description and acceptance criteria |
-| `SPEC.md` | Context, scope, constraints, open questions |
-| `PLAN.md` | Implementation approach, repo context, and steps |
-| `DECISIONS.md` | Non-obvious choices — what, why, alternatives rejected |
-
-Read `STATE.yaml` and `TICKET.md` at the start of every session. Read `SPEC.md` and `PLAN.md` before any implementation work.
-
----
-
-## Stage Handoff
-
-The feature folder is the handoff medium between stages. Read previous stage outputs before starting work. If a required input is missing, `orc mark ... pause` — do not proceed.
-
-Each stage writes its outputs to the paths declared in its stage instructions and
-any `required_artifacts` configured for the stage in `orc.yaml`. `orc validate`
-warns when these files are missing or empty. If `settings.artifact_policy` is
-`block`, `orc mark <ticket> next` refuses to advance until core docs and the
-current stage's required artifacts are ready — a required artifact that is still
-byte-identical to the feature template counts as not written yet. A human can
-override with `orc mark <ticket> next --force`, which records the skipped
-artifacts in history; agents should `orc mark <ticket> pause` instead.
-
-These are handoff folders, not canonical resource IDs. The default pack uses
-friendly folders such as `develop/`, `code-review/`, and `pr-open/`.
-
-Do not create feature output folders named after canonical IDs such as
-`default:develop/` unless the stage instructions explicitly require it.
-
-| Path | Written by | Read by |
-|------|-----------|---------|
-| `TICKET.md` | intake | all stages |
-| `SPEC.md` | intake | develop, code-review |
-| `PLAN.md` | intake | develop, code-review, pr-open, qa-automation |
-| `DECISIONS.md` | any stage | any stage |
-| `develop/HANDOFF.md` | develop | code-review, pr-open, qa-automation |
-| `code-review/REVIEW.md` | code-review | develop, pr-open |
-| `pr-open/PR.md` | pr-open | pr-repair, qa-automation, human |
-| `qa-automation/PLAN.md` | qa-automation | qa-automation (next session) |
-| `qa-automation/RUNS.md` | qa-automation | qa-automation, human |
-| `qa-automation/RESULT.md` | qa-automation | human, archive |
-
----
-
-## Recording Decisions
-
-When you make a non-obvious choice, write it to `features/<ticket-slug>/DECISIONS.md` at the moment of the decision:
-
-```
+```markdown
 ## <short title>
 **Decision:** <what>
-**Reason:** <why — constraints, tradeoffs, context>
-**Alternatives:** <what else was considered and why rejected>
+**Reason:** <constraints and tradeoffs>
+**Alternatives:** <what was rejected and why>
 ```
 
-One entry per decision. Do not batch at end of session.
+One entry per decision; do not defer decision logging until session end.

@@ -19,23 +19,28 @@ orc work <ticket>
 **Inputs:** Ticket ID  
 **Outputs:** `TICKET.md`, `SPEC.md`, `PLAN.md`
 
-1. Read `ROUTER.md` — the **Ticket System** section tells you where tickets
-   live, how to fetch them, and any auth requirements. Use that.
-2. Fetch the ticket from the source system described in `ROUTER.md`.
-3. If the ticket cannot be found, run `orc mark <ticket> pause "<explanation>"` and stop.
-4. Populate `TICKET.md` with the ticket summary, description, and acceptance criteria.
-5. Identify the target repo or repos for the work. Use `orc.yaml`, the ticket,
-   and `ROUTER.md`; if the correct repo is unclear, record the uncertainty in
-   `SPEC.md` rather than guessing.
-6. Check target repos for repo-local context that may affect the work, such as:
+1. Read `TOOLS.md` for the verified ticket retrieval method and fetch the ticket.
+2. If the ticket cannot be found, run `orc mark <ticket> pause "<explanation>"` and stop.
+3. Populate `TICKET.md` with the ticket summary, description, and acceptance criteria.
+4. Resolve the repository-routing precondition from `ORC.md` proactively by
+   identifying every target repository:
+   - honor explicit repository names in trusted ticket metadata;
+   - match exact ticket labels/components against `orc.yaml` routing rules;
+   - otherwise compare ticket scope with each repository's `purpose` and
+     `agent_hints`.
+   A routing rule may intentionally select multiple repositories. Record each
+   selected repository as a key in `STATE.yaml.repos`. If multiple rules match,
+   or the fallback is still ambiguous, record the uncertainty in `SPEC.md` and
+   pause rather than unioning rules or guessing.
+5. Check target repos for repo-local context that may affect the work, such as:
    - `AGENTS.md`, `CLAUDE.md`, `README.md`
    - `ARCHITECTURE.md`, `docs/architecture.md`
    - `docs/domains/REGISTRY.md`
    - `docs/domains/*/README.md`
-7. Read only the context docs that are relevant to the ticket. Do not run broad
+6. Read only the context docs that are relevant to the ticket. Do not run broad
    analysis or update repo docs during intake.
-8. Draft `SPEC.md` with context, scope, open questions, and any repo constraints.
-9. Draft `PLAN.md` with an initial approach, steps, and a `Repo Context` section.
+7. Draft `SPEC.md` with context, scope, open questions, and any repo constraints.
+8. Draft `PLAN.md` with an initial approach, steps, and a `Repo Context` section.
 
 ## Repo Context
 

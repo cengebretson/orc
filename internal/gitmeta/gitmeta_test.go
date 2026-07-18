@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -36,6 +37,13 @@ func TestInspectGitGroupsLinkedWorktreeUnderCommonRepository(t *testing.T) {
 func runGit(t *testing.T, cwd string, args ...string) {
 	t.Helper()
 	cmd := exec.Command("git", append([]string{"-C", cwd}, args...)...)
+	// Git exports repository-local GIT_* variables to hooks. Tests that create a
+	// separate repository must not inherit the parent hook's index or worktree.
+	for _, entry := range os.Environ() {
+		if !strings.HasPrefix(entry, "GIT_") {
+			cmd.Env = append(cmd.Env, entry)
+		}
+	}
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, out)
 	}

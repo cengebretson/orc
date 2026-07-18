@@ -25,11 +25,18 @@ settings:
 
 repos:
   - name: my-app
-    path: ../my-app
+    path: /Users/example/workspace/my-app
     purpose: Application code, APIs, tests
-    worktree_setup: "../my-app/scripts/setup-worktree.sh -b {{branch}} --path {{worktree_path}}"
+    worktree_setup: "{{repo_path}}/scripts/setup-worktree.sh -b {{branch}} --path {{worktree_path}}"
     agent_hints:
       - Use the repo Makefile before direct tool commands.
+
+routing:
+  - labels: [application]
+    components: [web]
+    repos: [my-app]
+  - labels: [full-stack]
+    repos: [my-app, shared-api]
 
 workflows:
   default:standard:
@@ -56,6 +63,13 @@ workflows:
         worker: default:brian
         advance: auto
 ```
+
+Repository routes use exact, case-insensitive ticket labels or components and
+may select one repository or an explicit cross-repository set. Signals must be
+unique across routes. Multiple matching rules are ambiguous rather than merged;
+put an intentional cross-repo selection in one rule. Ticket ID prefixes are not
+repository selectors, and routes do not restrict which workflows may operate on
+a repository.
 
 ## Settings
 

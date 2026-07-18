@@ -3,6 +3,7 @@ package config_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/cengebretson/orc/internal/config"
@@ -88,6 +89,10 @@ repos:
     worktree_setup: "../my-app/setup.sh -b {{branch}} --path {{worktree_path}}"
     agent_hints:
       - Use the repo Makefile before direct tool commands.
+routing:
+  - labels: [full-stack]
+    components: [web]
+    repos: [my-app]
 `)
 
 	cfg, err := config.Load(dir)
@@ -102,6 +107,15 @@ repos:
 	}
 	if got := cfg.Repos[0].AgentHints; len(got) != 1 || got[0] != "Use the repo Makefile before direct tool commands." {
 		t.Fatalf("AgentHints = %#v", got)
+	}
+	if len(cfg.Routing) != 1 || len(cfg.Routing[0].Repos) != 1 || cfg.Routing[0].Repos[0] != "my-app" {
+		t.Fatalf("Routing = %#v", cfg.Routing)
+	}
+	if got := cfg.Routing[0].Labels; len(got) != 1 || got[0] != "full-stack" {
+		t.Fatalf("Routing.Labels = %#v", got)
+	}
+	if got := cfg.Routing[0].Components; len(got) != 1 || got[0] != "web" {
+		t.Fatalf("Routing.Components = %#v", got)
 	}
 }
 
@@ -118,6 +132,19 @@ func TestLoad_MissingFile_ReturnsEmptyConfig(t *testing.T) {
 	}
 	if len(cfg.Names()) != 0 {
 		t.Errorf("expected no workflows, got %d", len(cfg.Names()))
+	}
+}
+
+func TestLoad_RejectsUnknownFields(t *testing.T) {
+	dir := t.TempDir()
+	writeOrcYAML(t, dir, `
+settings:
+  artifact_polciy: block
+`)
+
+	_, err := config.Load(dir)
+	if err == nil || !strings.Contains(err.Error(), "field artifact_polciy not found") {
+		t.Fatalf("Load error = %v, want unknown field error", err)
 	}
 }
 

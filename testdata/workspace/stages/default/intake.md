@@ -19,13 +19,59 @@ orc work <ticket>
 **Inputs:** Ticket ID  
 **Outputs:** `TICKET.md`, `SPEC.md`, `PLAN.md`
 
-1. Read `ROUTER.md` — the **Ticket System** section tells you where tickets
-   live, how to fetch them, and any auth requirements. Use that.
-2. Fetch the ticket from the source system described in `ROUTER.md`.
-3. If the ticket cannot be found, run `orc mark <ticket> pause "<explanation>"` and stop.
-4. Populate `TICKET.md` with the ticket summary, description, and acceptance criteria.
-5. Draft `SPEC.md` with context, scope, and open questions.
-6. Draft `PLAN.md` with an initial approach and steps.
+1. Read `TOOLS.md` for the verified ticket retrieval method and fetch the ticket.
+2. If the ticket cannot be found, run `orc mark <ticket> pause "<explanation>"` and stop.
+3. Populate `TICKET.md` with the ticket summary, description, and acceptance criteria.
+4. Resolve the repository-routing precondition from `ORC.md` proactively by
+   identifying every target repository:
+   - honor explicit repository names in trusted ticket metadata;
+   - match exact ticket labels/components against `orc.yaml` routing rules;
+   - otherwise compare ticket scope with each repository's `purpose` and
+     `agent_hints`.
+   A routing rule may intentionally select multiple repositories. Record each
+   selected repository as a key in `STATE.yaml.repos`. If multiple rules match,
+   or the fallback is still ambiguous, record the uncertainty in `SPEC.md` and
+   pause rather than unioning rules or guessing.
+5. Check target repos for repo-local context that may affect the work, such as:
+   - `AGENTS.md`, `CLAUDE.md`, `README.md`
+   - `ARCHITECTURE.md`, `docs/architecture.md`
+   - `docs/domains/REGISTRY.md`
+   - `docs/domains/*/README.md`
+6. Read only the context docs that are relevant to the ticket. Do not run broad
+   analysis or update repo docs during intake.
+7. Draft `SPEC.md` with context, scope, open questions, and any repo constraints.
+8. Draft `PLAN.md` with an initial approach, steps, and a `Repo Context` section.
+
+## Repo Context
+
+In `PLAN.md`, include:
+
+```markdown
+## Repo Context
+
+Relevant docs:
+- `<path>` — why it matters
+
+Impacted areas:
+- `<area or domain>`
+
+Risks:
+- `<boundary, coupling, test, or docs risk>`
+
+Missing context:
+- `<important doc or owner that could not be found>`
+```
+
+If no relevant repo-local docs are found, write:
+
+```markdown
+## Repo Context
+
+Relevant docs: none found
+Impacted areas: inferred from ticket only
+Risks: none identified from repo-local docs
+Missing context: none
+```
 
 ## Exit Criteria
 

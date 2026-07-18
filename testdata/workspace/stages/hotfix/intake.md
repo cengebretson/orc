@@ -19,11 +19,11 @@ orc work <ticket>
 **Inputs:** Ticket ID  
 **Outputs:** `TICKET.md`, `SPEC.md`, `PLAN.md`
 
-1. Read `ROUTER.md` — the **Ticket System** section tells you where tickets
-   live, how to fetch them, and any auth requirements. Use that.
-2. Fetch the ticket from the source system described in `ROUTER.md`.
-3. If the ticket cannot be found, run `orc mark <ticket> pause "<explanation>"` and stop.
+1. Read `TOOLS.md` for the verified ticket retrieval method and fetch the ticket.
+2. If the ticket cannot be found, run `orc mark <ticket> pause "<explanation>"` and stop.
 4. Populate `TICKET.md` with the ticket summary, description, and acceptance criteria.
+4. Select the target repositories using ticket metadata and routing rules in
+   `orc.yaml`; pause if the result is ambiguous.
 5. Draft `SPEC.md` with context, scope, and open questions.
 6. Draft `PLAN.md` with an initial approach and steps.
 

@@ -22,7 +22,6 @@ func TestInit_CreatesExpectedFiles(t *testing.T) {
 	required := []string{
 		"AGENTS.md",
 		"CLAUDE.md",
-		"ROUTER.md",
 		"TOOLS.md",
 		"RULES.md",
 		"SETUP.md",
@@ -75,9 +74,9 @@ func TestInit_PrintsNextSteps(t *testing.T) {
 		"Workspace ready at: " + dir,
 		"Next:",
 		"  cd " + dir,
-		`  claude "Read SETUP.md and follow the setup instructions"`,
+		`  claude "Read SETUP.md and perform the workspace setup"`,
 		"  # or:",
-		`  codex "Read SETUP.md and follow the setup instructions"`,
+		`  codex "Read SETUP.md and perform the workspace setup"`,
 		"  orc doctor",
 	} {
 		if !strings.Contains(out, want) {
@@ -100,9 +99,9 @@ func TestInit_DryRunPrintsNextSteps(t *testing.T) {
 		"Would create workspace at: " + dir,
 		"Would run next:",
 		"  cd " + dir,
-		`  claude "Read SETUP.md and follow the setup instructions"`,
+		`  claude "Read SETUP.md and perform the workspace setup"`,
 		"  # or:",
-		`  codex "Read SETUP.md and follow the setup instructions"`,
+		`  codex "Read SETUP.md and perform the workspace setup"`,
 		"  orc doctor",
 	} {
 		if !strings.Contains(out, want) {

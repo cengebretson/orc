@@ -2,50 +2,51 @@
 
 ## Scope
 
-This is the workspace root. It owns shared routing, tool policy, feature context,
-and cross-repo workflow state.
+This is the shared workspace entrypoint for Claude, Codex, and other agents.
+It explains which workspace contracts apply and holds team conventions that
+span repositories. `CLAUDE.md` imports it; Codex reads it directly.
 
-This workspace is designed to work equally well with Claude and Codex. `AGENTS.md`
-is the shared source of truth. `CLAUDE.md` imports it; Codex reads it directly.
-Never put product-specific instructions here — those belong in worker definitions.
+Keep product-specific commands and standards in the owning repository. Put
+stage behavior in stage files and worker-specific behavior in worker files.
 
 ## Read First
 
-- Read `ROUTER.md` before deciding which repo or workflow owns the task.
-- Read `TOOLS.md` before choosing commands, MCP servers, skills, scripts, or apps.
-- Read `RULES.md` before writing files, opening PRs, or updating external systems.
-- Read `ORC.md` before executing any stage — it defines status values, STATE.yaml
-  update rules, and error handling for all stages.
+- `ORC.md` owns ticket session protocol, durable state, repository-routing
+  preconditions, handoffs, and worktrees.
+- `orc.yaml` owns repository definitions and routing data, workflows, stages,
+  workers, and workspace settings.
+- `RULES.md` owns permission and approval boundaries.
+- `TOOLS.md` owns verified integrations, external access, and preferred tools.
+- The current stage file owns the task, exit criteria, and required outputs.
+- Repository-local instructions own product commands and coding conventions.
 
-## Session Start
+## Ticket Sessions
 
-At the start of every ticket session, before doing any work:
+Follow the complete Session Protocol in `ORC.md`; do not substitute a second
+lifecycle procedure from this file. Start by inspecting
+`orc status <ticket> --json`, then read the feature context and current stage
+before acting. End every active session with the durable transition required by
+the stage and `ORC.md`.
 
-1. Identify the ticket from your prompt or context
-2. Run `orc mark <ticket> start` to mark the ticket in_progress
-3. Run `orc status <ticket> --json` to read current state — note `stage.name`
-4. Read `features/<ticket-slug>/STATE.yaml` for full feature context
-5. Read `stages/<pack>/<stage>.md` for namespaced stage IDs. For example,
-   `default:develop` is `stages/default/develop.md`.
+The feature folder under `features/<ticket-slug>/` is the durable handoff. Do
+not rely on conversation memory for facts that the next stage or agent needs.
 
-At the end of every session, run exactly one of:
-- `orc mark <ticket> next --worker <who> --result "<what was done>"` — stage complete
-- `orc mark <ticket> pause "<what you need or what is blocking>"` — human needed
-- `orc mark <ticket> done [--result "<what was done>"]` — all stages complete
+## Repository Commands
 
-Never end a session without updating state. Never hand-edit STATE.yaml directly.
+Use the repository selection persisted in `STATE.yaml.repos`, resolving it by
+the `ORC.md` contract when missing or incomplete. A main checkout will commonly
+live under `projects/<repo-name>/`, but `orc.yaml` may point to an external
+absolute path; always use the configured path.
 
-**Before any human interaction:** run `orc mark <ticket> pause "<what you need>"` before
-asking a human for input, approval, or a decision. State must reflect reality even if
-the session ends before the human responds.
+Run repository-specific commands from the selected repository or ticket
+worktree, never from the workspace root unless a workflow explicitly requires
+it. Code-changing ticket work uses
+`worktrees/<repo-name>/<ticket-slug>/` and must remain recorded in feature state.
 
-## Feature Context
+---
 
-For ticket-driven work, the feature folder is the durable source of truth.
-Everything the agent needs to pick up and continue is in `features/<ticket-slug>/`.
+## Team Conventions
 
-## Repo Commands
-
-Run repo-specific commands with the selected repo or worktree as `cwd`.
-Do not run package, test, or git commands from the workspace root unless
-the workflow explicitly says to.
+<!-- This section is yours. Add cross-repository conventions, review
+     expectations, naming rules, or other stable guidance that cannot live in
+     a single repository. Orc does not read or modify this section. -->

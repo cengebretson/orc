@@ -41,7 +41,8 @@ settings:
 
 repos:
   - name: my-app
-    path: ../my-app
+    # SETUP.md replaces this placeholder with the discovered absolute path.
+    path: /absolute/path/to/my-app
     purpose: Application code, APIs, tests
     # Optional: repo-specific hints shown in `orc next` launch prompts.
     # agent_hints:
@@ -49,4 +50,17 @@ repos:
     # Optional: use when this repo needs setup beyond raw git worktree add.
     # Supported placeholders: {{branch}}, {{worktree_path}}, {{repo_path}},
     # {{repo_name}}, {{ticket}}, {{slug}}, {{workspace}}.
-    # worktree_setup: "../my-app/scripts/setup-worktree.sh -b {{branch}} --path {{worktree_path}}"
+    # worktree_setup: "{{repo_path}}/scripts/setup-worktree.sh -b {{branch}} --path {{worktree_path}}"
+
+# Optional deterministic repository routes based on ticket metadata. Ticket ID
+# prefixes identify ticket namespaces, not code ownership, so they are not used
+# here. Each route selects one repo or an explicit cross-repo set. Signals must
+# be unique across routes. Exactly one matching rule is required; multiple
+# matches are ambiguous and intake pauses. Purpose and ticket content are the
+# fallback when no route matches. Workflow selection stays independent.
+# routing:
+#   - labels: [application]
+#     components: [web]
+#     repos: [my-app]
+#   - labels: [full-stack]
+#     repos: [my-app, shared-api]
