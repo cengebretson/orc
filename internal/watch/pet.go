@@ -500,16 +500,16 @@ func renderPetCard(r row, selected bool, width, frame int) string {
 	provider := strings.Trim(strings.Join([]string{r.branch, r.engine, r.model}, " · "), " ·")
 
 	lines := []string{
-		mutedStyle.Render(truncatePet("⌂ "+room, lineWidth)),
+		mutedStyle.Render(truncate("⌂ "+room, lineWidth)),
 		renderPetSprite(r, frame, contentWidth),
-		selectedStyle.Render(truncatePet(name, lineWidth)),
-		stateStyleForPet(r).Render(truncatePet(petStateLabel(r), lineWidth)),
+		selectedStyle.Render(truncate(name, lineWidth)),
+		stateStyleForPet(r).Render(truncate(petStateLabel(r), lineWidth)),
 	}
 	if meta != "" {
-		lines = append(lines, mutedStyle.Render(truncatePet(meta, lineWidth)))
+		lines = append(lines, mutedStyle.Render(truncate(meta, lineWidth)))
 	}
 	if provider != "" {
-		lines = append(lines, mutedStyle.Render(truncatePet(provider, lineWidth)))
+		lines = append(lines, mutedStyle.Render(truncate(provider, lineWidth)))
 	}
 	lines = append(lines, renderPetContext(r, contentWidth))
 
@@ -623,24 +623,6 @@ func (m Model) renderPets() string {
 	}
 	b.WriteString(mutedStyle.Render(truncate(footer, width)))
 	return strings.TrimRight(b.String(), "\n")
-}
-
-func truncatePet(value string, width int) string {
-	value = strings.TrimSpace(value)
-	if width <= 0 {
-		return ""
-	}
-	if lipgloss.Width(value) <= width {
-		return value
-	}
-	var out []rune
-	for _, candidate := range value {
-		if lipgloss.Width(string(append(out, candidate))+"…") > width {
-			break
-		}
-		out = append(out, candidate)
-	}
-	return string(out) + "…"
 }
 
 func featureRoom(s *state.State) (string, string) {

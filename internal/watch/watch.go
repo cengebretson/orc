@@ -618,13 +618,20 @@ func truncate(s string, width int) string {
 	if width <= 0 {
 		return ""
 	}
-	if len(s) <= width {
+	if lipgloss.Width(s) <= width {
 		return s
 	}
 	if width == 1 {
-		return s[:1]
+		return "…"
 	}
-	return s[:width-1] + "…"
+	var out []rune
+	for _, candidate := range s {
+		if lipgloss.Width(string(append(out, candidate))+"…") > width {
+			break
+		}
+		out = append(out, candidate)
+	}
+	return string(out) + "…"
 }
 
 func max(a, b int) int {
