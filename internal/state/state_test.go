@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -591,5 +592,138 @@ next_action:
 	}
 	if got := s.History[len(s.History)-1].Result; got != "resumed" {
 		t.Errorf("last history result = %q, want resumed", got)
+	}
+}
+
+func TestLifecycleMutators(t *testing.T) {
+	newFeature := func(t *testing.T) string {
+		t.Helper()
+		dir := t.TempDir()
+		if err := state.Create(dir, &state.State{
+			Ticket: "ORC-1", Slug: "ORC-1-test", Status: "pending",
+			Stage:      state.Stage{Name: "develop", Worker: "bob"},
+			NextAction: state.NextAction{Worker: "human", Prompt: "old"},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		return dir
+	}
+
+	t.Run("start", func(t *testing.T) {
+		dir := newFeature(t)
+		if err := state.Start(dir); err != nil {
+			t.Fatal(err)
+		}
+		got, _ := state.Load(dir)
+		if got.Status != "active" || len(got.History) != 1 || got.History[0].Result != "started" {
+			t.Fatalf("state after Start = %+v", got)
+		}
+	})
+
+	t.Run("pause", func(t *testing.T) {
+		dir := newFeature(t)
+		if err := state.Pause(dir, "needs approval"); err != nil {
+			t.Fatal(err)
+		}
+		got, _ := state.Load(dir)
+		if got.Status != "paused" || got.NextAction.Worker != "human" || got.NextAction.Prompt != "needs approval" {
+			t.Fatalf("state after Pause = %+v", got)
+		}
+		if len(got.History) != 1 || got.History[0].Result != "paused — needs approval" {
+			t.Fatalf("pause history = %+v", got.History)
+		}
+	})
+
+	t.Run("done", func(t *testing.T) {
+		dir := newFeature(t)
+		if err := state.Done(dir, "shipped"); err != nil {
+			t.Fatal(err)
+		}
+		got, _ := state.Load(dir)
+		if got.Status != "done" || got.NextAction != (state.NextAction{}) || got.History[0].Result != "shipped" {
+			t.Fatalf("state after Done = %+v", got)
+		}
+	})
+
+	t.Run("status and history", func(t *testing.T) {
+		dir := newFeature(t)
+		if err := state.SetStatus(dir, "blocked"); err != nil {
+			t.Fatal(err)
+		}
+		if err := state.AppendHistory(dir, "review", "fred", "changes requested"); err != nil {
+			t.Fatal(err)
+		}
+		got, _ := state.Load(dir)
+		if got.Status != "blocked" || len(got.History) != 1 || got.History[0].Worker != "fred" {
+			t.Fatalf("state after SetStatus/AppendHistory = %+v", got)
+		}
+	})
+}
+
+func TestRuntimeMutators(t *testing.T) {
+	dir := t.TempDir()
+	if err := state.Create(dir, &state.State{Ticket: "ORC-2", Slug: "ORC-2-runtime", Status: "active"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := state.SetRuntime(dir, "ORC-2"); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := state.Load(dir)
+	if got.Runtime.Tmux == nil || got.Runtime.Tmux.Session != "ORC-2" {
+		t.Fatalf("runtime after SetRuntime = %+v", got.Runtime)
+	}
+	if err := state.SetRuntimeTarget(dir, "ORC-2", "%7"); err != nil {
+		t.Fatal(err)
+	}
+	if err := state.SetJIT(dir, "default:fred", "review this"); err != nil {
+		t.Fatal(err)
+	}
+	got, _ = state.Load(dir)
+	if got.Runtime.Tmux == nil || got.Runtime.Tmux.Pane != "%7" || got.Runtime.JIT == nil || got.Runtime.JIT.Worker != "default:fred" || got.Runtime.JIT.StartedAt == "" {
+		t.Fatalf("runtime after target/JIT = %+v", got.Runtime)
+	}
+	if err := state.ClearJIT(dir); err != nil {
+		t.Fatal(err)
+	}
+	got, _ = state.Load(dir)
+	if got.Runtime.JIT != nil || got.Runtime.Tmux == nil {
+		t.Fatalf("runtime after ClearJIT = %+v", got.Runtime)
+	}
+	if err := state.ClearRuntime(dir); err != nil {
+		t.Fatal(err)
+	}
+	got, _ = state.Load(dir)
+	if got.Runtime != (state.Runtime{}) {
+		t.Fatalf("runtime after ClearRuntime = %+v", got.Runtime)
+	}
+}
+
+func TestInspectLockAndArchivedLookup(t *testing.T) {
+	dir := t.TempDir()
+	lock, err := state.InspectLock(dir)
+	if err != nil || lock.Status != state.LockMissing {
+		t.Fatalf("missing lock = %+v, %v", lock, err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, state.Filename+".lock"), []byte(strconv.Itoa(os.Getpid())), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	lock, err = state.InspectLock(dir)
+	if err != nil || lock.Status != state.LockActive || lock.PID != os.Getpid() {
+		t.Fatalf("active lock = %+v, %v", lock, err)
+	}
+
+	workspace := t.TempDir()
+	archived := filepath.Join(workspace, "features", "_archive", "ORC-9-old")
+	if err := os.MkdirAll(archived, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	got, err := state.FindFeatureDirWithArchive(workspace, "ORC-9")
+	if err != nil || got != archived {
+		t.Fatalf("archived lookup = %q, %v", got, err)
+	}
+
+	errs := state.RepoValidationErrors{{Field: "repos.api.main", Message: "missing"}}
+	if text := errs.Error(); !strings.Contains(text, "repos.api.main") || !strings.Contains(text, "missing") {
+		t.Fatalf("RepoValidationErrors.Error() = %q", text)
 	}
 }
