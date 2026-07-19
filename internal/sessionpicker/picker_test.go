@@ -70,3 +70,26 @@ func TestViewShowsResumeMetadata(t *testing.T) {
 		}
 	}
 }
+
+func TestSelectRejectsEmptyCandidates(t *testing.T) {
+	if _, err := Select(nil); err == nil || !strings.Contains(err.Error(), "no resumable") {
+		t.Fatalf("Select(nil) error = %v", err)
+	}
+}
+
+func TestModelInitAndEmptySelection(t *testing.T) {
+	m := New(nil)
+	if cmd := m.Init(); cmd == nil {
+		t.Fatal("Init() = nil, want blink command")
+	}
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = pickerModel(t, updated)
+	if m.width != 80 || m.height != 24 || m.search.Width != 76 {
+		t.Fatalf("size = %dx%d search=%d", m.width, m.height, m.search.Width)
+	}
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = pickerModel(t, updated)
+	if cmd != nil || m.hasSelection {
+		t.Fatalf("empty enter: cmd=%v selected=%v", cmd, m.hasSelection)
+	}
+}
