@@ -590,6 +590,9 @@ func TestWork_CreatesFeatureFolder(t *testing.T) {
 	if st.Stage.Name == "" {
 		t.Error("stage.name not stamped")
 	}
+	if st.NextAction.Worker != "default:fred" {
+		t.Errorf("next_action.worker = %q, want default:fred", st.NextAction.Worker)
+	}
 	if len(st.History) != 1 || st.History[0].Worker != "agent" {
 		t.Errorf("history not round-tripped: %+v", st.History)
 	}

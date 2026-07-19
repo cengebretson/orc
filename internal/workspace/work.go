@@ -78,12 +78,16 @@ func Work(opts WorkOptions) (*WorkResult, error) {
 		return nil, fmt.Errorf("workflow %q has no stages defined in orc.yaml", workflowName)
 	}
 	firstStage := stages[0]
+	firstStageConfig, ok := cfg.StageConfig(workflowName, firstStage)
+	if !ok {
+		return nil, fmt.Errorf("stage %q not found in workflow %q", firstStage, workflowName)
+	}
 
 	if err := copyDir(templateDir, featureDir); err != nil {
 		return nil, fmt.Errorf("creating feature folder: %w", err)
 	}
 
-	if err := writeStateYAML(featureDir, ticket, slug, workflowName, firstStage); err != nil {
+	if err := writeStateYAML(featureDir, ticket, slug, workflowName, firstStage, firstStageConfig.Worker); err != nil {
 		return nil, fmt.Errorf("writing STATE.yaml: %w", err)
 	}
 
@@ -123,7 +127,7 @@ func buildSlug(ticket, suffix string) string {
 // the template placeholder copied into the feature dir. Uses the canonical
 // state.State schema so the scaffold can never drift from what state.Load
 // reads back.
-func writeStateYAML(featureDir, ticket, slug, workflowName, firstStage string) error {
+func writeStateYAML(featureDir, ticket, slug, workflowName, firstStage, firstWorker string) error {
 	s := &state.State{
 		SchemaVersion: state.SchemaVersion,
 		Ticket:        ticket,
@@ -134,7 +138,7 @@ func writeStateYAML(featureDir, ticket, slug, workflowName, firstStage string) e
 			Name: firstStage,
 		},
 		NextAction: state.NextAction{
-			Worker: firstStage,
+			Worker: firstWorker,
 			Prompt: fmt.Sprintf("Load ticket %s and populate TICKET.md, SPEC.md, and PLAN.md. Update STATE.yaml when complete.", ticket),
 			CWD:    ".",
 		},
