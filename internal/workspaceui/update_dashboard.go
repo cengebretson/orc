@@ -12,33 +12,33 @@ import (
 
 func (m Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// ── Search mode: route keys to textinput ─────────────────────
-	if m.searching {
+	if m.filter.active {
 		switch {
 		case key.Matches(msg, keys.cancel):
-			m.searching = false
-			m.search.Blur()
-			m.search.SetValue("")
-			m.cursor = 0
+			m.filter.active = false
+			m.filter.input.Blur()
+			m.filter.input.SetValue("")
+			m.navigation.featureCursor = 0
 			return m, nil
 		case key.Matches(msg, keys.confirm):
-			m.searching = false
-			m.search.Blur()
-			m.cursor = 0
+			m.filter.active = false
+			m.filter.input.Blur()
+			m.navigation.featureCursor = 0
 			return m, nil
 		default:
 			var cmd tea.Cmd
-			m.search, cmd = m.search.Update(msg)
-			m.cursor = 0
+			m.filter.input, cmd = m.filter.input.Update(msg)
+			m.navigation.featureCursor = 0
 			return m, cmd
 		}
 	}
 
 	// track last 3 keys for "orc" easter egg
-	m.keyBuffer[0] = m.keyBuffer[1]
-	m.keyBuffer[1] = m.keyBuffer[2]
-	m.keyBuffer[2] = msg.String()
-	if m.keyBuffer == [3]string{"o", "r", "c"} && m.rainbowStep == 0 {
-		m.rainbowStep = rainbowSteps
+	m.effects.keyBuffer[0] = m.effects.keyBuffer[1]
+	m.effects.keyBuffer[1] = m.effects.keyBuffer[2]
+	m.effects.keyBuffer[2] = msg.String()
+	if m.effects.keyBuffer == [3]string{"o", "r", "c"} && m.effects.rainbowStep == 0 {
+		m.effects.rainbowStep = rainbowSteps
 		return m, rainbowTick()
 	}
 
@@ -53,9 +53,9 @@ func (m Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.refresh):
 		return m, loadData(m.root)
 	case key.Matches(msg, keys.filter):
-		if m.focusedPane == paneFeatures {
-			m.searching = true
-			m.search.Focus()
+		if m.navigation.pane == paneFeatures {
+			m.filter.active = true
+			m.filter.input.Focus()
 			return m, textinput.Blink
 		}
 
@@ -63,68 +63,68 @@ func (m Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.cycleSectionFocus(key.Matches(msg, keys.cycleForward))
 
 	case key.Matches(msg, keys.back):
-		if m.search.Value() != "" {
-			m.search.SetValue("")
-			m.cursor = 0
-		} else if m.focusedPane == paneSection {
+		if m.filter.input.Value() != "" {
+			m.filter.input.SetValue("")
+			m.navigation.featureCursor = 0
+		} else if m.navigation.pane == paneSection {
 			m.blurSectionFocus()
 		}
 
 	case key.Matches(msg, keys.up):
-		if m.focusedPane == paneSection {
-			if m.sectionCursor > 0 {
-				m.sectionCursor--
+		if m.navigation.pane == paneSection {
+			if m.navigation.sectionCursor > 0 {
+				m.navigation.sectionCursor--
 			}
 		} else {
-			if m.cursor > 0 {
-				m.cursor--
+			if m.navigation.featureCursor > 0 {
+				m.navigation.featureCursor--
 			}
 		}
 
 	case key.Matches(msg, keys.down):
-		if m.focusedPane == paneSection {
-			items := m.sectionItems[m.sectionFocus]
-			if m.sectionCursor < len(items)-1 {
-				m.sectionCursor++
+		if m.navigation.pane == paneSection {
+			items := m.navigation.items[m.navigation.section]
+			if m.navigation.sectionCursor < len(items)-1 {
+				m.navigation.sectionCursor++
 			}
 		} else {
 			rows := m.visibleFeatures()
-			if m.cursor < len(rows)-1 {
-				m.cursor++
+			if m.navigation.featureCursor < len(rows)-1 {
+				m.navigation.featureCursor++
 			}
 		}
 
 	case key.Matches(msg, keys.featurePageDown):
-		if m.focusedPane != paneSection {
+		if m.navigation.pane != paneSection {
 			m.moveFeatureCursor(m.featuresPageSize())
 		}
 	case key.Matches(msg, keys.featurePageUp):
-		if m.focusedPane != paneSection {
+		if m.navigation.pane != paneSection {
 			m.moveFeatureCursor(-m.featuresPageSize())
 		}
 	case key.Matches(msg, keys.top):
-		if m.focusedPane != paneSection {
-			m.cursor = 0
+		if m.navigation.pane != paneSection {
+			m.navigation.featureCursor = 0
 		}
 	case key.Matches(msg, keys.bottom):
-		if m.focusedPane != paneSection {
-			m.cursor = len(m.visibleFeatures()) - 1
-			if m.cursor < 0 {
-				m.cursor = 0
+		if m.navigation.pane != paneSection {
+			m.navigation.featureCursor = len(m.visibleFeatures()) - 1
+			if m.navigation.featureCursor < 0 {
+				m.navigation.featureCursor = 0
 			}
 		}
 
 	case key.Matches(msg, keys.archive):
-		if m.focusedPane == paneFeatures {
-			m.showArchived = !m.showArchived
-			m.cursor = 0
+		if m.navigation.pane == paneFeatures {
+			m.navigation.showArchived = !m.navigation.showArchived
+			m.navigation.featureCursor = 0
 		}
 
 	case key.Matches(msg, keys.attach):
-		if m.focusedPane == paneFeatures {
+		if m.navigation.pane == paneFeatures {
 			rows := m.visibleFeatures()
-			if m.cursor < len(rows) {
-				row := rows[m.cursor]
+			if m.navigation.featureCursor < len(rows) {
+				row := rows[m.navigation.featureCursor]
 				if row.s != nil && row.s.Runtime.Tmux != nil && row.tmuxLive {
 					return m, attachTmux(row.s.Runtime.Tmux.Session, row.s.Stage.Name)
 				}
@@ -132,34 +132,35 @@ func (m Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case key.Matches(msg, keys.character):
-		if m.focusedPane == paneSection && m.sectionFocus == sectionWorkers {
-			items := m.sectionItems[sectionWorkers]
-			if m.sectionCursor < len(items) {
-				m.charSheetWorker = workerForPath(items[m.sectionCursor].path, m.allWorkers)
-				m.charSheetReturn = viewDashboard
+		if m.navigation.pane == paneSection && m.navigation.section == sectionWorkers {
+			items := m.navigation.items[sectionWorkers]
+			if m.navigation.sectionCursor < len(items) {
+				m.effects.charSheetWorker = workerForPath(items[m.navigation.sectionCursor].path, m.data.allWorkers)
+				m.effects.charSheetReturn = viewDashboard
 				m.view = viewCharacterSheet
 				return m, tea.ClearScreen
 			}
 		}
 
 	case key.Matches(msg, keys.open):
-		if m.focusedPane == paneSection {
+		if m.navigation.pane == paneSection {
 			m.openSectionItem()
 		} else {
 			rows := m.visibleFeatures()
-			if m.cursor < len(rows) {
-				row := rows[m.cursor]
+			if m.navigation.featureCursor < len(rows) {
+				row := rows[m.navigation.featureCursor]
 				if row.s == nil {
 					m.openViewer(func(int) string { return renderBrokenFeature(row) },
 						row.ticketID(), "broken", viewDashboard)
 					return m, nil
 				}
-				m.detail = row
-				m.detailFiles = buildFileList(m.detail.featureDir, m.detail.s)
-				m.fileIdx = 0
-				m.viewport = viewport.New(m.width-4, m.height-6)
-				m.viewport.SetContent(m.renderDetailBody())
-				m.detailScroll = 0
+				m.detail = detailState{
+					feature: row,
+					files:   buildFileList(row.featureDir, row.s),
+				}
+				m.viewer.viewport = viewport.New(m.width-4, m.height-6)
+				m.viewer.viewport.SetContent(m.renderDetailBody())
+				m.detail.scroll = 0
 				m.view = viewDetail
 			}
 		}
@@ -183,12 +184,12 @@ func (m Model) featuresPageSize() int {
 // moveFeatureCursor shifts the features cursor by delta, clamped to the list.
 func (m *Model) moveFeatureCursor(delta int) {
 	n := len(m.visibleFeatures())
-	m.cursor += delta
-	if m.cursor > n-1 {
-		m.cursor = n - 1
+	m.navigation.featureCursor += delta
+	if m.navigation.featureCursor > n-1 {
+		m.navigation.featureCursor = n - 1
 	}
-	if m.cursor < 0 {
-		m.cursor = 0
+	if m.navigation.featureCursor < 0 {
+		m.navigation.featureCursor = 0
 	}
 }
 
@@ -199,7 +200,7 @@ func (m *Model) cycleSectionFocus(forward bool) {
 	if len(navigable) == 0 {
 		return
 	}
-	if m.focusedPane != paneSection {
+	if m.navigation.pane != paneSection {
 		if forward {
 			m.focusSection(navigable[0])
 		} else {
@@ -209,7 +210,7 @@ func (m *Model) cycleSectionFocus(forward bool) {
 	}
 	idx := -1
 	for i, k := range navigable {
-		if k == m.sectionFocus {
+		if k == m.navigation.section {
 			idx = i
 			break
 		}
@@ -227,38 +228,38 @@ func (m *Model) cycleSectionFocus(forward bool) {
 
 func (m *Model) focusSection(name sectionID) {
 	m.collapseAutoExpandedSection()
-	m.focusedPane = paneSection
-	m.sectionFocus = name
-	m.sectionCursor = 0
-	if !m.expanded[name] {
-		m.autoExpandedSection = name
+	m.navigation.pane = paneSection
+	m.navigation.section = name
+	m.navigation.sectionCursor = 0
+	if !m.navigation.expanded[name] {
+		m.navigation.autoExpanded = name
 	}
-	m.expanded[name] = true
+	m.navigation.expanded[name] = true
 }
 
 func (m *Model) blurSectionFocus() {
 	m.collapseAutoExpandedSection()
-	m.focusedPane = paneFeatures
-	m.sectionFocus = sectionNone
-	m.sectionCursor = 0
+	m.navigation.pane = paneFeatures
+	m.navigation.section = sectionNone
+	m.navigation.sectionCursor = 0
 }
 
 func (m *Model) collapseAutoExpandedSection() {
-	if m.autoExpandedSection != sectionNone {
-		m.expanded[m.autoExpandedSection] = false
-		m.autoExpandedSection = sectionNone
+	if m.navigation.autoExpanded != sectionNone {
+		m.navigation.expanded[m.navigation.autoExpanded] = false
+		m.navigation.autoExpanded = sectionNone
 	}
 }
 
 // toggleSection expands or collapses a dashboard section; collapsing the
 // focused section returns focus to the features pane.
 func (m *Model) toggleSection(name sectionID) {
-	wasExpanded := m.expanded[name]
-	if m.autoExpandedSection == name {
-		m.autoExpandedSection = sectionNone
+	wasExpanded := m.navigation.expanded[name]
+	if m.navigation.autoExpanded == name {
+		m.navigation.autoExpanded = sectionNone
 	}
-	m.expanded[name] = !wasExpanded
-	if wasExpanded && m.sectionFocus == name {
+	m.navigation.expanded[name] = !wasExpanded
+	if wasExpanded && m.navigation.section == name {
 		m.blurSectionFocus()
 	}
 }
@@ -267,44 +268,45 @@ func (m *Model) toggleSection(name sectionID) {
 // a workflow detail page, or a plain file view.
 func (m *Model) openSectionItem() {
 	// Health has no list items — it drills straight into the full doctor report.
-	if m.sectionFocus == sectionHealth {
-		checks := m.healthItems
+	if m.navigation.section == sectionHealth {
+		checks := m.data.healthItems
 		m.openViewer(func(w int) string { return renderHealthReport(checks, w) },
 			"doctor report", "Health", viewDashboard)
-		m.viewerKind = viewerHealth
+		m.viewer.kind = viewerHealth
 		return
 	}
-	items := m.sectionItems[m.sectionFocus]
-	if m.sectionCursor >= len(items) {
+	items := m.navigation.items[m.navigation.section]
+	if m.navigation.sectionCursor >= len(items) {
 		return
 	}
-	f := items[m.sectionCursor]
-	switch m.sectionFocus {
+	f := items[m.navigation.sectionCursor]
+	switch m.navigation.section {
 	case sectionWorkers:
-		m.charSheetWorker = workerForPath(f.path, m.allWorkers)
-		m.openViewer(workerRenderer(f.path, m.features), f.label, sectionLabel(m.sectionFocus), viewDashboard)
-		m.viewerKind = viewerWorker
-		m.viewerPath = f.path
+		m.effects.charSheetWorker = workerForPath(f.path, m.data.allWorkers)
+		m.openViewer(workerRenderer(f.path, m.data.features), f.label, sectionLabel(m.navigation.section), viewDashboard)
+		m.viewer.kind = viewerWorker
+		m.viewer.path = f.path
 	case sectionWorkflows:
 		workflowName := f.id
 		if workflowName == "" {
 			workflowName = f.label
 		}
-		m.wfDetailName = workflowName
-		m.wfDetailCursor = 0
-		content := renderWorkflowDetail(workflowName, m.workflows, m.allWorkers, filepath.Join(m.root, "stages"), m.features, 0, m.width-4)
-		m.viewport = viewport.New(m.width-4, m.height-6)
-		m.viewport.SetContent(content)
+		m.navigation.workflowName = workflowName
+		m.navigation.workflowCursor = 0
+		content := renderWorkflowDetail(workflowName, m.data.workflows, m.data.allWorkers, filepath.Join(m.root, "stages"), m.data.features, 0, m.width-4)
+		view := viewport.New(m.width-4, m.height-6)
+		view.SetContent(content)
+		m.viewer = viewerState{viewport: view}
 		m.view = viewWorkflowDetail
 	case sectionRepositories:
-		repos := append([]config.Repo(nil), m.repos...)
-		routes := append([]config.RepoRoute(nil), m.routes...)
-		features := append([]*featureRow(nil), m.features...)
+		repos := append([]config.Repo(nil), m.data.repos...)
+		routes := append([]config.RepoRoute(nil), m.data.routes...)
+		features := append([]*featureRow(nil), m.data.features...)
 		m.openViewer(func(w int) string { return renderRoutingReport(repos, routes, features, w) },
 			"map", "Repositories", viewDashboard)
-		m.viewerKind = viewerRepositories
+		m.viewer.kind = viewerRepositories
 	default:
-		m.openViewer(fileRenderer(f.path), f.label, sectionLabel(m.sectionFocus), viewDashboard)
+		m.openViewer(fileRenderer(f.path), f.label, sectionLabel(m.navigation.section), viewDashboard)
 	}
 }
 

@@ -17,11 +17,11 @@ import (
 
 func TestUpdateDataMsgClampsCursor(t *testing.T) {
 	m := testModel(t)
-	m.cursor = 2
-	tm, _ := m.Update(dataMsg{features: m.features[:1]})
+	m.navigation.featureCursor = 2
+	tm, _ := m.Update(dataMsg{features: m.data.features[:1]})
 	got := asModel(t, tm)
-	if got.cursor != 0 {
-		t.Errorf("cursor = %d, want clamped to 0 after data shrank", got.cursor)
+	if got.navigation.featureCursor != 0 {
+		t.Errorf("cursor = %d, want clamped to 0 after data shrank", got.navigation.featureCursor)
 	}
 }
 
@@ -43,20 +43,20 @@ func TestUpdateWindowSizeReflowsFileViewer(t *testing.T) {
 
 	m := testModel(t)
 	m.view = viewFile
-	m.viewerRender = fileRenderer(path)
-	m.viewport = viewport.New(m.width-4, m.height-6)
+	m.viewer.render = fileRenderer(path)
+	m.viewer.viewport = viewport.New(m.width-4, m.height-6)
 	wide, err := renderFile(path, m.width-4)
 	if err != nil {
 		t.Fatal(err)
 	}
-	m.viewport.SetContent(wide)
-	wideLines := m.viewport.TotalLineCount()
+	m.viewer.viewport.SetContent(wide)
+	wideLines := m.viewer.viewport.TotalLineCount()
 
 	tm, _ := m.Update(tea.WindowSizeMsg{Width: 48, Height: 40})
 	got := asModel(t, tm)
-	if got.viewport.TotalLineCount() <= wideLines {
+	if got.viewer.viewport.TotalLineCount() <= wideLines {
 		t.Errorf("content lines = %d after shrinking from %d-wide render — viewer did not reflow",
-			got.viewport.TotalLineCount(), wideLines)
+			got.viewer.viewport.TotalLineCount(), wideLines)
 	}
 }
 
@@ -65,23 +65,23 @@ func TestUpdateWindowSizeReflowsFileViewer(t *testing.T) {
 func TestUpdateWindowSizeReflowsHealthReport(t *testing.T) {
 	m := testModel(t)
 	m.view = viewFile
-	m.healthItems = []doctor.Check{{
+	m.data.healthItems = []doctor.Check{{
 		Group:  "config",
 		Name:   "orc.yaml",
 		Status: doctor.Fail,
 		Detail: strings.Repeat("a long validation failure message ", 8),
 	}}
-	checks := m.healthItems
-	m.viewerRender = func(w int) string { return renderHealthReport(checks, w) }
-	m.viewport = viewport.New(m.width-4, m.height-6)
-	m.viewport.SetContent(m.viewerRender(m.width - 4))
-	wideLines := m.viewport.TotalLineCount()
+	checks := m.data.healthItems
+	m.viewer.render = func(w int) string { return renderHealthReport(checks, w) }
+	m.viewer.viewport = viewport.New(m.width-4, m.height-6)
+	m.viewer.viewport.SetContent(m.viewer.render(m.width - 4))
+	wideLines := m.viewer.viewport.TotalLineCount()
 
 	tm, _ := m.Update(tea.WindowSizeMsg{Width: 40, Height: 40})
 	got := asModel(t, tm)
-	if got.viewport.TotalLineCount() <= wideLines {
+	if got.viewer.viewport.TotalLineCount() <= wideLines {
 		t.Errorf("health report lines = %d after shrink from %d — synthetic viewer did not reflow",
-			got.viewport.TotalLineCount(), wideLines)
+			got.viewer.viewport.TotalLineCount(), wideLines)
 	}
 }
 
@@ -93,19 +93,19 @@ func TestUpdateWindowSizeReflowsWorkflowDetail(t *testing.T) {
 	for _, n := range []string{"intake", "develop", "code-review", "qa-automation", "pr-open", "evidence"} {
 		steps = append(steps, routeStep{name: n, advance: "auto"})
 	}
-	m.workflows = []workflowChain{{name: "default", steps: steps}}
+	m.data.workflows = []workflowChain{{name: "default", steps: steps}}
 	m.view = viewWorkflowDetail
-	m.wfDetailName = "default"
+	m.navigation.workflowName = "default"
 	m.root = t.TempDir()
-	m.viewport = viewport.New(m.width-4, m.height-6)
-	m.viewport.SetContent(renderWorkflowDetail("default", m.workflows, nil, filepath.Join(m.root, "stages"), m.features, 0, m.width-4))
-	wideLines := m.viewport.TotalLineCount()
+	m.viewer.viewport = viewport.New(m.width-4, m.height-6)
+	m.viewer.viewport.SetContent(renderWorkflowDetail("default", m.data.workflows, nil, filepath.Join(m.root, "stages"), m.data.features, 0, m.width-4))
+	wideLines := m.viewer.viewport.TotalLineCount()
 
 	tm, _ := m.Update(tea.WindowSizeMsg{Width: 60, Height: 40})
 	got := asModel(t, tm)
-	if got.viewport.TotalLineCount() <= wideLines {
+	if got.viewer.viewport.TotalLineCount() <= wideLines {
 		t.Errorf("content lines = %d after shrinking from %d — workflow detail did not reflow",
-			got.viewport.TotalLineCount(), wideLines)
+			got.viewer.viewport.TotalLineCount(), wideLines)
 	}
 }
 
@@ -113,15 +113,15 @@ func TestRepositoryViewerRefreshesRecordedWorkInPlace(t *testing.T) {
 	m := testModel(t)
 	m.width, m.height = 72, 30
 	m.view = viewFile
-	m.viewerKind = viewerRepositories
-	m.repos = []config.Repo{{Name: "app", Path: "projects/app"}}
-	m.features = []*featureRow{{s: &state.State{
+	m.viewer.kind = viewerRepositories
+	m.data.repos = []config.Repo{{Name: "app", Path: "projects/app"}}
+	m.data.features = []*featureRow{{s: &state.State{
 		Ticket: "STORY-1", Status: "active", Repos: map[string]state.Repo{"app": {}},
 	}}}
-	m.viewport = viewport.New(m.width-4, m.height-6)
+	m.viewer.viewport = viewport.New(m.width-4, m.height-6)
 	m.refreshStructuredViewer()
-	if !strings.Contains(ansi.Strip(m.viewport.View()), "STORY-1") {
-		t.Fatalf("initial repository viewer missing STORY-1:\n%s", m.viewport.View())
+	if !strings.Contains(ansi.Strip(m.viewer.viewport.View()), "STORY-1") {
+		t.Fatalf("initial repository viewer missing STORY-1:\n%s", m.viewer.viewport.View())
 	}
 
 	updated, _ := m.Update(dataMsg{
@@ -132,7 +132,7 @@ func TestRepositoryViewerRefreshesRecordedWorkInPlace(t *testing.T) {
 		sectionItems: map[sectionID][]sectionItem{},
 	})
 	m = asModel(t, updated)
-	out := ansi.Strip(m.viewport.View())
+	out := ansi.Strip(m.viewer.viewport.View())
 	if !strings.Contains(out, "STORY-2") || strings.Contains(out, "STORY-1") {
 		t.Fatalf("repository viewer did not refresh in place:\n%s", out)
 	}
@@ -140,14 +140,14 @@ func TestRepositoryViewerRefreshesRecordedWorkInPlace(t *testing.T) {
 
 func TestStaleWorkspaceTickDoesNotRestartAfterReactivation(t *testing.T) {
 	m := New(t.TempDir())
-	staleEpoch := m.epoch
+	staleEpoch := m.lifecycle.epoch
 	m = m.SetActive(false)
 	m = m.SetActive(true)
 	updated, cmd := m.Update(tickMsg{at: time.Now(), epoch: staleEpoch})
 	if cmd != nil {
 		t.Fatal("stale workspace tick restarted the refresh timer")
 	}
-	if got := asModel(t, updated); got.epoch != m.epoch {
-		t.Fatalf("epoch changed from %d to %d", m.epoch, got.epoch)
+	if got := asModel(t, updated); got.lifecycle.epoch != m.lifecycle.epoch {
+		t.Fatalf("epoch changed from %d to %d", m.lifecycle.epoch, got.lifecycle.epoch)
 	}
 }

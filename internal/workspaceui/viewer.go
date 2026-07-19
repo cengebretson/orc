@@ -8,14 +8,15 @@ import (
 
 func (m *Model) openViewer(render func(width int) string, title, context string, returnView viewState) {
 	viewerWidth := max(1, m.width-4)
-	m.viewport = viewport.New(viewerWidth, max(1, m.height-6))
-	m.viewport.SetContent(render(viewerWidth))
-	m.viewerTitle = title
-	m.viewerContext = context
-	m.viewerReturn = returnView
-	m.viewerRender = render
-	m.viewerKind = viewerNone
-	m.viewerPath = ""
+	view := viewport.New(viewerWidth, max(1, m.height-6))
+	view.SetContent(render(viewerWidth))
+	m.viewer = viewerState{
+		viewport:   view,
+		title:      title,
+		context:    context,
+		returnView: returnView,
+		render:     render,
+	}
 	m.view = viewFile
 }
 
@@ -23,17 +24,17 @@ func (m *Model) refreshStructuredViewer() {
 	if m.view != viewFile {
 		return
 	}
-	switch m.viewerKind {
+	switch m.viewer.kind {
 	case viewerHealth:
-		checks := append([]doctor.Check(nil), m.healthItems...)
-		m.viewerRender = func(w int) string { return renderHealthReport(checks, w) }
+		checks := append([]doctor.Check(nil), m.data.healthItems...)
+		m.viewer.render = func(w int) string { return renderHealthReport(checks, w) }
 	case viewerRepositories:
-		repos := append([]config.Repo(nil), m.repos...)
-		routes := append([]config.RepoRoute(nil), m.routes...)
-		features := append([]*featureRow(nil), m.features...)
-		m.viewerRender = func(w int) string { return renderRoutingReport(repos, routes, features, w) }
+		repos := append([]config.Repo(nil), m.data.repos...)
+		routes := append([]config.RepoRoute(nil), m.data.routes...)
+		features := append([]*featureRow(nil), m.data.features...)
+		m.viewer.render = func(w int) string { return renderRoutingReport(repos, routes, features, w) }
 	case viewerWorker:
-		m.viewerRender = workerRenderer(m.viewerPath, m.features)
+		m.viewer.render = workerRenderer(m.viewer.path, m.data.features)
 	default:
 		return
 	}

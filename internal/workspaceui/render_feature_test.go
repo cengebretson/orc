@@ -147,8 +147,8 @@ func TestViewDetailShowsTimingSection(t *testing.T) {
 	m := New("")
 	m.width = 120
 	m.height = 50
-	m.detail = row
-	m.detailFiles = nil
+	m.detail.feature = row
+	m.detail.files = nil
 
 	out := m.renderDetailBody()
 	if !strings.Contains(out, "Timing") {
@@ -185,7 +185,7 @@ func TestViewDetailShowsDimCanonicalIDs(t *testing.T) {
 	m.width = 120
 	m.height = 40
 	m.root = root
-	m.detail = row
+	m.detail.feature = row
 
 	out := ansi.Strip(m.renderDetailBody())
 	if !strings.Contains(out, "default (default:standard)") {
@@ -211,7 +211,7 @@ func TestViewDetailShowsRequiredArtifactChecklist(t *testing.T) {
 	m := New("")
 	m.width = 120
 	m.height = 40
-	m.detail = row
+	m.detail.feature = row
 
 	out := ansi.Strip(m.renderDetailBody())
 	for _, want := range []string{"Required Artifacts", "PLAN.md", "develop/HANDOFF.md missing"} {
@@ -232,8 +232,8 @@ func TestViewDetailTimingKeepsLongStageName(t *testing.T) {
 	m := New("")
 	m.width = 120
 	m.height = 50
-	m.detail = row
-	m.detailFiles = nil
+	m.detail.feature = row
+	m.detail.files = nil
 
 	out := ansi.Strip(m.renderDetailBody())
 	if !strings.Contains(out, "default:qa-automation") {
@@ -263,7 +263,7 @@ func TestViewDetailNarrowWidthDoesNotPanic(t *testing.T) {
 	m := New("")
 	m.width = 50 // innerW = 46 → history result budget innerW-72 = -26
 	m.height = 40
-	m.detail = row
+	m.detail.feature = row
 
 	_ = m.renderDetailBody() // must not panic
 }

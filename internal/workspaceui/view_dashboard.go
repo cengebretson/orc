@@ -21,8 +21,8 @@ func (m Model) View() string {
 	case viewWorkflowDetail:
 		return m.viewWorkflowDetailPage()
 	case viewCharacterSheet:
-		if m.charSheetWorker != nil {
-			return renderCharacterSheet(m, m.charSheetWorker)
+		if m.effects.charSheetWorker != nil {
+			return renderCharacterSheet(m, m.effects.charSheetWorker)
 		}
 		return m.viewDashboard()
 	default:
@@ -48,11 +48,11 @@ func (m Model) viewDashboard() string {
 	leftInnerW := leftW - 2
 
 	// ── Header stats ─────────────────────────────────────────────────
-	overview := workspaceOverviewFor(m.features, m.lastRefresh, time.Now())
+	overview := workspaceOverviewFor(m.data.features, m.lifecycle.lastRefresh, time.Now())
 	ago := overview.refreshAge.Round(time.Second)
 	orcLabel := styleHeader.Render("orc")
-	if m.rainbowStep > 0 {
-		idx := (rainbowSteps - m.rainbowStep) % len(rainbowPalette)
+	if m.effects.rainbowStep > 0 {
+		idx := (rainbowSteps - m.effects.rainbowStep) % len(rainbowPalette)
 		c := lipgloss.Color(rainbowPalette[idx])
 		orcLabel = lipgloss.NewStyle().Foreground(c).Bold(true).Render("orc")
 	}
@@ -74,7 +74,7 @@ func (m Model) viewDashboard() string {
 	left.WriteString(drawBoxLabeled(headerTitle, []string{statsLine}, leftW) + "\n")
 
 	healthSpec := sectionSpecFor(sectionHealth)
-	healthFocused := m.focusedPane == paneSection && m.sectionFocus == sectionHealth
+	healthFocused := m.navigation.pane == paneSection && m.navigation.section == sectionHealth
 	healthContent := m.healthIssueLines(leftInnerW - 4)
 	if len(healthContent) == 0 {
 		healthContent = []string{styleHealthOK.Render("All checks passed")}
@@ -84,51 +84,51 @@ func (m Model) viewDashboard() string {
 	}
 	// Surface the issue count in the collapsed summary so problems are visible
 	// even when the section is collapsed (the default).
-	healthSummary := styleDim.Render(fmt.Sprintf("%d checks", len(m.healthItems)))
+	healthSummary := styleDim.Render(fmt.Sprintf("%d checks", len(m.data.healthItems)))
 	if extra := m.healthSummaryExtra(); extra != "" {
 		healthSummary += styleDim.Render("  ·  ") + extra
 	}
-	if m.artifactPolicy != "" {
-		healthSummary += styleDim.Render("  ·  artifacts ") + artifactPolicyStyle(m.artifactPolicy).Render(m.artifactPolicy)
+	if m.data.artifactPolicy != "" {
+		healthSummary += styleDim.Render("  ·  artifacts ") + artifactPolicyStyle(m.data.artifactPolicy).Render(m.data.artifactPolicy)
 	}
 	left.WriteString(m.sectionBox(healthSpec,
 		healthSummary, healthContent, leftW, healthFocused) + "\n")
 
 	wfSpec := sectionSpecFor(sectionWorkflows)
-	wfFocused := m.focusedPane == paneSection && m.sectionFocus == sectionWorkflows
+	wfFocused := m.navigation.pane == paneSection && m.navigation.section == sectionWorkflows
 	var wfContent []string
 	if wfFocused {
-		wfContent = renderGroupedWorkflowList(m.workflowGroups, m.sectionCursor)
+		wfContent = renderGroupedWorkflowList(m.data.workflowGroups, m.navigation.sectionCursor)
 	} else {
-		wfContent = renderWorkflowChainGroups(m.workflows, leftInnerW-4)
+		wfContent = renderWorkflowChainGroups(m.data.workflows, leftInnerW-4)
 	}
 	left.WriteString(m.sectionBox(wfSpec,
-		styleDim.Render(fmt.Sprintf("%d", len(m.workflows))),
+		styleDim.Render(fmt.Sprintf("%d", len(m.data.workflows))),
 		wfContent, leftW, wfFocused) + "\n")
 
 	wkSpec := sectionSpecFor(sectionWorkers)
-	wkFocused := m.focusedPane == paneSection && m.sectionFocus == sectionWorkers
+	wkFocused := m.navigation.pane == paneSection && m.navigation.section == sectionWorkers
 	var wkContent []string
 	if wkFocused {
-		wkContent = renderGroupedWorkerList(m.workerGroups, m.sectionCursor)
+		wkContent = renderGroupedWorkerList(m.data.workerGroups, m.navigation.sectionCursor)
 	} else {
-		wkContent = renderWorkerGroups(m.workerGroups, leftInnerW-4)
+		wkContent = renderWorkerGroups(m.data.workerGroups, leftInnerW-4)
 		if len(wkContent) == 0 {
-			wkContent = renderNameList(leftInnerW-4, m.workerNames)
+			wkContent = renderNameList(leftInnerW-4, m.data.workerNames)
 		}
 	}
 	left.WriteString(m.sectionBox(wkSpec,
-		styleDim.Render(fmt.Sprintf("%d", len(m.workerNames))),
+		styleDim.Render(fmt.Sprintf("%d", len(m.data.workerNames))),
 		wkContent, leftW, wkFocused) + "\n")
 
 	repoSpec := sectionSpecFor(sectionRepositories)
-	rtFocused := m.focusedPane == paneSection && m.sectionFocus == sectionRepositories
-	rtContent := renderRepoRoutingOverview(m.repos, m.routes, leftInnerW-4)
+	rtFocused := m.navigation.pane == paneSection && m.navigation.section == sectionRepositories
+	rtContent := renderRepoRoutingOverview(m.data.repos, m.data.routes, leftInnerW-4)
 	if rtFocused {
 		rtContent = append(rtContent, "", styleDim.Render("enter to inspect repositories"))
 	}
 	left.WriteString(m.sectionBox(repoSpec,
-		styleDim.Render(fmt.Sprintf("%d repos  ·  %d routes", len(m.repos), len(m.routes))),
+		styleDim.Render(fmt.Sprintf("%d repos  ·  %d routes", len(m.data.repos), len(m.data.routes))),
 		rtContent, leftW, rtFocused))
 
 	// ── Top block: left column + right box (logo + quote) ───────────
@@ -138,9 +138,9 @@ func (m Model) viewDashboard() string {
 		leftHeight := lipgloss.Height(leftStr)
 
 		logoColor := lipgloss.Color(activeTheme.Palette.Surface1)
-		if m.rainbowStep > 0 {
+		if m.effects.rainbowStep > 0 {
 			// offset by half the palette so logo and header title use different colors
-			idx := (rainbowSteps - m.rainbowStep + len(rainbowPalette)/2) % len(rainbowPalette)
+			idx := (rainbowSteps - m.effects.rainbowStep + len(rainbowPalette)/2) % len(rainbowPalette)
 			logoColor = lipgloss.Color(rainbowPalette[idx])
 		}
 		logoStyle := lipgloss.NewStyle().Foreground(logoColor)
@@ -151,8 +151,8 @@ func (m Model) viewDashboard() string {
 			rightLines = append(rightLines, " "+logoStyle.Render(l))
 		}
 		rightLines = append(rightLines, "")
-		if m.quote != "" {
-			for _, l := range strings.Split(ui.Wrap(m.quote, logoW), "\n") {
+		if m.effects.quote != "" {
+			for _, l := range strings.Split(ui.Wrap(m.effects.quote, logoW), "\n") {
 				centered := lipgloss.PlaceHorizontal(logoW, lipgloss.Center, quoteStyle.Render(l))
 				rightLines = append(rightLines, " "+centered)
 			}
@@ -181,7 +181,7 @@ func (m Model) viewDashboard() string {
 	}
 
 	archiveToggle := styleDim.Render("  [a] show archived")
-	if m.showArchived {
+	if m.navigation.showArchived {
 		archiveToggle = styleDim.Render("  [a] hide archived")
 	}
 
@@ -190,8 +190,8 @@ func (m Model) viewDashboard() string {
 
 	// Scroll window: keep cursor in view.
 	offset := 0
-	if m.cursor >= maxDataRows {
-		offset = m.cursor - maxDataRows + 1
+	if m.navigation.featureCursor >= maxDataRows {
+		offset = m.navigation.featureCursor - maxDataRows + 1
 	}
 	if offset+maxDataRows > total {
 		offset = total - maxDataRows
@@ -206,8 +206,8 @@ func (m Model) viewDashboard() string {
 	visibleRows := allRows[offset:end]
 
 	var featuresTitle string
-	if m.searching {
-		query := m.search.Value()
+	if m.filter.active {
+		query := m.filter.input.Value()
 		matchCount := len(m.visibleFeatures())
 		var matchHint string
 		if query == "" {
@@ -219,14 +219,14 @@ func (m Model) viewDashboard() string {
 			}
 			matchHint = styleDim.Render(fmt.Sprintf("  %d %s  esc cancel", matchCount, noun))
 		}
-		featuresTitle = styleSection.Render("Features") + "  " + m.search.View() + matchHint
-	} else if m.search.Value() != "" {
+		featuresTitle = styleSection.Render("Features") + "  " + m.filter.input.View() + matchHint
+	} else if m.filter.input.Value() != "" {
 		noun := "matches"
 		if total == 1 {
 			noun = "match"
 		}
 		featuresTitle = styleSection.Render("Features") +
-			styleDim.Render("  /") + " " + styleStatusWaiting.Render(m.search.Value()) +
+			styleDim.Render("  /") + " " + styleStatusWaiting.Render(m.filter.input.Value()) +
 			styleDim.Render(fmt.Sprintf("  %d %s  esc clear", total, noun))
 	} else {
 		featuresTitle = styleSection.Render("Features") + archiveToggle + styleDim.Render("  [/] search")
@@ -239,10 +239,10 @@ func (m Model) viewDashboard() string {
 	if total == 0 {
 		tableLines = []string{"  " + styleDim.Render("No features found. Run orc work <ticket> to start one.")}
 	} else {
-		tableLines = strings.Split(m.renderTable(visibleRows, outerW-2, m.cursor-offset), "\n")
+		tableLines = strings.Split(m.renderTable(visibleRows, outerW-2, m.navigation.featureCursor-offset), "\n")
 	}
 	featuresBorderColor := activeTheme.Palette.Surface1
-	if m.focusedPane == paneFeatures {
+	if m.navigation.pane == paneFeatures {
 		featuresBorderColor = activeTheme.Palette.Mauve
 	}
 
@@ -251,7 +251,7 @@ func (m Model) viewDashboard() string {
 	b.WriteString(drawBoxLabeledWith(featuresTitle, tableLines, outerW, featuresBorderColor) + "\n")
 
 	// ── Help bar ─────────────────────────────────────────────────────
-	if !m.searching && !m.embedded {
+	if !m.filter.active && !m.embedded {
 		var helpItems []string
 		helpItems = append(helpItems,
 			combinedBindingHelp("navigate", keys.up, keys.down),

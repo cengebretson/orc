@@ -14,8 +14,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		m.viewport.Width = max(1, msg.Width-4)
-		m.viewport.Height = max(1, msg.Height-6)
+		m.viewer.viewport.Width = max(1, msg.Width-4)
+		m.viewer.viewport.Height = max(1, msg.Height-6)
 		// viewport-backed views hold content pre-rendered at the old width;
 		// rebuild it (the dashboard and detail views render from m.width live)
 		switch m.view {
@@ -31,41 +31,43 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tickMsg:
-		if m.inactive || msg.epoch != m.epoch {
+		if m.lifecycle.inactive || msg.epoch != m.lifecycle.epoch {
 			return m, nil
 		}
-		interval := m.refreshInterval
+		interval := m.lifecycle.refreshInterval
 		if interval == 0 {
 			interval = defaultRefreshInterval
 		}
-		return m, tea.Batch(loadData(m.root), tickEvery(interval, m.epoch))
+		return m, tea.Batch(loadData(m.root), tickEvery(interval, m.lifecycle.epoch))
 
 	case dataMsg:
-		m.lastRefresh = time.Now()
+		m.lifecycle.lastRefresh = time.Now()
 		if msg.err != nil {
-			m.loadErr = msg.err
-			m.healthItems = []doctor.Check{{Group: "workspace", Name: config.Filename, Status: doctor.Fail, Detail: msg.err.Error()}}
+			m.lifecycle.loadErr = msg.err
+			m.data.healthItems = []doctor.Check{{Group: "workspace", Name: config.Filename, Status: doctor.Fail, Detail: msg.err.Error()}}
 			m.refreshStructuredViewer()
 			return m, nil
 		}
-		m.loadErr = nil
-		m.features = msg.features
-		m.healthItems = msg.healthItems
-		m.artifactPolicy = msg.artifactPolicy
-		m.workerNames = msg.workerNames
-		m.workerGroups = msg.workerGroups
-		m.workflowGroups = msg.workflowGroups
-		m.allWorkers = msg.allWorkers
-		m.workflows = msg.workflows
-		m.repos = msg.repos
-		m.routes = msg.routes
-		m.sectionItems = msg.sectionItems
-		m.refreshInterval = msg.refreshInterval
-		if m.quote == "" {
-			m.quote = pickQuote(msg.quotes)
+		m.lifecycle.loadErr = nil
+		m.data = workspaceData{
+			features:       msg.features,
+			healthItems:    msg.healthItems,
+			artifactPolicy: msg.artifactPolicy,
+			workerNames:    msg.workerNames,
+			workerGroups:   msg.workerGroups,
+			workflowGroups: msg.workflowGroups,
+			allWorkers:     msg.allWorkers,
+			workflows:      msg.workflows,
+			repos:          msg.repos,
+			routes:         msg.routes,
 		}
-		if rows := m.visibleFeatures(); m.cursor >= len(rows) && len(rows) > 0 {
-			m.cursor = len(rows) - 1
+		m.navigation.items = msg.sectionItems
+		m.lifecycle.refreshInterval = msg.refreshInterval
+		if m.effects.quote == "" {
+			m.effects.quote = pickQuote(msg.quotes)
+		}
+		if rows := m.visibleFeatures(); m.navigation.featureCursor >= len(rows) && len(rows) > 0 {
+			m.navigation.featureCursor = len(rows) - 1
 		}
 		m.refreshStructuredViewer()
 		if m.view == viewWorkflowDetail {
@@ -77,12 +79,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleKey(msg)
 
 	case rainbowTickMsg:
-		if m.inactive {
+		if m.lifecycle.inactive {
 			return m, nil
 		}
-		if m.rainbowStep > 0 {
-			m.rainbowStep--
-			if m.rainbowStep > 0 {
+		if m.effects.rainbowStep > 0 {
+			m.effects.rainbowStep--
+			if m.effects.rainbowStep > 0 {
 				return m, rainbowTick()
 			}
 		}

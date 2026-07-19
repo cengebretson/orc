@@ -24,12 +24,12 @@ func TestDrawBoxLabeledWidthInvariant(t *testing.T) {
 // ── health section ───────────────────────────────────────────────
 
 func TestRenderHealthLinesGroupsAndIcons(t *testing.T) {
-	m := Model{healthItems: []doctor.Check{
+	m := Model{data: workspaceData{healthItems: []doctor.Check{
 		{Group: "workspace", Name: "AGENTS.md", Status: doctor.OK},
 		{Group: "workspace", Name: "features/", Status: doctor.Warning},
 		{Group: "tools", Name: "tmux", Status: doctor.OK},
 		{Group: "tools", Name: "codex", Status: doctor.Fail},
-	}}
+	}}}
 
 	plain := ansi.Strip(strings.Join(m.renderHealthLines(80), "\n"))
 
@@ -44,18 +44,18 @@ func TestRenderHealthLinesGroupsAndIcons(t *testing.T) {
 }
 
 func TestHealthSummaryExtra(t *testing.T) {
-	m := Model{healthItems: []doctor.Check{
+	m := Model{data: workspaceData{healthItems: []doctor.Check{
 		{Name: "a", Status: doctor.OK},
 		{Name: "b", Status: doctor.Warning},
 		{Name: "c", Status: doctor.Fail},
 		{Name: "d", Status: doctor.Warning},
-	}}
+	}}}
 	got := ansi.Strip(m.healthSummaryExtra())
 	if !strings.Contains(got, "1 ✗") || !strings.Contains(got, "2 ⚠") {
 		t.Errorf("summary extra = %q, want \"1 ✗\" and \"2 ⚠\"", got)
 	}
 
-	clean := Model{healthItems: []doctor.Check{{Name: "a", Status: doctor.OK}}}
+	clean := Model{data: workspaceData{healthItems: []doctor.Check{{Name: "a", Status: doctor.OK}}}}
 	if got := clean.healthSummaryExtra(); got != "" {
 		t.Errorf("all-OK summary extra = %q, want empty", got)
 	}
@@ -63,16 +63,16 @@ func TestHealthSummaryExtra(t *testing.T) {
 
 func TestDashboardShowsArtifactPolicyAndRepoCapabilityBadges(t *testing.T) {
 	m := testModel(t)
-	m.expanded[sectionRepositories] = true
-	m.artifactPolicy = "block"
-	m.repos = []config.Repo{{
+	m.navigation.expanded[sectionRepositories] = true
+	m.data.artifactPolicy = "block"
+	m.data.repos = []config.Repo{{
 		Name:          "app",
 		Path:          "projects/app",
 		Purpose:       "primary app",
 		WorktreeSetup: "scripts/setup.sh",
 		AgentHints:    []string{"make test"},
 	}}
-	m.routes = []config.RepoRoute{{Labels: []string{"application"}, Components: []string{"web"}, Repos: []string{"app"}}}
+	m.data.routes = []config.RepoRoute{{Labels: []string{"application"}, Components: []string{"web"}, Repos: []string{"app"}}}
 
 	out := ansi.Strip(m.viewDashboard())
 	for _, want := range []string{"artifacts block", "Repositories", "app", "projects/app", "setup", "hints", "label:application", "component:web", "→"} {
@@ -84,7 +84,7 @@ func TestDashboardShowsArtifactPolicyAndRepoCapabilityBadges(t *testing.T) {
 
 func TestRepositoriesSectionIsCollapsedByDefault(t *testing.T) {
 	m := New(t.TempDir())
-	if m.expanded[sectionRepositories] {
+	if m.navigation.expanded[sectionRepositories] {
 		t.Fatal("Repositories section should start collapsed")
 	}
 }
@@ -136,7 +136,7 @@ func TestRoutingReportFitsNarrowAndWideTerminals(t *testing.T) {
 // line without expanding the section.
 func TestDashboardCollapsedHealthShowsIssueCount(t *testing.T) {
 	m := testModel(t)
-	m.healthItems = []doctor.Check{
+	m.data.healthItems = []doctor.Check{
 		{Group: "workspace", Name: "AGENTS.md", Status: doctor.OK},
 		{Group: "workspace", Name: "worktrees/", Status: doctor.Warning, Detail: "not created yet"},
 	}
@@ -148,10 +148,10 @@ func TestDashboardCollapsedHealthShowsIssueCount(t *testing.T) {
 
 func TestDashboardExpandedHealthStaysCompact(t *testing.T) {
 	m := testModel(t)
-	m.expanded[sectionHealth] = true
-	m.focusedPane = paneSection
-	m.sectionFocus = sectionHealth
-	m.healthItems = []doctor.Check{
+	m.navigation.expanded[sectionHealth] = true
+	m.navigation.pane = paneSection
+	m.navigation.section = sectionHealth
+	m.data.healthItems = []doctor.Check{
 		{Group: "workspace", Name: "AGENTS.md", Status: doctor.OK},
 		{Group: "workspace", Name: "worktrees/", Status: doctor.Warning, Detail: "not created yet"},
 		{Group: "tools", Name: "codex", Status: doctor.Fail, Detail: "not found on PATH"},
@@ -204,11 +204,11 @@ func TestRenderHealthReportEmpty(t *testing.T) {
 // Non-OK checks get an explanatory line (name + detail) on the expanded
 // dashboard; OK checks do not clutter it.
 func TestHealthIssueLines(t *testing.T) {
-	m := Model{healthItems: []doctor.Check{
+	m := Model{data: workspaceData{healthItems: []doctor.Check{
 		{Group: "workspace", Name: "AGENTS.md", Status: doctor.OK},
 		{Group: "workspace", Name: "worktrees/", Status: doctor.Warning, Detail: "not created yet"},
 		{Group: "tools", Name: "codex", Status: doctor.Fail, Detail: "not found on PATH"},
-	}}
+	}}}
 	lines := m.healthIssueLines(80)
 	if len(lines) != 2 {
 		t.Fatalf("issue lines = %d, want 2 (non-OK only)", len(lines))

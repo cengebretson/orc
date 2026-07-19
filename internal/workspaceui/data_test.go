@@ -24,7 +24,7 @@ func TestBrokenRowSurfaced(t *testing.T) {
 	}
 	m := New("/ws")
 	m.width = 120
-	m.features = []*featureRow{broken, healthy}
+	m.data.features = []*featureRow{broken, healthy}
 
 	// broken rows show even though state can't say whether they're archived
 	vis := m.visibleFeatures()
@@ -65,13 +65,13 @@ func TestLoadDataSurfacesInvalidConfigWithoutPanicking(t *testing.T) {
 	if !ok {
 		t.Fatalf("updated model = %T, want workspaceui.Model", updated)
 	}
-	if m.loadErr == nil || len(m.healthItems) != 1 || m.healthItems[0].Name != config.Filename {
-		t.Fatalf("invalid configuration was not surfaced in health: err=%v checks=%+v", m.loadErr, m.healthItems)
+	if m.lifecycle.loadErr == nil || len(m.data.healthItems) != 1 || m.data.healthItems[0].Name != config.Filename {
+		t.Fatalf("invalid configuration was not surfaced in health: err=%v checks=%+v", m.lifecycle.loadErr, m.data.healthItems)
 	}
 }
 
-// A broken row (nil state) lands in m.features alongside healthy ones. Every
-// consumer that ranges over m.features must skip it instead of dereferencing
+// A broken row (nil state) lands in m.data.features alongside healthy ones. Every
+// consumer that ranges over m.data.features must skip it instead of dereferencing
 // row.s — otherwise a single unparseable STATE.yaml crashes the dashboard, the
 // workflow detail page, and the worker file viewer.
 func TestBrokenRowDoesNotPanicConsumers(t *testing.T) {
@@ -87,7 +87,7 @@ func TestBrokenRowDoesNotPanicConsumers(t *testing.T) {
 	// Dashboard header counts active/paused over all features.
 	m := New("/ws")
 	m.width, m.height = 120, 40
-	m.features = rows
+	m.data.features = rows
 	_ = m.viewDashboard()
 
 	// Workflow detail counts tickets per stage over all features.

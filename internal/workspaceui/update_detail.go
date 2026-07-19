@@ -15,28 +15,28 @@ func (m Model) handleDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.back):
 		m.view = viewDashboard
 	case key.Matches(msg, keys.cycleForward, keys.next):
-		if m.fileIdx < len(m.detailFiles)-1 {
-			m.fileIdx++
+		if m.detail.fileIndex < len(m.detail.files)-1 {
+			m.detail.fileIndex++
 			m.reRenderDetail() // refresh the selected file chip
 		}
 	case key.Matches(msg, keys.cycleBackward, keys.previous):
-		if m.fileIdx > 0 {
-			m.fileIdx--
+		if m.detail.fileIndex > 0 {
+			m.detail.fileIndex--
 			m.reRenderDetail()
 		}
 	case key.Matches(msg, keys.attach):
-		if m.detail.s.Runtime.Tmux != nil && m.detail.tmuxLive {
-			return m, attachTmux(m.detail.s.Runtime.Tmux.Session, m.detail.s.Stage.Name)
+		if m.detail.feature.s.Runtime.Tmux != nil && m.detail.feature.tmuxLive {
+			return m, attachTmux(m.detail.feature.s.Runtime.Tmux.Session, m.detail.feature.s.Stage.Name)
 		}
 	case key.Matches(msg, keys.open):
-		if m.fileIdx < len(m.detailFiles) {
-			f := m.detailFiles[m.fileIdx]
-			m.detailScroll = m.viewport.YOffset // restore on return from the file viewer
-			m.openViewer(fileRenderer(f.path), f.label, m.detail.s.Ticket, viewDetail)
+		if m.detail.fileIndex < len(m.detail.files) {
+			f := m.detail.files[m.detail.fileIndex]
+			m.detail.scroll = m.viewer.viewport.YOffset // restore on return from the file viewer
+			m.openViewer(fileRenderer(f.path), f.label, m.detail.feature.s.Ticket, viewDetail)
 		}
 	default:
 		var cmd tea.Cmd
-		m.viewport, cmd = m.viewport.Update(msg)
+		m.viewer.viewport, cmd = m.viewer.viewport.Update(msg)
 		return m, cmd
 	}
 	return m, nil
@@ -49,41 +49,41 @@ func (m Model) handleWorkflowDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.back):
 		m.view = viewDashboard
 	case key.Matches(msg, keys.previous):
-		if m.wfDetailCursor > 0 {
-			m.wfDetailCursor--
+		if m.navigation.workflowCursor > 0 {
+			m.navigation.workflowCursor--
 			m.reRenderWorkflowDetailAndScroll()
 		}
 	case key.Matches(msg, keys.next):
-		if m.wfDetailCursor < wfDetailTotal(m.wfDetailName, m.workflows)-1 {
-			m.wfDetailCursor++
+		if m.navigation.workflowCursor < wfDetailTotal(m.navigation.workflowName, m.data.workflows)-1 {
+			m.navigation.workflowCursor++
 			m.reRenderWorkflowDetailAndScroll()
 		}
 	case key.Matches(msg, keys.up):
-		m.viewport.ScrollUp(1)
+		m.viewer.viewport.ScrollUp(1)
 	case key.Matches(msg, keys.down):
-		m.viewport.ScrollDown(1)
+		m.viewer.viewport.ScrollDown(1)
 	case key.Matches(msg, keys.pageUp):
-		m.viewport.PageUp()
+		m.viewer.viewport.PageUp()
 	case key.Matches(msg, keys.pageDown):
-		m.viewport.PageDown()
+		m.viewer.viewport.PageDown()
 	case key.Matches(msg, keys.halfPageUp):
-		m.viewport.HalfPageUp()
+		m.viewer.viewport.HalfPageUp()
 	case key.Matches(msg, keys.halfPageDown):
-		m.viewport.HalfPageDown()
+		m.viewer.viewport.HalfPageDown()
 	case key.Matches(msg, keys.top):
-		m.viewport.GotoTop()
+		m.viewer.viewport.GotoTop()
 	case key.Matches(msg, keys.bottom):
-		m.viewport.GotoBottom()
+		m.viewer.viewport.GotoBottom()
 	case key.Matches(msg, keys.open):
-		stageName, advance, stepNum, total := wfDetailSelectedStage(m.wfDetailName, m.wfDetailCursor, m.workflows)
+		stageName, advance, stepNum, total := wfDetailSelectedStage(m.navigation.workflowName, m.navigation.workflowCursor, m.data.workflows)
 		if stageName != "" {
 			stagePath := filepath.Join(m.root, "stages", config.ResourcePath(stageName))
-			title := stageViewerTitle(stageName, advance, stepNum, total, m.workflows)
-			m.openViewer(fileRenderer(stagePath), title, m.wfDetailName, viewWorkflowDetail)
+			title := stageViewerTitle(stageName, advance, stepNum, total, m.data.workflows)
+			m.openViewer(fileRenderer(stagePath), title, m.navigation.workflowName, viewWorkflowDetail)
 		}
 	default:
 		var cmd tea.Cmd
-		m.viewport, cmd = m.viewport.Update(msg)
+		m.viewer.viewport, cmd = m.viewer.viewport.Update(msg)
 		return m, cmd
 	}
 	return m, nil
@@ -94,67 +94,67 @@ func (m Model) handleFileKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.quit):
 		return m, tea.Quit
 	case key.Matches(msg, keys.back):
-		switch m.viewerReturn {
+		switch m.viewer.returnView {
 		case viewWorkflowDetail:
 			m.reRenderWorkflowDetailAndScroll()
 		case viewDetail:
 			// the viewport holds file content — rebuild the detail body and
 			// restore the scroll position we left from.
-			m.viewport.SetContent(m.renderDetailBody())
-			m.viewport.SetYOffset(m.detailScroll)
+			m.viewer.viewport.SetContent(m.renderDetailBody())
+			m.viewer.viewport.SetYOffset(m.detail.scroll)
 		}
-		m.view = m.viewerReturn
+		m.view = m.viewer.returnView
 	case key.Matches(msg, keys.up):
-		m.viewport.ScrollUp(1)
+		m.viewer.viewport.ScrollUp(1)
 	case key.Matches(msg, keys.down):
-		m.viewport.ScrollDown(1)
+		m.viewer.viewport.ScrollDown(1)
 	case key.Matches(msg, keys.pageUp):
-		m.viewport.PageUp()
+		m.viewer.viewport.PageUp()
 	case key.Matches(msg, keys.pageDown):
-		m.viewport.PageDown()
+		m.viewer.viewport.PageDown()
 	case key.Matches(msg, keys.halfPageUp):
-		m.viewport.HalfPageUp()
+		m.viewer.viewport.HalfPageUp()
 	case key.Matches(msg, keys.halfPageDown):
-		m.viewport.HalfPageDown()
+		m.viewer.viewport.HalfPageDown()
 	case key.Matches(msg, keys.top):
-		m.viewport.GotoTop()
+		m.viewer.viewport.GotoTop()
 	case key.Matches(msg, keys.bottom):
-		m.viewport.GotoBottom()
+		m.viewer.viewport.GotoBottom()
 	case key.Matches(msg, keys.previous):
-		switch m.viewerReturn {
+		switch m.viewer.returnView {
 		case viewDetail:
-			if m.fileIdx > 0 {
-				m.fileIdx--
+			if m.detail.fileIndex > 0 {
+				m.detail.fileIndex--
 				m.loadViewerFile()
 			}
 		case viewWorkflowDetail:
-			if m.wfDetailCursor > 0 {
-				m.wfDetailCursor--
+			if m.navigation.workflowCursor > 0 {
+				m.navigation.workflowCursor--
 				m.loadViewerStage()
 			}
 		}
 	case key.Matches(msg, keys.next):
-		switch m.viewerReturn {
+		switch m.viewer.returnView {
 		case viewDetail:
-			if m.fileIdx < len(m.detailFiles)-1 {
-				m.fileIdx++
+			if m.detail.fileIndex < len(m.detail.files)-1 {
+				m.detail.fileIndex++
 				m.loadViewerFile()
 			}
 		case viewWorkflowDetail:
-			if m.wfDetailCursor < wfDetailTotal(m.wfDetailName, m.workflows)-1 {
-				m.wfDetailCursor++
+			if m.navigation.workflowCursor < wfDetailTotal(m.navigation.workflowName, m.data.workflows)-1 {
+				m.navigation.workflowCursor++
 				m.loadViewerStage()
 			}
 		}
 	case key.Matches(msg, keys.character):
-		if m.charSheetWorker != nil {
-			m.charSheetReturn = viewFile
+		if m.effects.charSheetWorker != nil {
+			m.effects.charSheetReturn = viewFile
 			m.view = viewCharacterSheet
 			return m, tea.ClearScreen
 		}
 	default:
 		var cmd tea.Cmd
-		m.viewport, cmd = m.viewport.Update(msg)
+		m.viewer.viewport, cmd = m.viewer.viewport.Update(msg)
 		return m, cmd
 	}
 	return m, nil
@@ -165,7 +165,7 @@ func (m Model) handleCharacterSheetKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.quit):
 		return m, tea.Quit
 	case key.Matches(msg, keys.character, keys.back):
-		m.view = m.charSheetReturn
+		m.view = m.effects.charSheetReturn
 		return m, tea.ClearScreen
 	}
 	return m, nil

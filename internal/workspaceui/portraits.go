@@ -207,7 +207,7 @@ func renderCharacterSheet(m Model, w *workers.Worker) string {
 	var activeQ, pausedQ, doneQ int
 	type questEntry struct{ f *featureRow }
 	var quests []questEntry
-	for _, f := range m.features {
+	for _, f := range m.data.features {
 		if f.s == nil || (f.workerName != displayName && f.workerName != w.ID) {
 			continue
 		}

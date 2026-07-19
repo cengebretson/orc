@@ -301,7 +301,7 @@ func firstLineContaining(s, needle string) string {
 
 func TestVisibleFeatures(t *testing.T) {
 	m := New("")
-	m.features = []*featureRow{
+	m.data.features = []*featureRow{
 		testRow("STORY-1", "active", "develop"),
 		testRow("STORY-2", "archived", "done"),
 		testRow("AUTH-9", "pending", "intake"),
@@ -311,18 +311,18 @@ func TestVisibleFeatures(t *testing.T) {
 		t.Errorf("archived hidden by default: got %d rows, want 2", got)
 	}
 
-	m.showArchived = true
+	m.navigation.showArchived = true
 	if got := len(m.visibleFeatures()); got != 3 {
 		t.Errorf("with showArchived: got %d rows, want 3", got)
 	}
 
-	m.search.SetValue("auth")
+	m.filter.input.SetValue("auth")
 	vis := m.visibleFeatures()
 	if len(vis) != 1 || vis[0].s.Ticket != "AUTH-9" {
 		t.Errorf("search filter: got %d rows, want only AUTH-9", len(vis))
 	}
 
-	story := m.features[0]
+	story := m.data.features[0]
 	story.workerID = "ada-reviewer"
 	story.workerName = "Ada"
 	story.engine = "codex"
@@ -331,7 +331,7 @@ func TestVisibleFeatures(t *testing.T) {
 		"los-app": {Branch: "feature/story-1", Worktree: "/work/los-app"},
 	}
 	for _, query := range []string{"ada review", "los-app feature/story-1", "codex develop"} {
-		m.search.SetValue(query)
+		m.filter.input.SetValue(query)
 		vis = m.visibleFeatures()
 		if len(vis) != 1 || vis[0].s.Ticket != "STORY-1" {
 			t.Errorf("metadata search %q: got %#v, want only STORY-1", query, vis)

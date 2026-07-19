@@ -19,13 +19,13 @@ import (
 // scrollable detail body, which lives in the viewport so long tickets stay
 // usable on short terminals.
 func (m Model) viewDetail() string {
-	if m.detail == nil {
+	if m.detail.feature == nil {
 		return ""
 	}
 	outerW := max(4, m.width-2)
 	var b strings.Builder
-	b.WriteString("\n" + drawBox(styleDetailTitle.Render(" "+m.detail.s.Slug+" "), nil, outerW) + "\n")
-	b.WriteString(m.viewport.View())
+	b.WriteString("\n" + drawBox(styleDetailTitle.Render(" "+m.detail.feature.s.Slug+" "), nil, outerW) + "\n")
+	b.WriteString(m.viewer.viewport.View())
 	if !m.embedded {
 		help := strings.Join([]string{
 			combinedBindingHelp("cycle files", keys.cycleForward, keys.cycleBackward, keys.previous, keys.next),
@@ -43,11 +43,11 @@ func (m Model) viewDetail() string {
 // renderDetailBody renders the scrollable body of the detail view — the State,
 // Repos, Timing, History, and Files boxes — for the viewport.
 func (m Model) renderDetailBody() string {
-	s := m.detail.s
-	summary := ticketview.Build(m.root, m.detail.featureDir, s, ticketview.Options{
+	s := m.detail.feature.s
+	summary := ticketview.Build(m.root, m.detail.feature.featureDir, s, ticketview.Options{
 		TmuxAvailable: func() bool { return true },
 		SessionExists: func(session string) bool {
-			return s.Runtime.Tmux != nil && session == s.Runtime.Tmux.Session && m.detail.tmuxLive
+			return s.Runtime.Tmux != nil && session == s.Runtime.Tmux.Session && m.detail.feature.tmuxLive
 		},
 		AttachHint: func(session, window string) string {
 			return "tmux attach -t " + session + ":" + window
@@ -65,12 +65,12 @@ func (m Model) renderDetailBody() string {
 	if workerLabel == "" {
 		workerLabel = summary.WorkerID
 	}
-	workflowLabel := m.detail.workflowLabel
+	workflowLabel := m.detail.feature.workflowLabel
 	if workflowLabel == "" {
 		workflowLabel = summary.Workflow
 	}
 	workflowValue := labelWithDimID(workflowLabel, summary.Workflow)
-	stageLabel := m.detail.stageLabel
+	stageLabel := m.detail.feature.stageLabel
 	if stageLabel == "" {
 		stageLabel = summary.Stage
 	}
@@ -87,7 +87,7 @@ func (m Model) renderDetailBody() string {
 		stateLines = append(stateLines, fmt.Sprintf("%s  %s",
 			styleDetailLabel.Render(f.label), f.value))
 	}
-	if m.detail.hasIssues {
+	if m.detail.feature.hasIssues {
 		stateLines = append(stateLines, fmt.Sprintf("%s  %s",
 			styleDetailLabel.Render(" Issues  "),
 			styleHealthWarn.Render("! no worker assigned for this stage — set worker: in orc.yaml or run `orc mark "+s.Ticket+" next --worker <id>`")))
@@ -102,9 +102,9 @@ func (m Model) renderDetailBody() string {
 				styleTmuxDead.Render("not running — "+summary.TmuxRestart)))
 		}
 	}
-	if m.detail.context.Observed {
+	if m.detail.feature.context.Observed {
 		stateLines = append(stateLines, fmt.Sprintf("%s  %s",
-			styleDetailLabel.Render(" Context "), renderContextPressure(m.detail.context)))
+			styleDetailLabel.Render(" Context "), renderContextPressure(m.detail.feature.context)))
 	}
 	if summary.JIT != nil {
 		jit := summary.JIT
@@ -114,7 +114,7 @@ func (m Model) renderDetailBody() string {
 		)
 	}
 	if summary.NextStage != "" {
-		nextStage := workflowStageLabel(summary.NextStage, m.workflows)
+		nextStage := workflowStageLabel(summary.NextStage, m.data.workflows)
 		var nextVal string
 		if summary.NextAdvance == "auto" {
 			nextVal = styleHealthOK.Render("→ "+nextStage) + styleDim.Render("  auto")
@@ -155,9 +155,9 @@ func (m Model) renderDetailBody() string {
 		b.WriteString(drawBox(styleSection.Render(" Repos "), repoLines, outerW) + "\n")
 	}
 
-	if len(m.detail.requiredArtifacts) > 0 {
+	if len(m.detail.feature.requiredArtifacts) > 0 {
 		b.WriteString(drawBox(styleSection.Render(" Required Artifacts "),
-			artifactStatusLines(m.detail.featureDir, artifactcheck.TemplateDir(m.root), m.detail.requiredArtifacts, innerW), outerW) + "\n")
+			artifactStatusLines(m.detail.feature.featureDir, artifactcheck.TemplateDir(m.root), m.detail.feature.requiredArtifacts, innerW), outerW) + "\n")
 	}
 
 	// Timing — per-stage durations derived from history
@@ -263,12 +263,12 @@ func (m Model) renderDetailBody() string {
 	}
 
 	// Files
-	if len(m.detailFiles) > 0 {
+	if len(m.detail.files) > 0 {
 		chips := " "
-		for i, f := range m.detailFiles {
+		for i, f := range m.detail.files {
 			exists := fileExists(f.path)
 			var chip string
-			if i == m.fileIdx {
+			if i == m.detail.fileIndex {
 				chip = styleFileSelected.Render(f.label)
 			} else if exists {
 				chip = styleFileOK.Render(f.label)
@@ -278,8 +278,8 @@ func (m Model) renderDetailBody() string {
 			chips += chip + " "
 		}
 		fileLines := []string{chips}
-		if m.fileIdx < len(m.detailFiles) {
-			f := m.detailFiles[m.fileIdx]
+		if m.detail.fileIndex < len(m.detail.files) {
+			f := m.detail.files[m.detail.fileIndex]
 			if fileExists(f.path) {
 				fileLines = append(fileLines, " "+styleDim.Render("enter to view "+f.label))
 			} else {

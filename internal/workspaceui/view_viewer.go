@@ -11,17 +11,17 @@ import (
 func (m Model) viewFile() string {
 	outerW := max(4, m.width-2)
 	var b strings.Builder
-	title := styleDetailTitle.Render(" "+m.viewerContext) +
+	title := styleDetailTitle.Render(" "+m.viewer.context) +
 		styleDim.Render(" · ") +
-		styleSubtext.Render(m.viewerTitle) +
-		styleDim.Render(fmt.Sprintf("  ·  %.0f%% ", m.viewport.ScrollPercent()*100))
+		styleSubtext.Render(m.viewer.title) +
+		styleDim.Render(fmt.Sprintf("  ·  %.0f%% ", m.viewer.viewport.ScrollPercent()*100))
 	b.WriteString("\n" + drawBox(title, nil, outerW) + "\n")
-	b.WriteString(m.viewport.View())
+	b.WriteString(m.viewer.viewport.View())
 	if !m.embedded {
 		helpItems := []string{
 			combinedBindingHelp("scroll", keys.up, keys.down, keys.pageUp, keys.pageDown),
 		}
-		switch m.viewerReturn {
+		switch m.viewer.returnView {
 		case viewDetail:
 			helpItems = append(helpItems, combinedBindingHelp("prev/next file", keys.previous, keys.next))
 		case viewWorkflowDetail:
@@ -44,10 +44,10 @@ func (m Model) viewWorkflowDetailPage() string {
 	var b strings.Builder
 	title := styleDetailTitle.Render(" Workflows") +
 		styleDim.Render(" · ") +
-		styleSubtext.Render(workflowDisplayWithID(m.wfDetailName, m.workflows)) +
-		styleDim.Render(fmt.Sprintf("  ·  %.0f%% ", m.viewport.ScrollPercent()*100))
+		styleSubtext.Render(workflowDisplayWithID(m.navigation.workflowName, m.data.workflows)) +
+		styleDim.Render(fmt.Sprintf("  ·  %.0f%% ", m.viewer.viewport.ScrollPercent()*100))
 	b.WriteString("\n" + drawBox(title, nil, outerW) + "\n")
-	b.WriteString(m.viewport.View())
+	b.WriteString(m.viewer.viewport.View())
 	if !m.embedded {
 		help := strings.Join([]string{
 			combinedBindingHelp("select stage", keys.previous, keys.next),

@@ -191,62 +191,82 @@ func (f *featureRow) searchFields() []string {
 // ── model ─────────────────────────────────────────────────────────
 
 type Model struct {
-	root            string
-	view            viewState
-	features        []*featureRow
-	healthItems     []doctor.Check
-	artifactPolicy  string
-	workerNames     []string
-	workerGroups    []workerGroup
-	workflowGroups  []workflowGroup
-	allWorkers      []*workers.Worker
-	workflows       []workflowChain
-	repos           []config.Repo
-	routes          []config.RepoRoute
-	expanded        map[sectionID]bool
-	cursor          int
-	showArchived    bool
+	root     string
+	view     viewState
+	width    int
+	height   int
+	embedded bool
+
+	data       workspaceData
+	lifecycle  lifecycleState
+	navigation navigationState
+	detail     detailState
+	viewer     viewerState
+	filter     searchState
+	effects    effectsState
+}
+
+type workspaceData struct {
+	features       []*featureRow
+	healthItems    []doctor.Check
+	artifactPolicy string
+	workerNames    []string
+	workerGroups   []workerGroup
+	workflowGroups []workflowGroup
+	allWorkers     []*workers.Worker
+	workflows      []workflowChain
+	repos          []config.Repo
+	routes         []config.RepoRoute
+}
+
+type lifecycleState struct {
 	lastRefresh     time.Time
 	refreshInterval time.Duration
-	width           int
-	height          int
-	embedded        bool
 	inactive        bool
 	epoch           uint64
 	loadErr         error
+}
 
-	// workflow detail drill-in
-	wfDetailName   string
-	wfDetailCursor int
+type navigationState struct {
+	expanded      map[sectionID]bool
+	featureCursor int
+	showArchived  bool
 
-	// section pane navigation
-	focusedPane         paneID
-	sectionFocus        sectionID
-	sectionCursor       int
-	sectionItems        map[sectionID][]sectionItem
-	autoExpandedSection sectionID
+	workflowName   string
+	workflowCursor int
 
-	// detail
-	detail       *featureRow
-	detailFiles  []detailFile
-	fileIdx      int
-	detailScroll int // saved viewport offset, restored when returning from a file
+	pane          paneID
+	section       sectionID
+	sectionCursor int
+	items         map[sectionID][]sectionItem
+	autoExpanded  sectionID
+}
 
-	// file viewer
-	viewport      viewport.Model
-	viewerTitle   string
-	viewerContext string // label shown in file viewer title bar
-	viewerReturn  viewState
-	viewerKind    viewerKind
-	viewerPath    string
-	// viewerRender regenerates the viewer's content at a given width so the file
+type detailState struct {
+	feature   *featureRow
+	files     []detailFile
+	fileIndex int
+	scroll    int // saved viewport offset, restored when returning from a file
+}
+
+type viewerState struct {
+	viewport   viewport.Model
+	title      string
+	context    string // label shown in file viewer title bar
+	returnView viewState
+	kind       viewerKind
+	path       string
+	// render regenerates the viewer's content at a given width so the file
 	// viewer re-flows on resize. Set for every viewFile, file-backed or synthetic.
-	viewerRender func(width int) string
+	render func(width int) string
+}
 
-	// search
-	search    textinput.Model
-	searching bool
+type searchState struct {
+	input  textinput.Model
+	active bool
+}
 
+type effectsState struct {
 	quote string
 
 	// easter egg: type "orc" on the dashboard to trigger rainbow logo
@@ -272,12 +292,16 @@ func New(root string) Model {
 	ti.CharLimit = 64
 
 	return Model{
-		root:         root,
-		lastRefresh:  time.Now(),
-		focusedPane:  paneFeatures,
-		sectionItems: map[sectionID][]sectionItem{},
-		expanded:     defaultSectionExpansion(),
-		search:       ti,
+		root: root,
+		lifecycle: lifecycleState{
+			lastRefresh: time.Now(),
+		},
+		navigation: navigationState{
+			pane:     paneFeatures,
+			items:    map[sectionID][]sectionItem{},
+			expanded: defaultSectionExpansion(),
+		},
+		filter: searchState{input: ti},
 	}
 }
 
@@ -291,25 +315,25 @@ func NewEmbedded(root string) Model {
 
 // SetActive controls refresh work while Workspace is embedded but hidden.
 func (m Model) SetActive(active bool) Model {
-	if active == !m.inactive {
+	if active == !m.lifecycle.inactive {
 		return m
 	}
-	m.epoch++
-	m.inactive = !active
+	m.lifecycle.epoch++
+	m.lifecycle.inactive = !active
 	if !active {
-		m.rainbowStep = 0
+		m.effects.rainbowStep = 0
 	}
 	return m
 }
 
 func (m Model) IsActive() bool {
-	return !m.inactive
+	return !m.lifecycle.inactive
 }
 
 // CanSwitchSection reports whether the shared dashboard shell can consume a
 // section-switch or help key without stealing text from the ticket filter.
 func (m Model) CanSwitchSection() bool {
-	return !m.searching
+	return !m.filter.active
 }
 
 // ── Init ─────────────────────────────────────────────────────────
@@ -317,10 +341,10 @@ func (m Model) CanSwitchSection() bool {
 const defaultRefreshInterval = 60 * time.Second
 
 func (m Model) Init() tea.Cmd {
-	if m.inactive {
+	if m.lifecycle.inactive {
 		return nil
 	}
-	return tea.Batch(loadData(m.root), tickEvery(defaultRefreshInterval, m.epoch))
+	return tea.Batch(loadData(m.root), tickEvery(defaultRefreshInterval, m.lifecycle.epoch))
 }
 
 // ── section navigation ─────────────────────────────────────────────
@@ -328,7 +352,7 @@ func (m Model) Init() tea.Cmd {
 func (m Model) navigableSections() []sectionID {
 	out := make([]sectionID, 0, len(workspaceSections))
 	for _, spec := range workspaceSections {
-		if spec.alwaysNavigable || len(m.sectionItems[spec.id]) > 0 {
+		if spec.alwaysNavigable || len(m.navigation.items[spec.id]) > 0 {
 			out = append(out, spec.id)
 		}
 	}
@@ -337,12 +361,12 @@ func (m Model) navigableSections() []sectionID {
 
 // visibleFeatures filters features by the archive toggle and search query.
 func (m Model) visibleFeatures() []*featureRow {
-	query := m.search.Value()
+	query := m.filter.input.Value()
 	var out []*featureRow
-	for _, f := range m.features {
+	for _, f := range m.data.features {
 		// Broken rows (unparseable state) always show — they need attention and
 		// we can't tell whether they're archived.
-		if f.s != nil && f.s.Status == "archived" && !m.showArchived {
+		if f.s != nil && f.s.Status == "archived" && !m.navigation.showArchived {
 			continue
 		}
 		if !searchmatch.Match(query, f.searchFields()...) {

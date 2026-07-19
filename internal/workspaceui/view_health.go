@@ -40,7 +40,7 @@ func (m Model) renderHealthLines(maxW int) []string {
 	rowW := 0
 	currentGroup := ""
 
-	for _, item := range m.healthItems {
+	for _, item := range m.data.healthItems {
 		icon, s := healthIconStyle(item.Status)
 		part := s.Render(icon + " " + strings.TrimSpace(item.Name))
 
@@ -86,7 +86,7 @@ func (m Model) renderHealthLines(maxW int) []string {
 // the collapsed Health summary, or "" when everything is healthy.
 func (m Model) healthSummaryExtra() string {
 	warns, fails := 0, 0
-	for _, c := range m.healthItems {
+	for _, c := range m.data.healthItems {
 		switch c.Status {
 		case doctor.Warning:
 			warns++
@@ -109,7 +109,7 @@ func (m Model) healthSummaryExtra() string {
 // just flagging them. OK checks stay in the compact wrapped overview.
 func (m Model) healthIssueLines(maxW int) []string {
 	var lines []string
-	for _, c := range m.healthItems {
+	for _, c := range m.data.healthItems {
 		if c.Status == doctor.OK {
 			continue
 		}
