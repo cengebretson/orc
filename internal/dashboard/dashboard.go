@@ -9,6 +9,7 @@ import (
 	terminalui "github.com/cengebretson/orc/internal/ui"
 	"github.com/cengebretson/orc/internal/watch"
 	"github.com/cengebretson/orc/internal/workspaceui"
+	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -114,22 +115,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return updated, tea.Batch(sectionCmd, sizeCmd)
 	case tea.KeyMsg:
 		if m.help {
-			switch msg.String() {
-			case "q", "ctrl+c":
+			switch {
+			case key.Matches(msg, keys.quit):
 				return m, tea.Quit
-			case "?", "esc":
+			case key.Matches(msg, keys.help, keys.back):
 				m.help = false
 			}
 			return m, nil
 		}
 		if m.shellVisible() && m.canSwitchSection() {
-			switch msg.String() {
-			case "?":
+			switch {
+			case key.Matches(msg, keys.help):
 				m.help = true
 				return m, nil
-			case "[":
+			case key.Matches(msg, keys.live):
 				return m, m.switchSection(SectionLive)
-			case "]":
+			case key.Matches(msg, keys.workspace):
 				return m, m.switchSection(SectionWorkspace)
 			}
 		}
@@ -233,32 +234,19 @@ func (m Model) renderHeader() string {
 func (m Model) renderHelp() string {
 	width := max(16, m.width)
 	inner := min(52, max(12, width-6))
-	lines := []string{
-		keyStyle.Render("DASHBOARD"),
-		"[ / ]           Live / Workspace",
-		"? / esc         close help",
-		"q               quit",
-		"",
-		keyStyle.Render("LIVE"),
-		"j / k           select work",
-		"enter           details",
-		"/               filter",
-		"a / i           attach / focus attention",
-		"v               rail / pets",
-		"j/k, pgup/pgdn  scroll Live details",
-		"g / G           top / bottom",
-		"",
-		keyStyle.Render("WORKSPACE"),
-		"tab             cycle panes / detail files",
-		"1 / 2 / 3 / 4   health / workflows / workers / repos",
-		"enter           inspect selected item",
-		"t               attach from feature details",
-		"!               worker character sheet",
-		"j/k, pgup/pgdn  scroll inspectors",
-		"g / G           top / bottom",
-		"left / right    select workflow stage",
-		"/               filter work",
-		"esc / b         back",
+	sections := []terminalui.HelpSection{dashboardHelpSection()}
+	sections = append(sections, watch.HelpSections()...)
+	sections = append(sections, workspaceui.HelpSections()...)
+	var lines []string
+	for sectionIndex, section := range sections {
+		if sectionIndex > 0 {
+			lines = append(lines, "")
+		}
+		lines = append(lines, keyStyle.Render(section.Title))
+		for _, entry := range section.Entries {
+			line := terminalui.PadRight(entry.Keys, 20) + entry.Description
+			lines = append(lines, terminalui.Truncate(line, inner))
+		}
 	}
 	content := strings.Join(lines, "\n")
 	return brandStyle.Render(" ORC DASHBOARD · HELP") + "\n\n" + cardStyle.Width(inner).Render(content)

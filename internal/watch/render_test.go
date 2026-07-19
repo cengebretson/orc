@@ -116,7 +116,7 @@ func TestWatchSummaryDistinguishesRuntimePausedAndAttention(t *testing.T) {
 
 func TestRenderWatchStatusCompactsAtNarrowWidths(t *testing.T) {
 	rows := []row{{status: "active", tmuxState: "live"}, {status: "paused"}}
-	for _, line := range renderWatchStatusLines(rows, 12) {
+	for _, line := range renderWatchStatusLines(liveOverviewFor(rows, time.Time{}, time.Time{}), 12) {
 		if got := lipgloss.Width(line); got > 12 {
 			t.Fatalf("compact status width = %d, want <= 12", got)
 		}

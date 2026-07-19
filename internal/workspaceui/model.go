@@ -36,6 +36,15 @@ const (
 	viewCharacterSheet
 )
 
+type viewerKind uint8
+
+const (
+	viewerNone viewerKind = iota
+	viewerHealth
+	viewerRepositories
+	viewerWorker
+)
+
 // ── messages ─────────────────────────────────────────────────────
 
 type tickMsg struct {
@@ -77,7 +86,7 @@ type dataMsg struct {
 	workflows       []workflowChain
 	repos           []config.Repo
 	routes          []config.RepoRoute
-	sectionItems    map[string][]sectionItem
+	sectionItems    map[sectionID][]sectionItem
 	refreshInterval time.Duration
 	quotes          []string
 }
@@ -194,7 +203,7 @@ type Model struct {
 	workflows       []workflowChain
 	repos           []config.Repo
 	routes          []config.RepoRoute
-	expanded        map[string]bool
+	expanded        map[sectionID]bool
 	cursor          int
 	showArchived    bool
 	lastRefresh     time.Time
@@ -211,11 +220,11 @@ type Model struct {
 	wfDetailCursor int
 
 	// section pane navigation
-	focusedPane         string // "features" or "section"
-	sectionFocus        string // "workflows" | "workers" | "repositories"
+	focusedPane         paneID
+	sectionFocus        sectionID
 	sectionCursor       int
-	sectionItems        map[string][]sectionItem
-	autoExpandedSection string
+	sectionItems        map[sectionID][]sectionItem
+	autoExpandedSection sectionID
 
 	// detail
 	detail       *featureRow
@@ -228,7 +237,7 @@ type Model struct {
 	viewerTitle   string
 	viewerContext string // label shown in file viewer title bar
 	viewerReturn  viewState
-	viewerKind    string
+	viewerKind    viewerKind
 	viewerPath    string
 	// viewerRender regenerates the viewer's content at a given width so the file
 	// viewer re-flows on resize. Set for every viewFile, file-backed or synthetic.
@@ -265,15 +274,10 @@ func New(root string) Model {
 	return Model{
 		root:         root,
 		lastRefresh:  time.Now(),
-		focusedPane:  "features",
-		sectionItems: map[string][]sectionItem{},
-		expanded: map[string]bool{
-			"health":       false,
-			"workflows":    false,
-			"workers":      false,
-			"repositories": false,
-		},
-		search: ti,
+		focusedPane:  paneFeatures,
+		sectionItems: map[sectionID][]sectionItem{},
+		expanded:     defaultSectionExpansion(),
+		search:       ti,
 	}
 }
 
@@ -321,26 +325,14 @@ func (m Model) Init() tea.Cmd {
 
 // ── section navigation ─────────────────────────────────────────────
 
-func (m Model) navigableSections() []string {
-	out := []string{"health"}
-	for _, key := range []string{"workflows", "workers", "repositories"} {
-		if len(m.sectionItems[key]) > 0 {
-			out = append(out, key)
+func (m Model) navigableSections() []sectionID {
+	out := make([]sectionID, 0, len(workspaceSections))
+	for _, spec := range workspaceSections {
+		if spec.alwaysNavigable || len(m.sectionItems[spec.id]) > 0 {
+			out = append(out, spec.id)
 		}
 	}
 	return out
-}
-
-func sectionLabel(key string) string {
-	labels := map[string]string{
-		"workflows":    "Workflows",
-		"workers":      "Workers",
-		"repositories": "Repositories",
-	}
-	if l, ok := labels[key]; ok {
-		return l
-	}
-	return key
 }
 
 // visibleFeatures filters features by the archive toggle and search query.

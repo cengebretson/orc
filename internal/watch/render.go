@@ -215,34 +215,16 @@ func (m Model) renderPreview() string {
 func (m Model) renderHelp() string {
 	width := max(24, m.width)
 	inner := min(48, max(20, width-4))
-	lines := []string{
-		selectedStyle.Render("NAVIGATE"),
-		"j / k, ↑ / ↓   move selection",
-		"enter, n        details / back",
-		"/               filter work",
-		"",
-		selectedStyle.Render("DETAILS"),
-		"j / k, ↑ / ↓   scroll lines",
-		"pgup / pgdn     scroll half page",
-		"ctrl+u / ctrl+d scroll half page",
-		"g / G           top / bottom",
-		"",
-		selectedStyle.Render("ACT"),
-		"a               attach selected",
-		"i               focus attention",
-		"r               refresh now",
-		"",
-		selectedStyle.Render("VIEW"),
-		"v               rail / pets",
-		"l               pet layout",
-		"? / esc         close help",
-		"q               quit",
-	}
 	var content strings.Builder
-	for i, line := range lines {
-		content.WriteString(truncate(line, inner))
-		if i != len(lines)-1 {
+	sections := HelpSections()
+	for sectionIndex, section := range sections {
+		if sectionIndex > 0 {
+			content.WriteString("\n\n")
+		}
+		content.WriteString(selectedStyle.Render(strings.TrimPrefix(section.Title, "LIVE · ")))
+		for _, entry := range section.Entries {
 			content.WriteString("\n")
+			content.WriteString(truncate(terminalui.PadRight(entry.Keys, 18)+entry.Description, inner))
 		}
 	}
 	var b strings.Builder

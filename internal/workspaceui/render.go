@@ -59,33 +59,10 @@ func drawBoxLabeled(title string, contentLines []string, outerW int) string {
 
 // drawBoxLabeledWith is drawBoxLabeled with a configurable border color.
 func drawBoxLabeledWith(title string, contentLines []string, outerW int, borderColor string) string {
-	outerW = max(4, outerW)
-	innerW := outerW - 2
 	bd := lipgloss.NewStyle().Foreground(lipgloss.Color(borderColor))
-
-	label := " " + ui.Truncate(title, max(1, innerW-3)) + " "
-	labelW := lipgloss.Width(label)
-	dashRight := innerW - 1 - labelW
-	if dashRight < 0 {
-		dashRight = 0
-	}
-
-	top := bd.Render("╭─") + label + bd.Render(strings.Repeat("─", dashRight)+"╮")
-	bot := bd.Render("╰" + strings.Repeat("─", innerW) + "╯")
-
-	var lines []string
-	lines = append(lines, top)
-	for _, cl := range contentLines {
-		cl = ui.Truncate(cl, innerW)
-		clW := lipgloss.Width(cl)
-		pad := innerW - clW
-		if pad < 0 {
-			pad = 0
-		}
-		lines = append(lines, bd.Render("│")+cl+strings.Repeat(" ", pad)+bd.Render("│"))
-	}
-	lines = append(lines, bot)
-	return strings.Join(lines, "\n")
+	return ui.RenderLabeledPanel(ui.LabeledPanelOptions{
+		Title: title, Lines: contentLines, Width: outerW, Border: bd,
+	})
 }
 
 // padRight pads s to at least width visible characters, using lipgloss.Width

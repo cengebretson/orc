@@ -100,13 +100,13 @@ func loadData(root string) tea.Cmd {
 		}
 
 		// section items for navigable file viewer
-		si := map[string][]sectionItem{}
+		si := map[sectionID][]sectionItem{}
 
 		// workflows: one entry per workflow chain; path="" signals detail view
 		workflowGroupsByName := map[string][]sectionItem{}
 		for _, c := range chains {
 			item := sectionItem{label: chainLabel(c), id: c.name, path: ""}
-			si["workflows"] = append(si["workflows"], item)
+			si[sectionWorkflows] = append(si[sectionWorkflows], item)
 			workflowGroupsByName[workflowNamespace(c.name)] = append(workflowGroupsByName[workflowNamespace(c.name)], item)
 		}
 		var workflowGroups []workflowGroup
@@ -116,7 +116,7 @@ func loadData(root string) tea.Cmd {
 
 		// workers: actual namespaced .md files in workers/<namespace>/
 		for _, group := range workerGroups {
-			si["workers"] = append(si["workers"], group.items...)
+			si[sectionWorkers] = append(si[sectionWorkers], group.items...)
 		}
 
 		repos := snapshot.Config.Repos
@@ -125,7 +125,7 @@ func loadData(root string) tea.Cmd {
 		// routes: repository routing now lives in orc.yaml
 		configPath := filepath.Join(root, config.Filename)
 		if _, err := os.Stat(configPath); err == nil {
-			si["repositories"] = []sectionItem{{label: "repository configuration", path: configPath}}
+			si[sectionRepositories] = []sectionItem{{label: "repository configuration", path: configPath}}
 		}
 
 		return dataMsg{

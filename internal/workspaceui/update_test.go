@@ -86,9 +86,9 @@ func testModel(t *testing.T) Model {
 	m.workflows = testChains()
 	m.workflowGroups = []workflowGroup{{name: "default", items: []sectionItem{{label: "default", id: "default", path: ""}}}}
 	m.workerGroups = []workerGroup{{name: "local", items: []sectionItem{{label: "Bob", id: "bob", path: "bob.md"}}}}
-	m.sectionItems = map[string][]sectionItem{
-		"workflows": {{label: "default", id: "default", path: ""}},
-		"workers":   {{label: "Bob", id: "bob", path: "bob.md"}},
+	m.sectionItems = map[sectionID][]sectionItem{
+		sectionWorkflows: {{label: "default", id: "default", path: ""}},
+		sectionWorkers:   {{label: "Bob", id: "bob", path: "bob.md"}},
 	}
 	return m
 }
@@ -159,40 +159,40 @@ func TestHandleKeyTabCyclesSections(t *testing.T) {
 	m := testModel(t)
 	// navigable: health (always), workflows, workers
 	m, _ = press(t, m, "tab")
-	if m.focusedPane != "section" || m.sectionFocus != "health" {
-		t.Fatalf("tab: pane=%q focus=%q, want section/health", m.focusedPane, m.sectionFocus)
+	if m.focusedPane != paneSection || m.sectionFocus != sectionHealth {
+		t.Fatalf("tab: pane=%v focus=%v, want section/health", m.focusedPane, m.sectionFocus)
 	}
-	if !m.expanded["health"] {
+	if !m.expanded[sectionHealth] {
 		t.Error("tab should expand the focused section")
 	}
 	m, _ = press(t, m, "tab")
-	if m.sectionFocus != "workflows" {
-		t.Errorf("second tab: focus=%q, want workflows", m.sectionFocus)
+	if m.sectionFocus != sectionWorkflows {
+		t.Errorf("second tab: focus=%v, want workflows", m.sectionFocus)
 	}
-	if m.expanded["health"] {
+	if m.expanded[sectionHealth] {
 		t.Error("tabbing out of an auto-expanded section should collapse it")
 	}
-	if !m.expanded["workflows"] {
+	if !m.expanded[sectionWorkflows] {
 		t.Error("tab should expand the newly focused section")
 	}
 	m, _ = press(t, m, "tab", "tab")
-	if m.focusedPane != "features" {
-		t.Errorf("tab past last section should return to features, got %q", m.focusedPane)
+	if m.focusedPane != paneFeatures {
+		t.Errorf("tab past last section should return to features, got %v", m.focusedPane)
 	}
-	if m.expanded["workers"] {
+	if m.expanded[sectionWorkers] {
 		t.Error("tabbing out to features should collapse the last auto-expanded section")
 	}
 
 	m, _ = press(t, m, "shift+tab")
-	if m.sectionFocus != "workers" {
-		t.Errorf("shift+tab from features: focus=%q, want last section workers", m.sectionFocus)
+	if m.sectionFocus != sectionWorkers {
+		t.Errorf("shift+tab from features: focus=%v, want last section workers", m.sectionFocus)
 	}
 
 	m, _ = press(t, m, "esc")
-	if m.focusedPane != "features" {
-		t.Errorf("esc should return focus to features, got %q", m.focusedPane)
+	if m.focusedPane != paneFeatures {
+		t.Errorf("esc should return focus to features, got %v", m.focusedPane)
 	}
-	if m.expanded["workers"] {
+	if m.expanded[sectionWorkers] {
 		t.Error("esc should collapse an auto-expanded focused section")
 	}
 }
@@ -200,15 +200,15 @@ func TestHandleKeyTabCyclesSections(t *testing.T) {
 func TestHandleKeySectionToggleCollapseReturnsFocus(t *testing.T) {
 	m := testModel(t)
 	m, _ = press(t, m, "tab", "tab") // focus workflows (expands it)
-	if m.sectionFocus != "workflows" {
-		t.Fatalf("setup: focus=%q", m.sectionFocus)
+	if m.sectionFocus != sectionWorkflows {
+		t.Fatalf("setup: focus=%v", m.sectionFocus)
 	}
 	m, _ = press(t, m, "2") // collapse focused section
-	if m.expanded["workflows"] {
+	if m.expanded[sectionWorkflows] {
 		t.Error("2 should collapse workflows")
 	}
-	if m.focusedPane != "features" {
-		t.Errorf("collapsing the focused section should return focus to features, got %q", m.focusedPane)
+	if m.focusedPane != paneFeatures {
+		t.Errorf("collapsing the focused section should return focus to features, got %v", m.focusedPane)
 	}
 }
 
@@ -234,7 +234,7 @@ func TestHandleKeyFeaturesPageAndJump(t *testing.T) {
 
 	// jump keys are inert while a section is focused
 	m, _ = press(t, m, "tab", "G")
-	if m.focusedPane != "section" {
+	if m.focusedPane != paneSection {
 		t.Fatalf("tab should focus a section")
 	}
 	if m.cursor != 0 {
@@ -265,7 +265,7 @@ func TestHandleKeyWorkerFileViewer(t *testing.T) {
 	}
 	m := testModel(t)
 	m.allWorkers = []*workers.Worker{{ID: "bob", Name: "Bob", Engine: "claude", FilePath: path}}
-	m.sectionItems["workers"] = []sectionItem{{label: "Bob", id: "bob", path: path}}
+	m.sectionItems[sectionWorkers] = []sectionItem{{label: "Bob", id: "bob", path: path}}
 
 	// shift+tab focuses last section (workers), enter opens the file viewer
 	m, _ = press(t, m, "shift+tab", "enter")
@@ -303,8 +303,8 @@ func TestHandleKeyHealthDrillInOpensReport(t *testing.T) {
 
 	// tab focuses the first navigable section (always health); enter drills in
 	m, _ = press(t, m, "tab")
-	if m.sectionFocus != "health" {
-		t.Fatalf("tab should focus health, got %q", m.sectionFocus)
+	if m.sectionFocus != sectionHealth {
+		t.Fatalf("tab should focus health, got %v", m.sectionFocus)
 	}
 	m, _ = press(t, m, "enter")
 	if m.view != viewFile {
@@ -358,8 +358,8 @@ func TestHealthViewerSupportsExplicitScrollKeys(t *testing.T) {
 
 func TestRoutesDrillInOpensStructuredRepositoryInspector(t *testing.T) {
 	m := testModel(t)
-	m.sectionFocus = "repositories"
-	m.sectionItems["repositories"] = []sectionItem{{label: "repository configuration"}}
+	m.sectionFocus = sectionRepositories
+	m.sectionItems[sectionRepositories] = []sectionItem{{label: "repository configuration"}}
 	m.repos = []config.Repo{{Name: "app", Path: "projects/app", Purpose: "Primary application"}}
 	m.routes = []config.RepoRoute{{Labels: []string{"application"}, Repos: []string{"app"}}}
 	m.openSectionItem()
@@ -628,7 +628,7 @@ func TestHandleKeyStageViewerUsesNamespacedStagePath(t *testing.T) {
 		name:  "default:standard",
 		steps: []routeStep{{name: "default:develop", advance: "auto"}},
 	}}
-	m.sectionItems["workflows"] = []sectionItem{{label: "default:standard", path: ""}}
+	m.sectionItems[sectionWorkflows] = []sectionItem{{label: "default:standard", path: ""}}
 
 	stagePath := filepath.Join(m.root, "stages", "default", "develop.md")
 	if err := os.MkdirAll(filepath.Dir(stagePath), 0o755); err != nil {
@@ -771,7 +771,7 @@ func TestRepositoryViewerRefreshesRecordedWorkInPlace(t *testing.T) {
 	m := testModel(t)
 	m.width, m.height = 72, 30
 	m.view = viewFile
-	m.viewerKind = "repositories"
+	m.viewerKind = viewerRepositories
 	m.repos = []config.Repo{{Name: "app", Path: "projects/app"}}
 	m.features = []*featureRow{{s: &state.State{
 		Ticket: "STORY-1", Status: "active", Repos: map[string]state.Repo{"app": {}},
@@ -787,7 +787,7 @@ func TestRepositoryViewerRefreshesRecordedWorkInPlace(t *testing.T) {
 		features: []*featureRow{{s: &state.State{
 			Ticket: "STORY-2", Status: "paused", Repos: map[string]state.Repo{"app": {}},
 		}}},
-		sectionItems: map[string][]sectionItem{},
+		sectionItems: map[sectionID][]sectionItem{},
 	})
 	m = asModel(t, updated)
 	out := ansi.Strip(m.viewport.View())

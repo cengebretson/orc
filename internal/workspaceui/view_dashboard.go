@@ -47,21 +47,8 @@ func (m Model) viewDashboard() string {
 	leftInnerW := leftW - 2
 
 	// ── Header stats ─────────────────────────────────────────────────
-	since := time.Since(m.lastRefresh)
-	ago := since.Round(time.Second)
-	active, paused, broken := 0, 0, 0
-	for _, f := range m.features {
-		if f.s == nil {
-			broken++
-			continue
-		}
-		switch f.s.Status {
-		case "active":
-			active++
-		case "paused":
-			paused++
-		}
-	}
+	overview := workspaceOverviewFor(m.features, m.lastRefresh, time.Now())
+	ago := overview.refreshAge.Round(time.Second)
 	orcLabel := styleHeader.Render("orc")
 	if m.rainbowStep > 0 {
 		idx := (rainbowSteps - m.rainbowStep) % len(rainbowPalette)
@@ -70,22 +57,23 @@ func (m Model) viewDashboard() string {
 	}
 	headerTitle := orcLabel + styleDim.Render("  workspace orchestrator")
 	statsLine := "  " +
-		styleSubtext.Render(fmt.Sprintf("%d features", len(m.features))) +
+		styleSubtext.Render(fmt.Sprintf("%d features", overview.features)) +
 		styleDim.Render("  ·  ") +
-		styleHealthOK.Render(fmt.Sprintf("%d active", active)) +
+		styleHealthOK.Render(fmt.Sprintf("%d active", overview.active)) +
 		styleDim.Render("  ·  ") +
-		styleStatusWaiting.Render(fmt.Sprintf("%d paused", paused))
-	if broken > 0 {
+		styleStatusWaiting.Render(fmt.Sprintf("%d paused", overview.paused))
+	if overview.broken > 0 {
 		statsLine += styleDim.Render("  ·  ") +
-			styleHealthErr.Render(fmt.Sprintf("⚠ %d broken", broken))
+			styleHealthErr.Render(fmt.Sprintf("⚠ %d broken", overview.broken))
 	}
-	statsLine += stalenessStyle(since).Render(fmt.Sprintf("  ·  ↺ %s ago", ago))
+	statsLine += stalenessStyle(overview.refreshAge).Render(fmt.Sprintf("  ·  ↺ %s ago", ago))
 
 	// ── Left column: header + sections ───────────────────────────────
 	var left strings.Builder
 	left.WriteString(drawBoxLabeled(headerTitle, []string{statsLine}, leftW) + "\n")
 
-	healthFocused := m.focusedPane == "section" && m.sectionFocus == "health"
+	healthSpec := sectionSpecFor(sectionHealth)
+	healthFocused := m.focusedPane == paneSection && m.sectionFocus == sectionHealth
 	healthContent := m.healthIssueLines(leftInnerW - 4)
 	if len(healthContent) == 0 {
 		healthContent = []string{styleHealthOK.Render("All checks passed")}
@@ -102,21 +90,23 @@ func (m Model) viewDashboard() string {
 	if m.artifactPolicy != "" {
 		healthSummary += styleDim.Render("  ·  artifacts ") + artifactPolicyStyle(m.artifactPolicy).Render(m.artifactPolicy)
 	}
-	left.WriteString(m.sectionBox("health", "1", "Health",
+	left.WriteString(m.sectionBox(healthSpec,
 		healthSummary, healthContent, leftW, healthFocused) + "\n")
 
-	wfFocused := m.focusedPane == "section" && m.sectionFocus == "workflows"
+	wfSpec := sectionSpecFor(sectionWorkflows)
+	wfFocused := m.focusedPane == paneSection && m.sectionFocus == sectionWorkflows
 	var wfContent []string
 	if wfFocused {
 		wfContent = renderGroupedWorkflowList(m.workflowGroups, m.sectionCursor)
 	} else {
 		wfContent = renderWorkflowChainGroups(m.workflows, leftInnerW-4)
 	}
-	left.WriteString(m.sectionBox("workflows", "2", "Workflows",
+	left.WriteString(m.sectionBox(wfSpec,
 		styleDim.Render(fmt.Sprintf("%d", len(m.workflows))),
 		wfContent, leftW, wfFocused) + "\n")
 
-	wkFocused := m.focusedPane == "section" && m.sectionFocus == "workers"
+	wkSpec := sectionSpecFor(sectionWorkers)
+	wkFocused := m.focusedPane == paneSection && m.sectionFocus == sectionWorkers
 	var wkContent []string
 	if wkFocused {
 		wkContent = renderGroupedWorkerList(m.workerGroups, m.sectionCursor)
@@ -126,16 +116,17 @@ func (m Model) viewDashboard() string {
 			wkContent = renderNameList(leftInnerW-4, m.workerNames)
 		}
 	}
-	left.WriteString(m.sectionBox("workers", "3", "Workers",
+	left.WriteString(m.sectionBox(wkSpec,
 		styleDim.Render(fmt.Sprintf("%d", len(m.workerNames))),
 		wkContent, leftW, wkFocused) + "\n")
 
-	rtFocused := m.focusedPane == "section" && m.sectionFocus == "repositories"
+	repoSpec := sectionSpecFor(sectionRepositories)
+	rtFocused := m.focusedPane == paneSection && m.sectionFocus == sectionRepositories
 	rtContent := renderRepoRoutingOverview(m.repos, m.routes, leftInnerW-4)
 	if rtFocused {
 		rtContent = append(rtContent, "", styleDim.Render("enter to inspect repositories"))
 	}
-	left.WriteString(m.sectionBox("repositories", "4", "Repositories",
+	left.WriteString(m.sectionBox(repoSpec,
 		styleDim.Render(fmt.Sprintf("%d repos  ·  %d routes", len(m.repos), len(m.routes))),
 		rtContent, leftW, rtFocused))
 
@@ -250,7 +241,7 @@ func (m Model) viewDashboard() string {
 		tableLines = strings.Split(m.renderTable(visibleRows, outerW-2, m.cursor-offset), "\n")
 	}
 	featuresBorderColor := activeTheme.Palette.Surface1
-	if m.focusedPane == "features" {
+	if m.focusedPane == paneFeatures {
 		featuresBorderColor = activeTheme.Palette.Mauve
 	}
 
@@ -262,13 +253,13 @@ func (m Model) viewDashboard() string {
 	if !m.searching && !m.embedded {
 		var helpItems []string
 		helpItems = append(helpItems,
-			helpItem("↑↓", "navigate"),
-			helpItem("enter", "open"),
-			helpItem("tab", "focus sections"),
-			helpItem("t", "attach"),
+			combinedBindingHelp("navigate", keys.up, keys.down),
+			bindingHelp(keys.open),
+			bindingHelp(keys.cycleForward),
+			bindingHelp(keys.attach),
 			helpItem("1-4", "expand/collapse"),
-			helpItem("r", "refresh"),
-			helpItem("q", "quit"),
+			bindingHelp(keys.refresh),
+			bindingHelp(keys.quit),
 		)
 		b.WriteString(styleHelp.Render(" " + strings.Join(helpItems, "  ")))
 	}
@@ -280,327 +271,3 @@ func (m Model) viewDashboard() string {
 
 // healthIconStyle maps a check status to its glyph and color, shared by the
 // dashboard health overview, the inline issue lines, and the full report.
-func (m Model) sectionBox(key, keyStr, name, summary string, content []string, outerW int, focused bool) string {
-	innerW := outerW - 2
-	borderColor := activeTheme.Palette.Surface1
-	if focused {
-		borderColor = activeTheme.Palette.Mauve
-	}
-	bd := lipgloss.NewStyle().Foreground(lipgloss.Color(borderColor))
-	title := styleDim.Render(keyStr) + " " + styleSection.Render(name)
-
-	if !m.expanded[key] {
-		label := " " + title
-		if summary != "" {
-			label += "  " + summary // caller styles the summary
-		}
-		label += " "
-		labelW := lipgloss.Width(label)
-		dashRight := innerW - 1 - labelW
-		if dashRight < 0 {
-			dashRight = 0
-		}
-		top := bd.Render("╭─") + label + bd.Render(strings.Repeat("─", dashRight)+"╮")
-		bot := bd.Render("╰" + strings.Repeat("─", innerW) + "╯")
-		return strings.Join([]string{top, bot}, "\n")
-	}
-
-	var indented []string
-	for _, l := range content {
-		indented = append(indented, "  "+l)
-	}
-	return drawBoxLabeledWith(title, indented, outerW, borderColor)
-}
-
-func renderWorkerGroups(groups []workerGroup, maxW int) []string {
-	var lines []string
-	for _, group := range groups {
-		if len(group.items) == 0 {
-			continue
-		}
-		lines = append(lines, styleDim.Render(group.name))
-		var names []string
-		for _, item := range group.items {
-			names = append(names, item.label)
-		}
-		for _, line := range renderNameList(maxW-2, names) {
-			lines = append(lines, "  "+line)
-		}
-	}
-	return lines
-}
-
-func renderWorkflowGroups(groups []workflowGroup, maxW int) []string {
-	var lines []string
-	for _, group := range groups {
-		if len(group.items) == 0 {
-			continue
-		}
-		lines = append(lines, styleDim.Render(group.name))
-		var names []string
-		for _, item := range group.items {
-			names = append(names, item.label)
-		}
-		for _, line := range renderNameList(maxW-2, names) {
-			lines = append(lines, "  "+line)
-		}
-	}
-	return lines
-}
-
-func renderWorkflowChainGroups(chains []workflowChain, maxW int) []string {
-	grouped := map[string][]workflowChain{}
-	for _, chain := range chains {
-		grouped[workflowNamespace(chain.name)] = append(grouped[workflowNamespace(chain.name)], chain)
-	}
-
-	var lines []string
-	for _, groupName := range sortedKeys(grouped) {
-		lines = append(lines, styleDim.Render(groupName))
-		for _, chain := range grouped[groupName] {
-			if chain.name != "" {
-				lines = append(lines, "  "+workflowChainHeading(chain)+":")
-			}
-			for _, line := range renderRouteChain(chain.steps, chain.loops, maxW-2) {
-				lines = append(lines, "  "+line)
-			}
-			lines = append(lines, "")
-		}
-	}
-	for len(lines) > 0 && lines[len(lines)-1] == "" {
-		lines = lines[:len(lines)-1]
-	}
-	return lines
-}
-
-func workflowChainHeading(c workflowChain) string {
-	return styleDim.Render(labelWithDimID(chainLabel(c), c.name))
-}
-
-func renderGroupedWorkerList(groups []workerGroup, cursor int) []string {
-	var lines []string
-	itemIdx := 0
-	for _, group := range groups {
-		if len(group.items) == 0 {
-			continue
-		}
-		lines = append(lines, styleDim.Render(group.name))
-		for _, item := range group.items {
-			label := labelWithDimID(item.label, item.id)
-			if itemIdx == cursor {
-				lines = append(lines, styleHealthOK.Render("▶")+"  "+styleSubtext.Render(label)+
-					styleDim.Render("  enter to view"))
-			} else {
-				lines = append(lines, "   "+styleDim.Render(label))
-			}
-			itemIdx++
-		}
-	}
-	if len(lines) == 0 {
-		return []string{styleDim.Render("No workers configured.")}
-	}
-	return lines
-}
-
-func renderGroupedWorkflowList(groups []workflowGroup, cursor int) []string {
-	var lines []string
-	itemIdx := 0
-	for _, group := range groups {
-		if len(group.items) == 0 {
-			continue
-		}
-		lines = append(lines, styleDim.Render(group.name))
-		for _, item := range group.items {
-			label := labelWithDimID(item.label, item.id)
-			if itemIdx == cursor {
-				lines = append(lines, styleHealthOK.Render("▶")+"  "+styleSubtext.Render(label)+
-					styleDim.Render("  enter to view"))
-			} else {
-				lines = append(lines, "   "+styleDim.Render(label))
-			}
-			itemIdx++
-		}
-	}
-	if len(lines) == 0 {
-		return []string{styleDim.Render("No workflows configured.")}
-	}
-	return lines
-}
-
-// renderNameList wraps a list of names with · separators to fit maxW.
-func renderNameList(maxW int, names []string) []string {
-	sep := styleDivider.Render("  ·  ")
-	sepW := lipgloss.Width(sep)
-
-	var rows []string
-	row := ""
-	rowW := 0
-	for _, name := range names {
-		chip := styleSubtext.Render(name)
-		chipW := lipgloss.Width(chip)
-		if rowW > 0 && rowW+sepW+chipW > maxW {
-			rows = append(rows, row)
-			row = ""
-			rowW = 0
-		}
-		if rowW > 0 {
-			row += sep
-			rowW += sepW
-		}
-		row += chip
-		rowW += chipW
-	}
-	if row != "" {
-		rows = append(rows, row)
-	}
-	return rows
-}
-
-// renderRepoList renders repos as "name — purpose" lines.
-func (m Model) renderTable(rows []*featureRow, w int, selectedIdx int) string {
-	const (
-		wTicket  = 12
-		wStatus  = 12
-		wContext = 8
-		wTmux    = 6
-	)
-	// fixed overhead: leading space + static columns + separators (6 × "  ")
-	fixed := 1 + wTicket + wStatus + wContext + wTmux + 6*2
-	flex := w - fixed
-	if flex < 48 {
-		flex = 48
-	}
-	// Favor the human-readable feature name, then the workflow/stage cell. The
-	// worker column can be narrower without hiding state such as "+ jit".
-	wName := flex/2 + 5
-	remaining := flex - wName
-	wWorkflow := remaining/2 + 4
-	wWorker := remaining - wWorkflow
-
-	header := " " +
-		padRight(styleTableHeader.Render("Ticket"), wTicket) + "  " +
-		padRight(styleTableHeader.Render("Name"), wName) + "  " +
-		padRight(styleTableHeader.Render("Status"), wStatus) + "  " +
-		padRight(styleTableHeader.Render("Stage"), wWorkflow) + "  " +
-		padRight(styleTableHeader.Render("Worker"), wWorker) + "  " +
-		padRight(styleTableHeader.Render("Context"), wContext) + "  " +
-		padRight(styleTableHeader.Render("Tmux"), wTmux)
-
-	div := " " + styleDivider.Render(strings.Repeat("─", w-1))
-
-	var lines []string
-	lines = append(lines, header, div)
-
-	for i, row := range rows {
-		selected := i == selectedIdx
-
-		if row.s == nil {
-			lines = append(lines, brokenRow(row, w, wTicket, selected))
-			continue
-		}
-		s := row.s
-
-		icon := statusIcon(s.Status)
-		name := strings.TrimPrefix(s.Slug, s.Ticket+"-")
-		workflowLabel := row.workflowLabel
-		if workflowLabel == "" {
-			workflowLabel = row.workflow
-		}
-		stageLabel := row.stageLabel
-		if stageLabel == "" {
-			stageLabel = s.Stage.Name
-		}
-		stageCell := workflowLabel + " › " + stageLabel + row.stageLoopLabel
-		if s.Runtime.JIT != nil {
-			stageCell += " + jit"
-		}
-
-		plainWorker := row.workerName
-		if plainWorker == "" {
-			plainWorker = "—"
-		}
-		plainTmux := "-"
-		if s.Runtime.Tmux != nil {
-			if row.tmuxLive {
-				plainTmux = "✓"
-			} else {
-				plainTmux = "✗"
-			}
-		}
-
-		ticketCell := truncate(s.Ticket, wTicket)
-		if row.hasIssues {
-			ticketCell = truncate("! "+s.Ticket, wTicket)
-		}
-
-		if selected {
-			// Plain unstyled text so styleRowSelected background covers the full row
-			line := " " +
-				padRight(ticketCell, wTicket) + "  " +
-				padRight(truncate(name, wName), wName) + "  " +
-				padRight(truncate(icon+" "+s.Status, wStatus), wStatus) + "  " +
-				padRight(truncate(stageCell, wWorkflow), wWorkflow) + "  " +
-				padRight(truncate(plainWorker, wWorker), wWorker) + "  " +
-				padRight(row.context.Label(), wContext) + "  " +
-				padRight(plainTmux, wTmux)
-			lines = append(lines, styleRowSelected.Width(w).Render(line))
-		} else {
-			ticketStyled := ticketCell
-			if row.hasIssues {
-				ticketStyled = styleHealthWarn.Render(ticketCell)
-			}
-			statusCell := statusStyle(s.Status).Render(icon + " " + s.Status)
-			nameCell := styleDim.Render(truncate(name, wName))
-			workerCell := styleDim.Render(truncate(plainWorker, wWorker))
-			contextCell := renderContextPressure(row.context)
-			var tmuxCell string
-			if s.Runtime.Tmux != nil {
-				if row.tmuxLive {
-					tmuxCell = styleTmuxLive.Render(plainTmux)
-				} else {
-					tmuxCell = styleTmuxDead.Render(plainTmux)
-				}
-			} else {
-				tmuxCell = styleTmuxNone.Render(plainTmux)
-			}
-			line := " " +
-				padRight(ticketStyled, wTicket) + "  " +
-				padRight(nameCell, wName) + "  " +
-				padRight(statusCell, wStatus) + "  " +
-				padRight(truncate(stageCell, wWorkflow), wWorkflow) + "  " +
-				padRight(workerCell, wWorker) + "  " +
-				padRight(contextCell, wContext) + "  " +
-				padRight(tmuxCell, wTmux)
-			lines = append(lines, line)
-		}
-	}
-
-	return strings.Join(lines, "\n")
-}
-
-// brokenRow renders a feature whose STATE.yaml could not be parsed: ticket from
-// the directory name, a red "broken" status, and the parse error in the stage
-// column. The "!" health marker flags it like any other issue.
-func brokenRow(row *featureRow, w, wTicket int, selected bool) string {
-	ticket := truncate(row.ticketID(), wTicket)
-	reason := "unreadable STATE.yaml"
-	if row.loadErr != nil {
-		reason = row.loadErr.Error()
-	}
-	const marker = "⚠ broken — "
-	// width left for the reason after the leading space, ticket col, separator,
-	// and the marker
-	reasonW := w - (1 + wTicket + 2 + lipgloss.Width(marker))
-	if reasonW < 0 {
-		reasonW = 0
-	}
-	reason = truncate(reason, reasonW)
-
-	if selected {
-		line := " " + padRight(ticket, wTicket) + "  " + marker + reason
-		return styleRowSelected.Width(w).Render(line)
-	}
-	return " " +
-		padRight(styleHealthErr.Render(ticket), wTicket) + "  " +
-		styleHealthErr.Render("⚠ broken") + styleDim.Render(" — "+reason)
-}

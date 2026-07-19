@@ -105,7 +105,7 @@ func TestHealthSummaryExtra(t *testing.T) {
 
 func TestDashboardShowsArtifactPolicyAndRepoCapabilityBadges(t *testing.T) {
 	m := testModel(t)
-	m.expanded["repositories"] = true
+	m.expanded[sectionRepositories] = true
 	m.artifactPolicy = "block"
 	m.repos = []config.Repo{{
 		Name:          "app",
@@ -126,7 +126,7 @@ func TestDashboardShowsArtifactPolicyAndRepoCapabilityBadges(t *testing.T) {
 
 func TestRepositoriesSectionIsCollapsedByDefault(t *testing.T) {
 	m := New(t.TempDir())
-	if m.expanded["repositories"] {
+	if m.expanded[sectionRepositories] {
 		t.Fatal("Repositories section should start collapsed")
 	}
 }
@@ -190,9 +190,9 @@ func TestDashboardCollapsedHealthShowsIssueCount(t *testing.T) {
 
 func TestDashboardExpandedHealthStaysCompact(t *testing.T) {
 	m := testModel(t)
-	m.expanded["health"] = true
-	m.focusedPane = "section"
-	m.sectionFocus = "health"
+	m.expanded[sectionHealth] = true
+	m.focusedPane = paneSection
+	m.sectionFocus = sectionHealth
 	m.healthItems = []doctor.Check{
 		{Group: "workspace", Name: "AGENTS.md", Status: doctor.OK},
 		{Group: "workspace", Name: "worktrees/", Status: doctor.Warning, Detail: "not created yet"},
