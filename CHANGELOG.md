@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-07-19
+
 ### Changed
 
 - Simplified the terminal UI around shared work-item projection, view state,
@@ -375,7 +377,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Bubble Tea TUI dashboard with health, workflow, stage, and portrait views.
 - `orc doctor --fix` to clear stale state locks.
 
-[Unreleased]: https://github.com/cengebretson/orc/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/cengebretson/orc/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/cengebretson/orc/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/cengebretson/orc/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/cengebretson/orc/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/cengebretson/orc/compare/v0.11.0...v0.12.0
