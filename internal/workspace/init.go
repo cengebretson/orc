@@ -66,7 +66,7 @@ func Init(opts InitOptions) error {
 		return printDryRun(plan)
 	}
 
-	return writeEntries(plan, opts.Force)
+	return writeEntries(plan)
 }
 
 // loadPack reads and parses a pack's pack.yaml.
@@ -125,7 +125,10 @@ func collectEntries(opts InitOptions) ([]fileEntry, error) {
 		packs = []string{"default"}
 	}
 
-	var entries []fileEntry
+	entries := []fileEntry{{
+		dest:    ".gitignore",
+		content: "projects/\nworktrees/\n",
+	}}
 	var baseOrcYAML string
 
 	// 1. Base scaffold — always installed. orc.yaml is held back and assembled
@@ -525,7 +528,7 @@ func printDryRun(plan mutationPlan) error {
 	return nil
 }
 
-func writeEntries(plan mutationPlan, force bool) error {
+func writeEntries(plan mutationPlan) error {
 	result, err := plan.Apply()
 	if err != nil {
 		return err
@@ -542,8 +545,6 @@ func writeEntries(plan mutationPlan, force bool) error {
 			return fmt.Errorf("creating %s: %w", dir, err)
 		}
 	}
-
-	writeGitignore(plan.root, force)
 
 	fmt.Printf("\nDone. %d created, %d updated, %d skipped.\n", result.created, result.updated, result.skipped)
 	if result.skipped > 0 {
@@ -567,13 +568,4 @@ func printSetupNextSteps(root string, dryRun bool) {
 	fmt.Println("  # or:")
 	fmt.Println(`  codex "Read SETUP.md and perform the workspace setup"`)
 	fmt.Println("  orc doctor")
-}
-
-func writeGitignore(root string, force bool) {
-	dest := filepath.Join(root, ".gitignore")
-	if _, err := os.Stat(dest); err == nil && !force {
-		return
-	}
-	content := "projects/\nworktrees/\n"
-	_ = os.WriteFile(dest, []byte(content), 0644)
 }
