@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/cengebretson/orc/internal/config"
-	"github.com/cengebretson/orc/internal/contextpressure"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/workers"
 	"github.com/cengebretson/orc/internal/workspacesnapshot"
@@ -147,12 +146,9 @@ func loadData(root string) tea.Cmd {
 }
 
 func collectFeatures(snapshot *workspacesnapshot.Snapshot) []*featureRow {
-	workflowCfg := snapshot.Config
-	features := snapshot.Features
-	liveByFeature := snapshot.Telemetry
-	thresholds := workflowCfg.ContextPressureThresholds()
-	rows := make([]*featureRow, 0, len(features))
-	for _, f := range features {
+	rows := make([]*featureRow, 0, len(snapshot.Items))
+	for _, item := range snapshot.Items {
+		f := item.Feature
 		if f.LoadError != nil {
 			// Surface broken tickets instead of hiding them — a row with no
 			// parsed state renders as a "broken" entry the user can act on.
@@ -163,54 +159,25 @@ func collectFeatures(snapshot *workspacesnapshot.Snapshot) []*featureRow {
 			})
 			continue
 		}
-		context := contextpressure.Pressure{}
-		if live, ok := liveByFeature[filepath.Clean(f.FeatureDir)]; ok {
-			context = contextpressure.Evaluate(live.ContextUsed, live.ContextLimit, thresholds)
-		}
 		rows = append(rows, &featureRow{
 			s:                 f.State,
 			featureDir:        f.FeatureDir,
 			workflow:          f.Workflow,
-			stage:             workflowCfg.ResolveStage(f.State.Stage.Name),
-			workflowLabel:     workflowDisplayName(workflowCfg, f.Workflow),
-			stageLabel:        stageDisplayName(workflowCfg, f.State.Stage.Name),
+			stage:             f.Stage,
+			workflowLabel:     f.WorkflowLabel,
+			stageLabel:        f.StageLabel,
 			stageLoopLabel:    f.StageLoopLabel,
 			workerID:          f.WorkerID,
 			workerName:        f.WorkerName,
 			engine:            f.Engine,
 			attention:         f.Attention,
-			context:           context,
+			context:           item.Context,
 			tmuxLive:          f.TmuxLive,
 			hasIssues:         f.HasIssues,
-			requiredArtifacts: currentStageArtifacts(workflowCfg, f.Workflow, f.State.Stage.Name),
+			requiredArtifacts: f.RequiredArtifacts,
 		})
 	}
 	return rows
-}
-
-func currentStageArtifacts(cfg *config.Config, workflowName, stageName string) []string {
-	if cfg == nil {
-		return nil
-	}
-	sc, ok := cfg.StageConfig(workflowName, stageName)
-	if !ok {
-		return nil
-	}
-	return sc.RequiredArtifacts
-}
-
-func workflowDisplayName(cfg *config.Config, id string) string {
-	if cfg == nil {
-		return id
-	}
-	return cfg.WorkflowDisplayName(cfg.ResolveWorkflow(id))
-}
-
-func stageDisplayName(cfg *config.Config, id string) string {
-	if cfg == nil {
-		return id
-	}
-	return cfg.StageDisplayName(cfg.ResolveStage(id))
 }
 
 func workerDisplayName(cfg *config.Config, w *workers.Worker) string {

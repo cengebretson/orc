@@ -4,8 +4,10 @@ package workspacesnapshot
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/cengebretson/orc/internal/config"
+	"github.com/cengebretson/orc/internal/contextpressure"
 	"github.com/cengebretson/orc/internal/doctor"
 	"github.com/cengebretson/orc/internal/featurelist"
 	"github.com/cengebretson/orc/internal/sessionlist"
@@ -15,11 +17,20 @@ import (
 )
 
 type Snapshot struct {
-	Config    *config.Config
-	Workers   []*workers.Worker
-	Features  []*featurelist.Feature
-	Telemetry map[string]telemetry.Live
-	Health    []doctor.Check
+	Config  *config.Config
+	Workers []*workers.Worker
+	Items   []*WorkItem
+	Health  []doctor.Check
+}
+
+// WorkItem is the presentation-neutral projection shared by Orc's Live and
+// Workspace interfaces. Feature contains durable state and resolved workspace
+// metadata; Live and Context contain the current runtime observation.
+type WorkItem struct {
+	Feature      *featurelist.Feature
+	Live         telemetry.Live
+	HasTelemetry bool
+	Context      contextpressure.Pressure
 }
 
 func Load(root string) (*Snapshot, error) {
@@ -35,11 +46,27 @@ func Load(root string) (*Snapshot, error) {
 	if err != nil {
 		return nil, fmt.Errorf("loading features: %w", err)
 	}
+	liveByFeature := sessionlist.ManagedTelemetry(root, features)
+	thresholds := ctx.Config.ContextPressureThresholds()
+	items := buildItems(features, liveByFeature, thresholds)
 	return &Snapshot{
-		Config:    ctx.Config,
-		Workers:   ctx.Workers,
-		Features:  features,
-		Telemetry: sessionlist.ManagedTelemetry(root, features),
-		Health:    doctor.Run(root).Checks,
+		Config:  ctx.Config,
+		Workers: ctx.Workers,
+		Items:   items,
+		Health:  doctor.Run(root).Checks,
 	}, nil
+}
+
+func buildItems(features []*featurelist.Feature, liveByFeature map[string]telemetry.Live, thresholds contextpressure.Thresholds) []*WorkItem {
+	items := make([]*WorkItem, 0, len(features))
+	for _, feature := range features {
+		item := &WorkItem{Feature: feature}
+		if live, ok := liveByFeature[filepath.Clean(feature.FeatureDir)]; ok {
+			item.Live = live
+			item.HasTelemetry = true
+			item.Context = contextpressure.Evaluate(live.ContextUsed, live.ContextLimit, thresholds)
+		}
+		items = append(items, item)
+	}
+	return items
 }

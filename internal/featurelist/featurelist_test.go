@@ -73,6 +73,12 @@ runtime:
 	if f.Workflow != "default:standard" {
 		t.Fatalf("Workflow = %q, want default:standard", f.Workflow)
 	}
+	if f.WorkflowLabel != "default" {
+		t.Fatalf("WorkflowLabel = %q, want default", f.WorkflowLabel)
+	}
+	if f.Stage != "default:code-review" || f.StageLabel != "code-review" {
+		t.Fatalf("stage projection = %q / %q, want default:code-review / code-review", f.Stage, f.StageLabel)
+	}
 	if f.StageLoopLabel != " (2/3)" {
 		t.Fatalf("StageLoopLabel = %q, want (2/3)", f.StageLoopLabel)
 	}
@@ -109,7 +115,7 @@ stage:
 		if f.Archived && f.State != nil && f.State.Ticket == "TICKET-2" {
 			archived = true
 		}
-		if f.LoadError != nil && filepath.Base(f.FeatureDir) == "BROKEN" {
+		if f.LoadError != nil && f.HasIssues && filepath.Base(f.FeatureDir) == "BROKEN" {
 			broken = true
 		}
 	}

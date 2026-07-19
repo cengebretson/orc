@@ -30,15 +30,16 @@ func collectRows(root, ticket string) ([]row, error) {
 	if err != nil {
 		return nil, err
 	}
-	thresholds := snapshot.Config.ContextPressureThresholds()
-	rows := make([]row, 0, len(snapshot.Features))
-	for _, f := range snapshot.Features {
+	rows := make([]row, 0, len(snapshot.Items))
+	for _, item := range snapshot.Items {
+		f := item.Feature
 		if f.Archived {
 			continue
 		}
 		r := rowFromFeature(f, snapshot.Config)
-		if live, ok := snapshot.Telemetry[filepath.Clean(f.FeatureDir)]; ok {
-			r.context = contextpressure.Evaluate(live.ContextUsed, live.ContextLimit, thresholds)
+		r.context = item.Context
+		if item.HasTelemetry {
+			live := item.Live
 			r.providerID = live.ProviderSessionID
 			r.liveState = live.State
 			r.model = live.Model
@@ -158,17 +159,11 @@ func rowFromFeature(f *featurelist.Feature, cfg *config.Config) row {
 		}
 	}
 	s := f.State
-	workflowID := s.Workflow
-	if workflowID == "" {
-		workflowID = f.Workflow
-	}
-	workflowLabel := workflowID
-	stageLabel := s.Stage.Name
+	workflowID := f.Workflow
+	workflowLabel := f.WorkflowLabel
+	stageLabel := f.StageLabel
 	var workflowSteps []workflowStep
 	if cfg != nil {
-		workflowID = cfg.ResolveWorkflow(workflowID)
-		workflowLabel = cfg.WorkflowDisplayName(workflowID)
-		stageLabel = stageDisplayLabel(cfg, s.Stage.Name)
 		for _, stage := range cfg.Stages(workflowID) {
 			workflowSteps = append(workflowSteps, workflowStep{name: stage.Name, label: cfg.StageDisplayName(stage.Name), advance: stage.Advance})
 			if stage.Loop != nil && stage.Loop.Via == s.Stage.Name {
@@ -185,7 +180,7 @@ func rowFromFeature(f *featurelist.Feature, cfg *config.Config) row {
 		worker = s.Stage.Worker
 	}
 	searchFields := []string{
-		s.Ticket, s.Slug, s.Status, s.Workflow, s.Stage.Name, stageLabel, s.Stage.Worker,
+		s.Ticket, s.Slug, s.Status, s.Workflow, f.Stage, s.Stage.Name, stageLabel, s.Stage.Worker,
 		f.Workflow, f.WorkerID, f.WorkerName, f.Engine, f.Attention,
 	}
 	for name, repo := range s.Repos {
@@ -213,13 +208,6 @@ func rowFromFeature(f *featurelist.Feature, cfg *config.Config) row {
 		history:       historyRows(s.History),
 		search:        searchFields,
 	}
-}
-
-func stageDisplayLabel(cfg *config.Config, stage string) string {
-	if cfg == nil {
-		return stage
-	}
-	return cfg.StageDisplayName(cfg.ResolveStage(stage))
 }
 
 func tmuxSession(s *state.State) string {

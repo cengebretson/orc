@@ -13,18 +13,22 @@ import (
 )
 
 type Feature struct {
-	State          *state.State
-	FeatureDir     string
-	Archived       bool
-	Workflow       string
-	StageLoopLabel string
-	WorkerID       string
-	WorkerName     string
-	Engine         string
-	TmuxLive       bool
-	Attention      string
-	HasIssues      bool
-	LoadError      error
+	State             *state.State
+	FeatureDir        string
+	Archived          bool
+	Workflow          string
+	WorkflowLabel     string
+	Stage             string
+	StageLabel        string
+	StageLoopLabel    string
+	RequiredArtifacts []string
+	WorkerID          string
+	WorkerName        string
+	Engine            string
+	TmuxLive          bool
+	Attention         string
+	HasIssues         bool
+	LoadError         error
 }
 
 type Options struct {
@@ -98,6 +102,7 @@ func collectDir(root, dir string, archived bool, cfg *config.Config, allWorkers 
 			*out = append(*out, &Feature{
 				FeatureDir: featureDir,
 				Archived:   archived,
+				HasIssues:  true,
 				LoadError:  err,
 			})
 			continue
@@ -116,20 +121,56 @@ func collectDir(root, dir string, archived bool, cfg *config.Config, allWorkers 
 			engine = worker.Engine
 		}
 		*out = append(*out, &Feature{
-			State:          s,
-			FeatureDir:     featureDir,
-			Archived:       archived,
-			Workflow:       workflow,
-			StageLoopLabel: loopCountSuffix(cfg, workflow, s.Stage.Name, s),
-			WorkerID:       workerID,
-			WorkerName:     resolveWorkerName(allWorkers, workerID),
-			Engine:         engine,
-			TmuxLive:       tmuxLive,
-			Attention:      attention,
-			HasIssues:      workerID == "",
+			State:             s,
+			FeatureDir:        featureDir,
+			Archived:          archived,
+			Workflow:          workflow,
+			WorkflowLabel:     workflowDisplayName(cfg, workflow),
+			Stage:             resolveStage(cfg, s.Stage.Name),
+			StageLabel:        stageDisplayName(cfg, s.Stage.Name),
+			StageLoopLabel:    loopCountSuffix(cfg, workflow, s.Stage.Name, s),
+			RequiredArtifacts: requiredArtifacts(cfg, workflow, s.Stage.Name),
+			WorkerID:          workerID,
+			WorkerName:        resolveWorkerName(allWorkers, workerID),
+			Engine:            engine,
+			TmuxLive:          tmuxLive,
+			Attention:         attention,
+			HasIssues:         workerID == "",
 		})
 	}
 	return nil
+}
+
+func workflowDisplayName(cfg *config.Config, workflow string) string {
+	if cfg == nil {
+		return workflow
+	}
+	return cfg.WorkflowDisplayName(workflow)
+}
+
+func resolveStage(cfg *config.Config, stage string) string {
+	if cfg == nil {
+		return stage
+	}
+	return cfg.ResolveStage(stage)
+}
+
+func stageDisplayName(cfg *config.Config, stage string) string {
+	if cfg == nil {
+		return stage
+	}
+	return cfg.StageDisplayName(cfg.ResolveStage(stage))
+}
+
+func requiredArtifacts(cfg *config.Config, workflow, stage string) []string {
+	if cfg == nil {
+		return nil
+	}
+	stageConfig, ok := cfg.StageConfig(workflow, stage)
+	if !ok {
+		return nil
+	}
+	return append([]string(nil), stageConfig.RequiredArtifacts...)
 }
 
 func resolveWorkflow(cfg *config.Config, s *state.State) string {

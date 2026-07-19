@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cengebretson/orc/internal/config"
 	"github.com/cengebretson/orc/internal/contextpressure"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -281,13 +280,6 @@ func TestFeatureDetailTitleAvoidsRepeatingTicketPrefix(t *testing.T) {
 	got := featureDetailTitle(row{ticket: "STORY-789", name: "STORY-789-migrate-database"})
 	if got != "migrate-database · STORY-789" {
 		t.Fatalf("featureDetailTitle() = %q", got)
-	}
-}
-
-func TestStageDisplayLabelUsesConfiguredAlias(t *testing.T) {
-	cfg := &config.Config{Aliases: config.Aliases{Stages: map[string]string{"build": "default:develop"}}}
-	if got := stageDisplayLabel(cfg, "default:develop"); got != "build" {
-		t.Fatalf("stageDisplayLabel() = %q, want build", got)
 	}
 }
 
