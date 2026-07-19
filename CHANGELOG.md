@@ -6,6 +6,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Simplified the terminal UI around shared work-item projection, view state,
+  rendering primitives, and consolidated regression coverage.
+- Made workspace initialization and workflow-pack installation use the same
+  preflighted, atomic mutation plan, including rollback of created and updated
+  files when a write fails.
+- Split state persistence, tmux integration, and CLI registration into focused
+  modules, with tmux process execution isolated behind a testable boundary.
+- Expanded direct coverage of state transitions, tmux targeting, stage files,
+  parked-session cleanup, and provider-session selection.
+
+### Fixed
+
+- Stamped a new feature's configured first-stage worker into
+  `STATE.yaml.next_action.worker`, so ticket-scoped `orc doctor` succeeds
+  immediately after `orc work`.
+
 ## [0.14.0] - 2026-07-19
 
 ### Changed
