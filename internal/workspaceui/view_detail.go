@@ -9,6 +9,7 @@ import (
 	"github.com/cengebretson/orc/internal/artifactcheck"
 	"github.com/cengebretson/orc/internal/report"
 	"github.com/cengebretson/orc/internal/ticketview"
+	"github.com/cengebretson/orc/internal/ui"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -108,7 +109,7 @@ func (m Model) renderDetailBody() string {
 	if summary.JIT != nil {
 		jit := summary.JIT
 		stateLines = append(stateLines,
-			fmt.Sprintf("%s  %s", styleDetailLabel.Render(" JIT     "), styleStatusWaiting.Render(jit.Worker+" · "+truncate(jit.Task, innerW-20))),
+			fmt.Sprintf("%s  %s", styleDetailLabel.Render(" JIT     "), styleStatusWaiting.Render(jit.Worker+" · "+ui.Truncate(jit.Task, innerW-20))),
 			fmt.Sprintf("%s  %s", styleDetailLabel.Render("         "), styleDim.Render("started "+jit.StartedAt)),
 		)
 	}
@@ -128,7 +129,7 @@ func (m Model) renderDetailBody() string {
 	}
 	if s.Status == "paused" {
 		stateLines = append(stateLines, fmt.Sprintf("%s  %s",
-			styleDetailLabel.Render(" Paused  "), styleStatusWaiting.Render(truncate(summary.PausedReason, innerW-16))))
+			styleDetailLabel.Render(" Paused  "), styleStatusWaiting.Render(ui.Truncate(summary.PausedReason, innerW-16))))
 	}
 	b.WriteString(drawBox(styleSection.Render(" State "), stateLines, outerW) + "\n")
 
@@ -186,25 +187,25 @@ func (m Model) renderDetailBody() string {
 
 		var timingLines []string
 		timingLines = append(timingLines, fmt.Sprintf(" %s  %s  %s  %s",
-			padRight(styleDetailLabel.Render("stage"), wTimingStage),
-			padRight(styleDetailLabel.Render("active"), wActive),
-			padRight(styleDetailLabel.Render("elapsed"), wWall),
-			padRight(styleDetailLabel.Render("visits"), wVisits)))
+			ui.PadRight(styleDetailLabel.Render("stage"), wTimingStage),
+			ui.PadRight(styleDetailLabel.Render("active"), wActive),
+			ui.PadRight(styleDetailLabel.Render("elapsed"), wWall),
+			ui.PadRight(styleDetailLabel.Render("visits"), wVisits)))
 		for _, st := range rep.Stages {
 			marker := ""
 			if rep.Open && st.Stage == s.Stage.Name {
 				marker = styleHealthOK.Render("  ← current")
 			}
 			timingLines = append(timingLines, fmt.Sprintf(" %s  %s  %s  %s%s",
-				padRight(styleSubtext.Render(truncate(st.Stage, wTimingStage)), wTimingStage),
-				padRight(report.Humanize(st.Active), wActive),
-				padRight(styleDim.Render(report.Humanize(st.Wall)), wWall),
-				padRight(fmt.Sprintf("%d", st.Visits), wVisits),
+				ui.PadRight(styleSubtext.Render(ui.Truncate(st.Stage, wTimingStage)), wTimingStage),
+				ui.PadRight(report.Humanize(st.Active), wActive),
+				ui.PadRight(styleDim.Render(report.Humanize(st.Wall)), wWall),
+				ui.PadRight(fmt.Sprintf("%d", st.Visits), wVisits),
 				marker))
 		}
 		timingLines = append(timingLines, fmt.Sprintf(" %s  %s  %s",
-			padRight(styleDetailLabel.Render(totalLabel), wTimingStage),
-			padRight(report.Humanize(rep.Active), wActive),
+			ui.PadRight(styleDetailLabel.Render(totalLabel), wTimingStage),
+			ui.PadRight(report.Humanize(rep.Active), wActive),
 			styleDim.Render(report.Humanize(rep.Wall))))
 		b.WriteString(drawBox(styleSection.Render(" Timing "), timingLines, outerW) + "\n")
 	}
@@ -241,9 +242,9 @@ func (m Model) renderDetailBody() string {
 		wResult := innerW - wAt - wStage - wWorker - 7
 		var histLines []string
 		histLines = append(histLines, fmt.Sprintf(" %s  %s  %s  %s",
-			padRight(styleDetailLabel.Render("date"), wAt),
-			padRight(styleDetailLabel.Render("stage"), wStage),
-			padRight(styleDetailLabel.Render("worker"), wWorker),
+			ui.PadRight(styleDetailLabel.Render("date"), wAt),
+			ui.PadRight(styleDetailLabel.Render("stage"), wStage),
+			ui.PadRight(styleDetailLabel.Render("worker"), wWorker),
 			styleDetailLabel.Render("result"),
 		))
 		for _, h := range s.History {
@@ -252,10 +253,10 @@ func (m Model) renderDetailBody() string {
 				ts = ts[:10]
 			}
 			histLines = append(histLines, fmt.Sprintf(" %s  %s  %s  %s",
-				padRight(styleDim.Render(truncate(ts, wAt)), wAt),
-				padRight(styleSubtext.Render(truncate(h.Stage, wStage)), wStage),
-				padRight(styleDim.Render(truncate(h.Worker, wWorker)), wWorker),
-				styleSubtext.Render(truncate(h.Result, wResult)),
+				ui.PadRight(styleDim.Render(ui.Truncate(ts, wAt)), wAt),
+				ui.PadRight(styleSubtext.Render(ui.Truncate(h.Stage, wStage)), wStage),
+				ui.PadRight(styleDim.Render(ui.Truncate(h.Worker, wWorker)), wWorker),
+				styleSubtext.Render(ui.Truncate(h.Result, wResult)),
 			))
 		}
 		b.WriteString(drawBox(styleSection.Render(" History "), histLines, outerW) + "\n")
@@ -300,9 +301,9 @@ func artifactStatusLines(featureDir, templateDir string, artifacts []string, max
 	var lines []string
 	for _, artifact := range artifacts {
 		if issue, found := issueByPath[artifact]; found {
-			lines = append(lines, " "+styleHealthWarn.Render("!")+" "+styleFileMissing.Render(truncate(issue.Detail(), maxW-4)))
+			lines = append(lines, " "+styleHealthWarn.Render("!")+" "+styleFileMissing.Render(ui.Truncate(issue.Detail(), maxW-4)))
 		} else {
-			lines = append(lines, " "+styleHealthOK.Render("✓")+" "+styleFileOK.Render(truncate(artifact, maxW-4)))
+			lines = append(lines, " "+styleHealthOK.Render("✓")+" "+styleFileOK.Render(ui.Truncate(artifact, maxW-4)))
 		}
 	}
 	return lines
@@ -333,7 +334,7 @@ func joinColumns(left, right, gap string) string {
 		if i < len(rightLines) {
 			rightLine = rightLines[i]
 		}
-		out = append(out, padRight(leftLine, leftW)+gap+rightLine)
+		out = append(out, ui.PadRight(leftLine, leftW)+gap+rightLine)
 	}
 	return strings.Join(out, "\n")
 }

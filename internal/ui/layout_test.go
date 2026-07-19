@@ -42,3 +42,24 @@ func TestFitPreservesANSIAndUnicodeAtEveryWidth(t *testing.T) {
 		}
 	}
 }
+
+func TestLayoutPrimitiveEdgeCases(t *testing.T) {
+	if got := Truncate("hello", 0); got != "" {
+		t.Fatalf("Truncate(_, 0) = %q, want empty", got)
+	}
+	if got := Truncate("hello", -5); got != "" {
+		t.Fatalf("Truncate(_, negative) = %q, want empty", got)
+	}
+	if got := Truncate("hello world", 6); got != "hello…" {
+		t.Fatalf("Truncate long value = %q, want %q", got, "hello…")
+	}
+	if got := PadRight("abcdef", 3); got != "abcdef" {
+		t.Fatalf("PadRight should not truncate: %q", got)
+	}
+	if got, want := Wrap("one two three four", 9), "one two\nthree\nfour"; got != want {
+		t.Fatalf("Wrap = %q, want %q", got, want)
+	}
+	if got := Wrap("", 10); got != "" {
+		t.Fatalf("Wrap empty = %q, want empty", got)
+	}
+}

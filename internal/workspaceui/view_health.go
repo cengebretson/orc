@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/cengebretson/orc/internal/doctor"
+	"github.com/cengebretson/orc/internal/ui"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -118,7 +119,7 @@ func (m Model) healthIssueLines(maxW int) []string {
 		if c.Detail != "" {
 			budget := maxW - lipgloss.Width(head) - 3
 			if budget > 1 {
-				line += styleDim.Render(" — " + truncate(c.Detail, budget))
+				line += styleDim.Render(" — " + ui.Truncate(c.Detail, budget))
 			}
 		}
 		lines = append(lines, line)
@@ -178,7 +179,7 @@ func renderHealthReport(checks []doctor.Check, width int) string {
 		if groupFail == 0 && groupWarn == 0 {
 			title += fmt.Sprintf("  ·  %d passing", groupOK)
 		}
-		title = truncate(title, max(1, outerW-6))
+		title = ui.Truncate(title, max(1, outerW-6))
 		lines := renderHealthGroupChecks(group.checks, outerW-4)
 		sections = append(sections, drawBoxLabeledWith(styleSection.Render(title), lines, outerW, healthReportBorderColor(groupWarn, groupFail)))
 	}
@@ -235,7 +236,7 @@ func renderHealthGroupChecks(checks []doctor.Check, contentW int) []string {
 			continue
 		}
 		lines = append(lines, "  "+head)
-		for _, wrapped := range strings.Split(wrapText(detail, max(8, contentW-3)), "\n") {
+		for _, wrapped := range strings.Split(ui.Wrap(detail, max(8, contentW-3)), "\n") {
 			lines = append(lines, styleDim.Render("     "+wrapped))
 		}
 	}

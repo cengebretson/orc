@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/cengebretson/orc/internal/ui"
 	"github.com/cengebretson/orc/internal/workers"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -299,7 +300,7 @@ func renderCharacterSheet(m Model, w *workers.Worker) string {
 		rpgLine,
 	}
 	if desc != "" {
-		infoLines = append(infoLines, styleDim.Render(truncate(desc, infoPanelW)))
+		infoLines = append(infoLines, styleDim.Render(ui.Truncate(desc, infoPanelW)))
 	}
 	infoLines = append(infoLines, "")
 	for i, v := range stats {
@@ -354,7 +355,7 @@ func renderCharacterSheet(m Model, w *workers.Worker) string {
 				styleDetailLabel.Render(f.s.Ticket),
 				st.Render(f.s.Status),
 			),
-			fmt.Sprintf("     %s", styleDim.Render(truncate(slug, infoPanelW-6))),
+			fmt.Sprintf("     %s", styleDim.Render(ui.Truncate(slug, infoPanelW-6))),
 		)
 	}
 	questPanel := mkPlain(infoPanelW).Render(strings.Join(questLines, "\n"))

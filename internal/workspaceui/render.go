@@ -65,22 +65,7 @@ func drawBoxLabeledWith(title string, contentLines []string, outerW int, borderC
 	})
 }
 
-// padRight pads s to at least width visible characters, using lipgloss.Width
-// to measure so ANSI escape codes don't throw off the count.
-func padRight(s string, width int) string {
-	return ui.PadRight(s, width)
-}
-
-// wrapText wraps s to fit within maxW columns, breaking on word boundaries.
-func wrapText(s string, maxW int) string {
-	return ui.Wrap(s, maxW)
-}
-
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
-}
-
-func truncate(s string, max int) string {
-	return ui.Truncate(s, max)
 }

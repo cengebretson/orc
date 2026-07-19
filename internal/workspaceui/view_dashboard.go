@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cengebretson/orc/internal/ui"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -151,7 +152,7 @@ func (m Model) viewDashboard() string {
 		}
 		rightLines = append(rightLines, "")
 		if m.quote != "" {
-			for _, l := range strings.Split(wrapText(m.quote, logoW), "\n") {
+			for _, l := range strings.Split(ui.Wrap(m.quote, logoW), "\n") {
 				centered := lipgloss.PlaceHorizontal(logoW, lipgloss.Center, quoteStyle.Render(l))
 				rightLines = append(rightLines, " "+centered)
 			}

@@ -3,6 +3,7 @@ package workspaceui
 import (
 	"strings"
 
+	"github.com/cengebretson/orc/internal/ui"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -27,13 +28,13 @@ func (m Model) renderTable(rows []*featureRow, w int, selectedIdx int) string {
 	wWorker := remaining - wWorkflow
 
 	header := " " +
-		padRight(styleTableHeader.Render("Ticket"), wTicket) + "  " +
-		padRight(styleTableHeader.Render("Name"), wName) + "  " +
-		padRight(styleTableHeader.Render("Status"), wStatus) + "  " +
-		padRight(styleTableHeader.Render("Stage"), wWorkflow) + "  " +
-		padRight(styleTableHeader.Render("Worker"), wWorker) + "  " +
-		padRight(styleTableHeader.Render("Context"), wContext) + "  " +
-		padRight(styleTableHeader.Render("Tmux"), wTmux)
+		ui.PadRight(styleTableHeader.Render("Ticket"), wTicket) + "  " +
+		ui.PadRight(styleTableHeader.Render("Name"), wName) + "  " +
+		ui.PadRight(styleTableHeader.Render("Status"), wStatus) + "  " +
+		ui.PadRight(styleTableHeader.Render("Stage"), wWorkflow) + "  " +
+		ui.PadRight(styleTableHeader.Render("Worker"), wWorker) + "  " +
+		ui.PadRight(styleTableHeader.Render("Context"), wContext) + "  " +
+		ui.PadRight(styleTableHeader.Render("Tmux"), wTmux)
 
 	div := " " + styleDivider.Render(strings.Repeat("─", w-1))
 
@@ -77,21 +78,21 @@ func (m Model) renderTable(rows []*featureRow, w int, selectedIdx int) string {
 			}
 		}
 
-		ticketCell := truncate(s.Ticket, wTicket)
+		ticketCell := ui.Truncate(s.Ticket, wTicket)
 		if row.hasIssues {
-			ticketCell = truncate("! "+s.Ticket, wTicket)
+			ticketCell = ui.Truncate("! "+s.Ticket, wTicket)
 		}
 
 		if selected {
 			// Plain unstyled text so styleRowSelected background covers the full row
 			line := " " +
-				padRight(ticketCell, wTicket) + "  " +
-				padRight(truncate(name, wName), wName) + "  " +
-				padRight(truncate(icon+" "+s.Status, wStatus), wStatus) + "  " +
-				padRight(truncate(stageCell, wWorkflow), wWorkflow) + "  " +
-				padRight(truncate(plainWorker, wWorker), wWorker) + "  " +
-				padRight(row.context.Label(), wContext) + "  " +
-				padRight(plainTmux, wTmux)
+				ui.PadRight(ticketCell, wTicket) + "  " +
+				ui.PadRight(ui.Truncate(name, wName), wName) + "  " +
+				ui.PadRight(ui.Truncate(icon+" "+s.Status, wStatus), wStatus) + "  " +
+				ui.PadRight(ui.Truncate(stageCell, wWorkflow), wWorkflow) + "  " +
+				ui.PadRight(ui.Truncate(plainWorker, wWorker), wWorker) + "  " +
+				ui.PadRight(row.context.Label(), wContext) + "  " +
+				ui.PadRight(plainTmux, wTmux)
 			lines = append(lines, styleRowSelected.Width(w).Render(line))
 		} else {
 			ticketStyled := ticketCell
@@ -99,8 +100,8 @@ func (m Model) renderTable(rows []*featureRow, w int, selectedIdx int) string {
 				ticketStyled = styleHealthWarn.Render(ticketCell)
 			}
 			statusCell := statusStyle(s.Status).Render(icon + " " + s.Status)
-			nameCell := styleDim.Render(truncate(name, wName))
-			workerCell := styleDim.Render(truncate(plainWorker, wWorker))
+			nameCell := styleDim.Render(ui.Truncate(name, wName))
+			workerCell := styleDim.Render(ui.Truncate(plainWorker, wWorker))
 			contextCell := renderContextPressure(row.context)
 			var tmuxCell string
 			if s.Runtime.Tmux != nil {
@@ -113,13 +114,13 @@ func (m Model) renderTable(rows []*featureRow, w int, selectedIdx int) string {
 				tmuxCell = styleTmuxNone.Render(plainTmux)
 			}
 			line := " " +
-				padRight(ticketStyled, wTicket) + "  " +
-				padRight(nameCell, wName) + "  " +
-				padRight(statusCell, wStatus) + "  " +
-				padRight(truncate(stageCell, wWorkflow), wWorkflow) + "  " +
-				padRight(workerCell, wWorker) + "  " +
-				padRight(contextCell, wContext) + "  " +
-				padRight(tmuxCell, wTmux)
+				ui.PadRight(ticketStyled, wTicket) + "  " +
+				ui.PadRight(nameCell, wName) + "  " +
+				ui.PadRight(statusCell, wStatus) + "  " +
+				ui.PadRight(ui.Truncate(stageCell, wWorkflow), wWorkflow) + "  " +
+				ui.PadRight(workerCell, wWorker) + "  " +
+				ui.PadRight(contextCell, wContext) + "  " +
+				ui.PadRight(tmuxCell, wTmux)
 			lines = append(lines, line)
 		}
 	}
@@ -131,7 +132,7 @@ func (m Model) renderTable(rows []*featureRow, w int, selectedIdx int) string {
 // the directory name, a red "broken" status, and the parse error in the stage
 // column. The "!" health marker flags it like any other issue.
 func brokenRow(row *featureRow, w, wTicket int, selected bool) string {
-	ticket := truncate(row.ticketID(), wTicket)
+	ticket := ui.Truncate(row.ticketID(), wTicket)
 	reason := "unreadable STATE.yaml"
 	if row.loadErr != nil {
 		reason = row.loadErr.Error()
@@ -143,13 +144,13 @@ func brokenRow(row *featureRow, w, wTicket int, selected bool) string {
 	if reasonW < 0 {
 		reasonW = 0
 	}
-	reason = truncate(reason, reasonW)
+	reason = ui.Truncate(reason, reasonW)
 
 	if selected {
-		line := " " + padRight(ticket, wTicket) + "  " + marker + reason
+		line := " " + ui.PadRight(ticket, wTicket) + "  " + marker + reason
 		return styleRowSelected.Width(w).Render(line)
 	}
 	return " " +
-		padRight(styleHealthErr.Render(ticket), wTicket) + "  " +
+		ui.PadRight(styleHealthErr.Render(ticket), wTicket) + "  " +
 		styleHealthErr.Render("⚠ broken") + styleDim.Render(" — "+reason)
 }

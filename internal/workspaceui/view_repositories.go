@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/cengebretson/orc/internal/config"
+	"github.com/cengebretson/orc/internal/ui"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -31,12 +32,12 @@ func renderRepoList(repos []config.Repo, maxW int) []string {
 		}
 		line := name + badgeText + sep + purpose
 		if lipgloss.Width(line) > maxW {
-			purpose = styleDim.Render(truncate(r.Purpose, maxW-lipgloss.Width(name+badgeText+sep)))
+			purpose = styleDim.Render(ui.Truncate(r.Purpose, maxW-lipgloss.Width(name+badgeText+sep)))
 			line = name + badgeText + sep + purpose
 		}
 		lines = append(lines, line)
 		if r.Path != "" {
-			lines = append(lines, styleDim.Render("  ↳ "+truncate(r.Path, max(1, maxW-4))))
+			lines = append(lines, styleDim.Render("  ↳ "+ui.Truncate(r.Path, max(1, maxW-4))))
 		}
 	}
 	return lines
@@ -49,7 +50,7 @@ func renderRepoRoutingOverview(repos []config.Repo, routes []config.RepoRoute, m
 	}
 	lines = append(lines, styleSection.Render("OPTIONAL ROUTING"))
 	if len(routes) == 0 {
-		return append(lines, styleDim.Render(truncate("No metadata routes · use repo purpose and hints", maxW)))
+		return append(lines, styleDim.Render(ui.Truncate("No metadata routes · use repo purpose and hints", maxW)))
 	}
 	for _, route := range routes {
 		lines = append(lines, renderRepoRouteLine(route, maxW))
@@ -61,7 +62,7 @@ func renderRepoRouteLine(route config.RepoRoute, maxW int) string {
 	signals := routeSignalText(route)
 	targets := strings.Join(route.Repos, ", ")
 	plain := signals + "  →  " + targets
-	plain = truncate(plain, maxW)
+	plain = ui.Truncate(plain, maxW)
 	if before, after, ok := strings.Cut(plain, "  →  "); ok {
 		return styleSubtext.Render(before) + styleDivider.Render("  →  ") + styleHealthOK.Render(after)
 	}
@@ -145,7 +146,7 @@ func renderRoutingReport(repos []config.Repo, routes []config.RepoRoute, feature
 		"ticket context  →  exact label/component match  →  selected repo set",
 		"no match  →  purpose + agent hints     ambiguous  →  pause for input",
 	} {
-		for _, line := range strings.Split(wrapText(text, max(8, outerW-6)), "\n") {
+		for _, line := range strings.Split(ui.Wrap(text, max(8, outerW-6)), "\n") {
 			summary = append(summary, styleDim.Render(line))
 		}
 	}
@@ -182,7 +183,7 @@ func renderRoutingReport(repos []config.Repo, routes []config.RepoRoute, feature
 			{"task scope  →  repo purpose + agent hints", styleSubtext},
 			{"ambiguous  →  pause for input", styleStatusWaiting},
 		} {
-			for _, line := range strings.Split(wrapText(item.text, contentW), "\n") {
+			for _, line := range strings.Split(ui.Wrap(item.text, contentW), "\n") {
 				lines = append(lines, item.style.Render(line))
 			}
 		}
@@ -221,7 +222,7 @@ func renderRepositoryInspectorCard(repo config.Repo, work repoWorkSummary, width
 }
 
 func labeledInspectorLines(label, value string, width int, valueStyle lipgloss.Style) []string {
-	wrapped := strings.Split(wrapText(value, width), "\n")
+	wrapped := strings.Split(ui.Wrap(value, width), "\n")
 	lines := make([]string, 0, len(wrapped))
 	for i, line := range wrapped {
 		lineLabel := "         "
@@ -236,7 +237,7 @@ func labeledInspectorLines(label, value string, width int, valueStyle lipgloss.S
 func renderRouteInspectorCard(route config.RepoRoute, number, width int) string {
 	contentW := max(1, width-6)
 	var lines []string
-	for _, line := range strings.Split(wrapText(routeSignalText(route), contentW), "\n") {
+	for _, line := range strings.Split(ui.Wrap(routeSignalText(route), contentW), "\n") {
 		lines = append(lines, styleSubtext.Render(line))
 	}
 	lines = append(lines,

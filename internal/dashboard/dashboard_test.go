@@ -123,3 +123,37 @@ func TestDashboardOnlyRunsTheActiveSection(t *testing.T) {
 		t.Fatalf("switched lifecycle: live=%v workspace=%v", m.live.IsActive(), m.workspace.IsActive())
 	}
 }
+
+func TestDashboardTerminalSizeMatrix(t *testing.T) {
+	tests := []struct {
+		name          string
+		width, height int
+		start         Section
+	}{
+		{name: "narrow", width: 24, height: 18, start: SectionLive},
+		{name: "adaptive boundary", width: 56, height: 18, start: SectionLive},
+		{name: "short workspace", width: 80, height: 10, start: SectionWorkspace},
+		{name: "wide live", width: 120, height: 40, start: SectionLive},
+		{name: "wide workspace", width: 120, height: 40, start: SectionWorkspace},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m, err := New(t.TempDir(), Options{Start: tt.start, Adaptive: true})
+			if err != nil {
+				t.Fatal(err)
+			}
+			updated, _ := m.Update(tea.WindowSizeMsg{Width: tt.width, Height: tt.height})
+			m = dashboardModel(t, updated)
+			view := m.View()
+			if view == "" {
+				t.Fatal("View() returned empty output after resize")
+			}
+			for lineNumber, line := range strings.Split(view, "\n") {
+				if width := lipgloss.Width(line); width > tt.width {
+					t.Fatalf("line %d width = %d, terminal width = %d:\n%s", lineNumber, width, tt.width, view)
+				}
+			}
+		})
+	}
+}

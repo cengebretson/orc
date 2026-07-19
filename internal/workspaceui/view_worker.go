@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/cengebretson/orc/internal/ui"
 	"github.com/cengebretson/orc/internal/workers"
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
@@ -176,8 +177,8 @@ func renderActiveFeatureRows(rows []activeFeatureRow, width int) []string {
 	}
 	lines := make([]string, 0, len(visibleRows)+1)
 	for _, row := range visibleRows {
-		ticket := styleSubtext.Render(padRight(truncate(row.ticket, ticketW), ticketW))
-		stage := styleDim.Render(truncate(row.stage, stageW))
+		ticket := styleSubtext.Render(ui.PadRight(ui.Truncate(row.ticket, ticketW), ticketW))
+		stage := styleDim.Render(ui.Truncate(row.stage, stageW))
 		lines = append(lines, ticket+"  "+stage)
 	}
 	if hidden := len(rows) - len(visibleRows); hidden > 0 {

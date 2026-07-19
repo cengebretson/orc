@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/cengebretson/orc/internal/config"
+	"github.com/cengebretson/orc/internal/ui"
 	"github.com/cengebretson/orc/internal/workers"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -67,7 +68,7 @@ func renderWorkflowDetail(name string, chains []workflowChain, allWorkers []*wor
 
 	// Description — a one-line summary of what this workflow is for.
 	if chain.description != "" {
-		for _, l := range strings.Split(wrapText(chain.description, innerW), "\n") {
+		for _, l := range strings.Split(ui.Wrap(chain.description, innerW), "\n") {
 			sb.WriteString("  " + styleSubtext.Render(l) + "\n")
 		}
 		sb.WriteString("\n")
@@ -93,10 +94,10 @@ func renderWorkflowDetail(name string, chains []workflowChain, allWorkers []*wor
 		wWorker = 16
 	}
 	header := "  " +
-		padRight(styleTableHeader.Render(""), wCheck) + "  " +
-		padRight(styleTableHeader.Render("Stage"), wStageName) + "  " +
-		padRight(styleTableHeader.Render("Worker"), wWorker) + "  " +
-		padRight(styleTableHeader.Render("Advance"), wAdvance) + "  " +
+		ui.PadRight(styleTableHeader.Render(""), wCheck) + "  " +
+		ui.PadRight(styleTableHeader.Render("Stage"), wStageName) + "  " +
+		ui.PadRight(styleTableHeader.Render("Worker"), wWorker) + "  " +
+		ui.PadRight(styleTableHeader.Render("Advance"), wAdvance) + "  " +
 		styleTableHeader.Render("Active")
 	divider := "  " + styleDivider.Render(strings.Repeat("─", innerW-2))
 
@@ -121,10 +122,10 @@ func renderWorkflowDetail(name string, chains []workflowChain, allWorkers []*wor
 			cursor = cursorStyle.Render("▶") + " "
 		}
 		lines := []string{cursor +
-			padRight(stageExists(step.name), wCheck) + "  " +
-			padRight(styleSubtext.Render(truncate(stepLabel(step), wStageName)), wStageName) + "  " +
-			padRight(workerLabel(step.workerID), wWorker) + "  " +
-			padRight(advVal, wAdvance) + "  " +
+			ui.PadRight(stageExists(step.name), wCheck) + "  " +
+			ui.PadRight(styleSubtext.Render(ui.Truncate(stepLabel(step), wStageName)), wStageName) + "  " +
+			ui.PadRight(workerLabel(step.workerID), wWorker) + "  " +
+			ui.PadRight(advVal, wAdvance) + "  " +
 			activeVal}
 		if len(step.requiredArtifacts) > 0 {
 			lines = append(lines, "  "+strings.Repeat(" ", wCheck+wStageName+4)+styleDim.Render("artifacts: "+strings.Join(step.requiredArtifacts, ", ")))
