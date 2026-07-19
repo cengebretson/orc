@@ -129,7 +129,7 @@ settings:
   auto_archive: false
   auto_tmux: false       # wrap every orc next launch in a tmux session automatically
   auto_next: false       # orc work immediately launches the first stage (same as --next)
-  tui_refresh: 60        # dashboard auto-refresh interval in seconds
+  workspace_refresh: 60  # Workspace auto-refresh interval in seconds
   theme: catppuccin-mocha
   context_pressure:      # optional; defaults shown
     green: 0
@@ -213,7 +213,7 @@ review; the skipped artifacts are recorded in the stage result and history. The
 default is `warn`.
 
 `settings.context_pressure` controls the percentage boundaries used to color
-live provider context usage in `orc watch` and `orc tui`. The values must obey
+live provider context usage in `orc watch` and `orc dashboard`. The values must obey
 `0 <= green < yellow < red <= 100`. If the provider does not report a context
 limit, Orc displays `n/a`; this live overlay never changes workflow state.
 
@@ -314,7 +314,7 @@ history:
 `runtime.tmux.session` is the source of truth for tmux operations once present,
 and `runtime.tmux.pane` records the exact agent pane after a successful launch.
 Older tickets without that field fall back to the feature slug. `orc attach`,
-`orc status`, `orc tui`, and archive cleanup all use the recorded runtime session
+`orc status`, `orc dashboard`, and archive cleanup all use the recorded runtime session
 so custom or restored session names continue to work. Older tickets without a
 pane continue to use their stage window; if that window later has multiple panes,
 Orc requires exactly one pane marked `@orc_agent=1` instead of guessing.

@@ -1,15 +1,23 @@
 package main
 
 import (
+	"path/filepath"
 	"time"
 
+	"github.com/cengebretson/orc/internal/dashboard"
 	"github.com/cengebretson/orc/internal/tmux"
 	"github.com/cengebretson/orc/internal/watch"
 	"github.com/spf13/cobra"
 )
 
 func runWatch(cmd *cobra.Command, args []string) error {
-	root, err := resolveRoot(globalWorkspace)
+	root := ""
+	var err error
+	if watchDemo {
+		root, err = filepath.Abs(globalWorkspace)
+	} else {
+		root, err = resolveRoot(globalWorkspace)
+	}
 	if err != nil {
 		return err
 	}
@@ -35,6 +43,7 @@ func runWatch(cmd *cobra.Command, args []string) error {
 			Wide:      watchWide,
 			View:      string(mode),
 			PetLayout: string(petLayout),
+			Demo:      watchDemo,
 			Layout:    watchTmuxLayout,
 			Size:      watchTmuxSize,
 		})
@@ -45,11 +54,17 @@ func runWatch(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return watch.Run(root, watch.Options{
+	watchOpts := watch.Options{
 		Ticket:    ticket,
 		Interval:  interval,
 		Wide:      watchWide,
 		Mode:      mode,
 		PetLayout: petLayout,
+		Demo:      watchDemo,
+	}
+	return dashboard.Run(root, dashboard.Options{
+		Start:    dashboard.SectionLive,
+		Adaptive: true,
+		Watch:    watchOpts,
 	})
 }

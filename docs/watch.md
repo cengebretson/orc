@@ -1,7 +1,8 @@
 # orc watch spec
 
-`orc watch` is a compact tmux-side dashboard for active agent work. It is meant
-to run in a narrow vertical split, not replace the full `orc tui`.
+`orc watch` is the Live entry point to Orc's shared dashboard. It is meant to
+run as a compact tmux-side rail in a narrow split and gains Live/Workspace
+section navigation when rendered wide.
 
 ## Goals
 
@@ -9,7 +10,8 @@ to run in a narrow vertical split, not replace the full `orc tui`.
 - Let a user quickly select a ticket and act on its prompt.
 - Keep `STATE.yaml` as the durable source of truth.
 - Optionally consume `tmux-attention` as a transient backup signal.
-- Keep the full `orc tui` as the broad dashboard and detail browser.
+- Keep Workspace as the broad configuration, health, and detail browser within
+  the shared dashboard application.
 
 ## Non-goals
 
@@ -17,7 +19,7 @@ to run in a narrow vertical split, not replace the full `orc tui`.
 - Do not require `tmux-attention`.
 - Do not infer complex semantic agent state from terminal output in v1.
 - Do not make prompt sending automatic on selection.
-- Do not expand the main `orc tui` layout to support this narrow rail.
+- Do not force the Workspace layout into the narrow rail.
 
 ## Command shape
 
@@ -26,25 +28,43 @@ orc watch
 orc watch PROJ-123
 orc watch --interval 2s
 orc watch --wide
+orc watch --demo
+orc watch --demo --wide
 orc watch --view pet
 orc watch --view pet --pet-layout column
 orc watch --tmux-toggle
 orc watch --view pet --tmux-toggle
 orc watch --tmux-toggle --tmux-layout bottom --tmux-size 25%
+orc dashboard
 orc focus
 ```
 
 `orc watch` defaults to a compact multi-ticket rail. `orc watch PROJ-123`
-focuses a single ticket and can show a little more context. `--wide` may render a
-table-like session view when the pane is wide enough, with worker shown as a
-column in the session list rather than as a separate list. Pressing `enter`
-opens the selected story details page in both compact and wide layouts, including
-recent story history. Pressing `v` toggles the same rows and controls into an
+focuses a single ticket and can show a little more context. `--wide` renders the
+richer selected-row highlight and selected-work card around a table-like
+session view, with worker shown as a column in the session list
+rather than as a separate list. Pressing `enter` opens the selected story
+details page in both compact and wide layouts, including recent story history.
+Pressing `v` toggles the same rows and controls into an
 animated little-orc pet view; `--view pet` starts there directly. In pet mode,
 `l` toggles the responsive grid and a vertical column; the matching startup
 flag is `--pet-layout column`. `--tmux-toggle` is a helper for tmux keybindings.
 By default it opens a 32-column right-side pane; `--tmux-layout bottom` and
 `--tmux-size <size>` can override the split.
+
+`--demo` replaces live workspace rows with four read-only synthetic tickets so
+the complete visual language can be reviewed without manufacturing provider or
+tmux state. The demo covers active, blocked, stopped, and completed work;
+green/yellow/red context pressure and trends; workflow progress; attention;
+history; and the completion treatment. Attach and focus are disabled in demo
+mode. Demo mode does not require an initialized workspace.
+
+At 56 columns and wider, watch runs inside the shared dashboard shell. `[` opens
+Live and `]` opens Workspace; switching preserves each section's selection,
+filter, drill-in, and scroll state. Below that width, adaptive watch renders the
+Live rail directly with no extra shell chrome. `orc dashboard` uses the same
+application but starts in Workspace. The dashboard navigation replaces the
+former `ORC WATCH` banner in wide layouts.
 
 See [Tmux integration](tmux.md) for copyable watch popup and split bindings,
 workspace selection, and syntax verification. Orc never installs those bindings.
@@ -98,45 +118,93 @@ long labels, and dense detail.
 Example multi-session rail:
 
 ```text
-ORC
+╭─ orc  workspace ─────────╮
+│ ● 2 RUNNING  ◐ 1 PAUSED │
+│ ! 1 NEEDS YOU           │
+│ ↺ 3s ago                 │
+╰──────────────────────────╯
 
-SESSIONS
-! PROJ-123
-? PROJ-124
-x PROJ-125
+▌ ! PROJ-123
+  ● PROJ-124
+  × PROJ-125
 
-DETAIL
-! blocked
-develop
-bob-dev
-tmux live
+NEEDS YOU
+╭──────────────────────────╮
+│  ! BLOCKED               │
+│   api/feature · develop  │
+│   bob-dev                │
+│   tmux live              │
+│   ctx ████░░ 78%         │
+│   updated 4m ago         │
+│                          │
+│ Blocker                  │
+│ fix tests                │
+╰──────────────────────────╯
 
-Next
-fix tests
 ```
 
 Example focused ticket view:
 
 ```text
-ORC
+╭─ orc  workspace ─────────╮
+│ ● 1 RUNNING  ◐ 1 PAUSED │
+│ ! 1 NEEDS YOU           │
+│ ↺ 3s ago                 │
+╰──────────────────────────╯
 
 PROJ-123
-develop
-bob-dev
 
-! blocked
-tmux live
+▌ ! PROJ-123
 
-Next
-fix tests
+NEEDS YOU
+╭──────────────────╮
+│  ! BLOCKED       │
+│   develop        │
+│   bob-dev        │
+│   tmux live      │
+│                  │
+│ Blocker          │
+│ fix tests        │
+╰──────────────────╯
 ```
 
 The renderer should truncate cleanly to the available width. The primary signal
-is the state icon/label; the selected session should show a small details block
-below the list so the user does not need to press a key for basic context.
-Within that block, keep status on the first line, indent stage/worker/tmux
+is the state icon/label; the selected session uses a full-width highlighted row
+and a bordered details card so it remains obvious even without terminal color.
+The compact overview card mirrors the Workspace dashboard header, separates
+live sessions from work needing attention, and shows the age of the latest
+refresh. It replaces the former full-width title banner.
+Within the details block, keep status on the first line, combine non-workspace
+repository room and stage when both are available, indent worker/tmux/context
 metadata, and render `Blocker` or `Next` as its own section heading before the
-prompt text.
+prompt text. Activity age prefers matched provider telemetry and falls back to
+the latest durable story history entry; it is not inferred from terminal output.
+Persistent control legends are intentionally omitted from watch layouts; `?`
+opens the complete navigation reference without consuming dashboard space.
+Inside expanded details, `j`/`k` and the arrow keys scroll by line,
+Page Up/Down and `Ctrl-U`/`Ctrl-D` scroll by half-page, and `g`/`G` jump to the
+top or bottom. This keeps long workflow histories fully reachable.
+
+The selected card and expanded details page render the configured workflow as a
+progress route, for example `✓ intake → ● develop → ○ review → ○ ship`. Stage
+order and aliases come from `orc.yaml`; current-stage labels use those aliases
+too, while loop stages are shown at their configured owner when active. The
+expanded page uses the feature name and ticket as the
+first panel title, consolidates provider and live runtime metadata into that
+panel, then embeds Workflow, Next Action, and History titles into their
+respective panel borders without a separate page header.
+It includes the current workflow position, next stage and automatic/manual
+advance mode, time in the current stage and visit count, repository room/branch,
+provider/model, exact tmux target, attention, context trend, and last activity
+when available. History uses a connected event timeline and shows up to the 12
+most recent entries.
+
+The rail uses a lightweight presentation tick for a live-work pulse, two-second
+state-change highlight, and four-second completion treatment. This does not
+reload workspace or provider data. Durable/live data still refreshes every five
+seconds by default, `--interval` changes that cadence, and `r` refreshes
+immediately. Context sparklines retain the ten most recent refresh samples in
+memory and do not modify durable state.
 
 ## State model
 
@@ -187,7 +255,7 @@ the same urgency remain alphabetically ordered.
 ## Context pressure
 
 The wide session table and selected-session details display live provider
-context usage as a percentage. The full TUI uses the same classifier in its
+context usage as a percentage. The Workspace section uses the same classifier in its
 feature table and detail view. Configure the color boundaries in `orc.yaml`:
 
 ```yaml
@@ -262,8 +330,9 @@ fresh launch does not have a resumable provider identity.
 
 ## Interactions
 
-`orc watch` should be interactive, implemented as its own small Bubble Tea
-program.
+`orc watch` is the Live section of the shared Bubble Tea dashboard. Narrow
+terminals keep the compact rail without dashboard chrome; wider terminals can
+switch to Workspace with `[` and `]` without losing Live selection or details.
 
 Keybindings:
 
@@ -271,6 +340,7 @@ Keybindings:
 |-----|--------|
 | `j` / `down` | select next ticket |
 | `k` / `up` | select previous ticket |
+| `/` | filter visible work |
 | `enter` | preview selected prompt |
 | `a` | attach/focus selected agent session/window |
 | `i` | attach to the next live session that needs attention |
@@ -278,7 +348,13 @@ Keybindings:
 | `v` | toggle the rail and little-orc pet view |
 | `l` | toggle responsive and column pet layouts (pet view only) |
 | `r` | refresh immediately |
+| `j` / `k`, arrows | scroll while details are open |
+| `pgup` / `pgdown`, `ctrl+u` / `ctrl+d` | scroll details by page or half-page |
+| `g` / `G` | jump to the top or bottom of details |
+| `esc` | close details or clear filtering; quit when already at the top level |
+| `[` / `]` | switch between Live and Workspace in the wide dashboard |
 | `q` | quit watch pane |
+| `?` | toggle the compact key help overlay |
 
 Prompt sending must be explicit. Selecting a ticket or pressing `enter` should
 not paste into an agent pane by itself.
@@ -314,7 +390,7 @@ When a ticket is blocked because `STATE.yaml` is `paused`, label the prompt text
 as `Blocker`. For non-blocked states, label it as `Next`.
 
 When sending, `orc` should route through shared Go tmux helpers rather than
-constructing shell snippets in the TUI layer. This avoids quoting problems and
+constructing shell snippets in the dashboard layer. This avoids quoting problems and
 keeps behavior testable.
 
 ## Future structured human responses

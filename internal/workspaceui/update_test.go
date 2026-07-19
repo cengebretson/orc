@@ -1,4 +1,4 @@
-package tui
+package workspaceui
 
 import (
 	"fmt"
@@ -6,7 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/cengebretson/orc/internal/config"
 	"github.com/cengebretson/orc/internal/doctor"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/workers"
@@ -27,6 +29,10 @@ func keyMsg(s string) tea.KeyMsg {
 		return tea.KeyMsg{Type: tea.KeyEnter}
 	case "ctrl+c":
 		return tea.KeyMsg{Type: tea.KeyCtrlC}
+	case "ctrl+u":
+		return tea.KeyMsg{Type: tea.KeyCtrlU}
+	case "ctrl+d":
+		return tea.KeyMsg{Type: tea.KeyCtrlD}
 	case "up":
 		return tea.KeyMsg{Type: tea.KeyUp}
 	case "down":
@@ -320,6 +326,55 @@ func TestHandleKeyHealthDrillInOpensReport(t *testing.T) {
 	}
 }
 
+func TestHealthViewerSupportsExplicitScrollKeys(t *testing.T) {
+	checks := make([]doctor.Check, 0, 12)
+	for i := 0; i < 12; i++ {
+		checks = append(checks, doctor.Check{Group: fmt.Sprintf("group-%d", i), Name: "check", Status: doctor.OK, Detail: "healthy"})
+	}
+	m := testModel(t)
+	m.view = viewFile
+	m.viewerContext = "Health"
+	m.viewerTitle = "doctor report"
+	m.viewport = viewport.New(60, 6)
+	m.viewport.SetContent(renderHealthReport(checks, 60))
+
+	m, _ = press(t, m, "j")
+	if m.viewport.YOffset != 1 {
+		t.Fatalf("j health scroll offset = %d, want 1", m.viewport.YOffset)
+	}
+	m, _ = press(t, m, "pgdown")
+	if m.viewport.YOffset <= 1 {
+		t.Fatalf("pgdown should advance health report, offset=%d", m.viewport.YOffset)
+	}
+	m, _ = press(t, m, "G")
+	if !m.viewport.AtBottom() {
+		t.Fatalf("G should reach health report bottom, offset=%d", m.viewport.YOffset)
+	}
+	m, _ = press(t, m, "g")
+	if m.viewport.YOffset != 0 {
+		t.Fatalf("g should return to health report top, offset=%d", m.viewport.YOffset)
+	}
+}
+
+func TestRoutesDrillInOpensStructuredRepositoryInspector(t *testing.T) {
+	m := testModel(t)
+	m.sectionFocus = "repositories"
+	m.sectionItems["repositories"] = []sectionItem{{label: "repository configuration"}}
+	m.repos = []config.Repo{{Name: "app", Path: "projects/app", Purpose: "Primary application"}}
+	m.routes = []config.RepoRoute{{Labels: []string{"application"}, Repos: []string{"app"}}}
+	m.openSectionItem()
+
+	if m.view != viewFile || m.viewerTitle != "map" {
+		t.Fatalf("repository inspector = view %v title %q", m.view, m.viewerTitle)
+	}
+	body := ansi.Strip(m.viewport.View())
+	for _, want := range []string{"Repository map", "projects/app", "label:application", "selects", "app"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("repository inspector missing %q:\n%s", want, body)
+		}
+	}
+}
+
 // The detail body lives in a scrollable viewport so long tickets stay usable on
 // short terminals. Scrolling, opening a file, and returning must all behave.
 func TestDetailViewScrollsAndRestoresOnReturn(t *testing.T) {
@@ -405,11 +460,11 @@ func TestHandleKeyWorkflowDrillIn(t *testing.T) {
 	}
 
 	// chain has 2 steps + 1 repair step → cursor clamps at 2
-	m, _ = press(t, m, "down", "down", "down", "down")
+	m, _ = press(t, m, "right", "right", "right", "right")
 	if m.wfDetailCursor != 2 {
 		t.Errorf("wfDetailCursor = %d, want clamped at 2", m.wfDetailCursor)
 	}
-	m, _ = press(t, m, "up", "up", "up")
+	m, _ = press(t, m, "left", "left", "left")
 	if m.wfDetailCursor != 0 {
 		t.Errorf("wfDetailCursor = %d, want clamped at 0", m.wfDetailCursor)
 	}
@@ -479,6 +534,34 @@ func TestWorkflowDetailPageDownScrollsViewport(t *testing.T) {
 
 	if m.viewport.YOffset == 0 {
 		t.Fatalf("pgdown should scroll long workflow detail vertically")
+	}
+}
+
+func TestWorkflowDetailSupportsLineAndTopBottomScrolling(t *testing.T) {
+	m := testModel(t)
+	var steps []routeStep
+	for i := 0; i < 24; i++ {
+		steps = append(steps, routeStep{name: fmt.Sprintf("default:stage-%02d", i), label: fmt.Sprintf("stage-%02d", i), advance: "auto"})
+	}
+	m.workflows = []workflowChain{{name: "default:standard", label: "default", steps: steps}}
+	m.view = viewWorkflowDetail
+	m.wfDetailName = "default:standard"
+	m.width = 90
+	m.height = 12
+	m.viewport = viewport.New(m.width-4, m.height-6)
+	m.viewport.SetContent(renderWorkflowDetail(m.wfDetailName, m.workflows, nil, filepath.Join(m.root, "stages"), m.features, 0, m.width-4))
+
+	m, _ = press(t, m, "j")
+	if m.viewport.YOffset != 1 {
+		t.Fatalf("j workflow scroll offset = %d, want 1", m.viewport.YOffset)
+	}
+	m, _ = press(t, m, "G")
+	if !m.viewport.AtBottom() {
+		t.Fatalf("G should reach workflow bottom, offset=%d", m.viewport.YOffset)
+	}
+	m, _ = press(t, m, "g")
+	if m.viewport.YOffset != 0 {
+		t.Fatalf("g should return workflow to top, offset=%d", m.viewport.YOffset)
 	}
 }
 
@@ -681,5 +764,48 @@ func TestUpdateWindowSizeReflowsWorkflowDetail(t *testing.T) {
 	if got.viewport.TotalLineCount() <= wideLines {
 		t.Errorf("content lines = %d after shrinking from %d — workflow detail did not reflow",
 			got.viewport.TotalLineCount(), wideLines)
+	}
+}
+
+func TestRepositoryViewerRefreshesRecordedWorkInPlace(t *testing.T) {
+	m := testModel(t)
+	m.width, m.height = 72, 30
+	m.view = viewFile
+	m.viewerKind = "repositories"
+	m.repos = []config.Repo{{Name: "app", Path: "projects/app"}}
+	m.features = []*featureRow{{s: &state.State{
+		Ticket: "STORY-1", Status: "active", Repos: map[string]state.Repo{"app": {}},
+	}}}
+	m.viewport = viewport.New(m.width-4, m.height-6)
+	m.refreshStructuredViewer()
+	if !strings.Contains(ansi.Strip(m.viewport.View()), "STORY-1") {
+		t.Fatalf("initial repository viewer missing STORY-1:\n%s", m.viewport.View())
+	}
+
+	updated, _ := m.Update(dataMsg{
+		repos: []config.Repo{{Name: "app", Path: "projects/app"}},
+		features: []*featureRow{{s: &state.State{
+			Ticket: "STORY-2", Status: "paused", Repos: map[string]state.Repo{"app": {}},
+		}}},
+		sectionItems: map[string][]sectionItem{},
+	})
+	m = asModel(t, updated)
+	out := ansi.Strip(m.viewport.View())
+	if !strings.Contains(out, "STORY-2") || strings.Contains(out, "STORY-1") {
+		t.Fatalf("repository viewer did not refresh in place:\n%s", out)
+	}
+}
+
+func TestStaleWorkspaceTickDoesNotRestartAfterReactivation(t *testing.T) {
+	m := New(t.TempDir())
+	staleEpoch := m.epoch
+	m = m.SetActive(false)
+	m = m.SetActive(true)
+	updated, cmd := m.Update(tickMsg{at: time.Now(), epoch: staleEpoch})
+	if cmd != nil {
+		t.Fatal("stale workspace tick restarted the refresh timer")
+	}
+	if got := asModel(t, updated); got.epoch != m.epoch {
+		t.Fatalf("epoch changed from %d to %d", m.epoch, got.epoch)
 	}
 }

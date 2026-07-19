@@ -66,9 +66,9 @@ func TestValidate_ArtifactPolicy(t *testing.T) {
 	assertValidationError(t, config.Validate(cfg, []string{"fred"}), "settings.artifact_policy", `artifact_policy must be "warn" or "block"`)
 }
 
-func TestValidate_TuiRefreshCannotBeNegative(t *testing.T) {
-	cfg := &config.Config{Settings: config.Settings{TuiRefresh: -1}}
-	assertValidationError(t, config.Validate(cfg, nil), "settings.tui_refresh", "tui_refresh must be zero or greater")
+func TestValidate_WorkspaceRefreshCannotBeNegative(t *testing.T) {
+	cfg := &config.Config{Settings: config.Settings{WorkspaceRefresh: -1}}
+	assertValidationError(t, config.Validate(cfg, nil), "settings.workspace_refresh", "workspace_refresh must be zero or greater")
 }
 
 func TestValidate_RepoIdentity(t *testing.T) {

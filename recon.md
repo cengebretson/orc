@@ -39,7 +39,7 @@ The first Recon-inspired implementation added:
 - Crash-safe, confirmed `orc sessions park` and `orc sessions unpark` flows.
 - Repository and branch grouping from durable managed state plus cached Git
   metadata for orphaned and unmanaged sessions.
-- Configurable live context-pressure warnings in `orc watch` and `orc tui`.
+- Configurable live context-pressure warnings in `orc watch` and `orc dashboard`.
 
 See [docs/sessions.md](docs/sessions.md) and [docs/watch.md](docs/watch.md) for
 the implemented behavior.
@@ -115,7 +115,7 @@ Recon provides `/` filtering in its dashboard and an interactive resume picker:
 Implemented behavior:
 
 - One shared case-insensitive, multi-term matcher drives `/` filtering in
-  `orc watch` and `orc tui`.
+  `orc watch` and `orc dashboard`.
 - Existing durable metadata covers ticket, slug, workflow, stage, worker,
   repository, branch, status, engine, and attention state. Arbitrary labels
   remain deferred until Orc has a durable label schema.
@@ -162,7 +162,7 @@ Completed on 2026-07-16.
 Recon uses a colored context bar in its visual dashboard. Orc already exposes
 context usage in session telemetry, so it can add a lighter version:
 
-- Display context ratio in `orc watch` and `orc tui`.
+- Display context ratio in `orc watch` and `orc dashboard`.
 - Use configurable green, yellow, and red thresholds.
 - Treat missing or provider-unknown context limits as unavailable, not zero.
 - Keep context pressure as a live warning. It must never become durable workflow
@@ -170,7 +170,7 @@ context usage in session telemetry, so it can add a lighter version:
 
 Implemented behavior:
 
-- Exact managed-session telemetry feeds both watch and TUI without replacing
+- Exact managed-session telemetry feeds both Live and Workspace without replacing
   `STATE.yaml` as the durable source of truth.
 - The shared classifier defaults to green at 0%, yellow at 70%, and red at 90%;
   all three boundaries are configurable and validated in `orc.yaml`.

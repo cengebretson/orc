@@ -1,4 +1,4 @@
-package tui
+package workspaceui
 
 import (
 	"math/rand"
@@ -38,7 +38,10 @@ const (
 
 // ── messages ─────────────────────────────────────────────────────
 
-type tickMsg time.Time
+type tickMsg struct {
+	at    time.Time
+	epoch uint64
+}
 type rainbowTickMsg struct{}
 
 const rainbowSteps = 48 // 4 cycles × 12 colors at 80ms each ≈ 3.8s
@@ -63,6 +66,7 @@ func rainbowTick() tea.Cmd {
 }
 
 type dataMsg struct {
+	err             error
 	features        []*featureRow
 	healthItems     []doctor.Check
 	artifactPolicy  string
@@ -72,6 +76,7 @@ type dataMsg struct {
 	allWorkers      []*workers.Worker
 	workflows       []workflowChain
 	repos           []config.Repo
+	routes          []config.RepoRoute
 	sectionItems    map[string][]sectionItem
 	refreshInterval time.Duration
 	quotes          []string
@@ -188,6 +193,7 @@ type Model struct {
 	allWorkers      []*workers.Worker
 	workflows       []workflowChain
 	repos           []config.Repo
+	routes          []config.RepoRoute
 	expanded        map[string]bool
 	cursor          int
 	showArchived    bool
@@ -195,6 +201,10 @@ type Model struct {
 	refreshInterval time.Duration
 	width           int
 	height          int
+	embedded        bool
+	inactive        bool
+	epoch           uint64
+	loadErr         error
 
 	// workflow detail drill-in
 	wfDetailName   string
@@ -202,7 +212,7 @@ type Model struct {
 
 	// section pane navigation
 	focusedPane         string // "features" or "section"
-	sectionFocus        string // "workflows" | "workers" | "routes"
+	sectionFocus        string // "workflows" | "workers" | "repositories"
 	sectionCursor       int
 	sectionItems        map[string][]sectionItem
 	autoExpandedSection string
@@ -218,6 +228,8 @@ type Model struct {
 	viewerTitle   string
 	viewerContext string // label shown in file viewer title bar
 	viewerReturn  viewState
+	viewerKind    string
+	viewerPath    string
 	// viewerRender regenerates the viewer's content at a given width so the file
 	// viewer re-flows on resize. Set for every viewFile, file-backed or synthetic.
 	viewerRender func(width int) string
@@ -256,23 +268,44 @@ func New(root string) Model {
 		focusedPane:  "features",
 		sectionItems: map[string][]sectionItem{},
 		expanded: map[string]bool{
-			"health":    false,
-			"workflows": false,
-			"workers":   false,
-			"routes":    true,
+			"health":       false,
+			"workflows":    false,
+			"workers":      false,
+			"repositories": false,
 		},
 		search: ti,
 	}
 }
 
-func Run(root string) error {
-	if cfg, err := config.Load(root); err == nil {
-		_ = LoadTheme(cfg.Settings.Theme)
-	}
+// NewEmbedded constructs the Workspace section for the shared dashboard and
+// suppresses duplicated persistent navigation legends owned by the shell.
+func NewEmbedded(root string) Model {
 	m := New(root)
-	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())
-	_, err := p.Run()
-	return err
+	m.embedded = true
+	return m
+}
+
+// SetActive controls refresh work while Workspace is embedded but hidden.
+func (m Model) SetActive(active bool) Model {
+	if active == !m.inactive {
+		return m
+	}
+	m.epoch++
+	m.inactive = !active
+	if !active {
+		m.rainbowStep = 0
+	}
+	return m
+}
+
+func (m Model) IsActive() bool {
+	return !m.inactive
+}
+
+// CanSwitchSection reports whether the shared dashboard shell can consume a
+// section-switch or help key without stealing text from the ticket filter.
+func (m Model) CanSwitchSection() bool {
+	return !m.searching
 }
 
 // ── Init ─────────────────────────────────────────────────────────
@@ -280,14 +313,17 @@ func Run(root string) error {
 const defaultRefreshInterval = 60 * time.Second
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(loadData(m.root), tickEvery(defaultRefreshInterval))
+	if m.inactive {
+		return nil
+	}
+	return tea.Batch(loadData(m.root), tickEvery(defaultRefreshInterval, m.epoch))
 }
 
 // ── section navigation ─────────────────────────────────────────────
 
 func (m Model) navigableSections() []string {
 	out := []string{"health"}
-	for _, key := range []string{"workflows", "workers", "routes"} {
+	for _, key := range []string{"workflows", "workers", "repositories"} {
 		if len(m.sectionItems[key]) > 0 {
 			out = append(out, key)
 		}
@@ -297,9 +333,9 @@ func (m Model) navigableSections() []string {
 
 func sectionLabel(key string) string {
 	labels := map[string]string{
-		"workflows": "Workflows",
-		"workers":   "Workers",
-		"routes":    "Routes",
+		"workflows":    "Workflows",
+		"workers":      "Workers",
+		"repositories": "Repositories",
 	}
 	if l, ok := labels[key]; ok {
 		return l

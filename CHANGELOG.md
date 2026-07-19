@@ -6,6 +6,63 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Renamed `settings.tui_refresh` to `settings.workspace_refresh` to reflect
+  that it controls only Workspace polling; Live polling remains governed by
+  the `orc watch --interval` option.
+- Unified Live, Workspace, and dashboard theming behind shared terminal-cell
+  layout primitives, renamed the Workspace implementation package for clarity,
+  and stopped hidden dashboard sections from polling or animating.
+- Consolidated dashboard discovery into immutable workspace snapshots, made
+  structured inspectors refresh in place, and surfaced invalid `orc.yaml`
+  configuration as Health state instead of allowing a nil-config panic.
+- Hardened headers, tables, boxes, wrapping, and repository inspectors for ANSI,
+  Unicode, and narrow terminal widths.
+- Added consistent inner padding plus durable active and paused feature counts
+  and ticket IDs to repository inspector cards.
+- Polished the default `orc watch` rail with a live and attention summary,
+  stronger selection and action hierarchy, repository and stage context, a
+  compact context-pressure meter, durable activity age, and context-aware
+  navigation available through the `?` help overlay instead of persistent
+  footer legends.
+- Added a read-only `orc watch --demo` presentation, workflow progress routes,
+  in-memory context sparklines, live pulses, transition and completion
+  treatments, a key-help overlay, and a richer expanded details page covering
+  state, repository, runtime, next action, sticky scroll progress, workflow
+  position and timing, and connected history.
+- Added `orc dashboard` as the unified Live and Workspace application with
+  state-preserving `[`/`]` section navigation. Wide watch uses the same shell,
+  narrow watch retains its compact presentation, and the former `orc tui`
+  command has been removed.
+- Removed redundant watch title banners and replaced the plain live/attention
+  count with a compact Workspace-style overview card and live refresh age.
+- Embedded Live detail section titles into their respective panel borders and
+  removed the redundant `NOW` / `NEEDS YOU` selected-card headings.
+- Replaced the details `STATE` label with the feature name and ticket, and
+  removed the redundant details-page header.
+- Consolidated provider and live runtime metadata into the feature panel and
+  removed the separate Runtime panel.
+- Applied configured `orc.yaml` stage aliases throughout watch while retaining
+  canonical stage IDs for runtime targeting and search.
+- Made the wide watch table distribute all available terminal width across its
+  Ticket, Stage, Worker, and Tmux columns instead of leaving capped dead space;
+  the selected-work panel now spans and aligns with that table.
+- Renamed watch's tmux-derived `LIVE` count to `RUNNING` and added the durable
+  paused-feature count alongside the separate `NEEDS YOU` attention signal.
+- Split the Health drill-in into a status summary and color-coded panels per
+  health group, with wrapped diagnostics kept inside their owning section.
+- Made the dashboard Repositories section collapsed by default for a tighter
+  initial workspace overview.
+- Added explicit line, page, half-page, and top/bottom scrolling to Health and
+  other structured viewers, with live scroll percentage in the viewer title.
+- Applied the same scrolling controls and progress indicator to Workflow
+  details, leaving left/right navigation dedicated to stage selection.
+- Renamed the dashboard Routes section to Repositories, added repo paths and
+  optional rule mappings to its overview, and replaced raw `orc.yaml` drill-in
+  with a structured repository map, individual repo cards, and explicit
+  optional-routing flow cards.
+
 ## [0.13.0] - 2026-07-18
 
 ### Fixed

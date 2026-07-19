@@ -93,7 +93,7 @@ func TestWatchTogglesPetViewWithoutChangingPreview(t *testing.T) {
 		t.Fatalf("pet View() missing pet content:\n%s", view)
 	}
 
-	updated, cmd = m.Update(petTickMsg(time.Now()))
+	updated, cmd = m.Update(petTickMsg{at: time.Now(), epoch: m.epoch})
 	m = watchModel(t, updated)
 	if m.petFrame != 1 || cmd == nil {
 		t.Fatalf("pet tick = frame %d cmd %#v", m.petFrame, cmd)
@@ -104,7 +104,7 @@ func TestWatchTogglesPetViewWithoutChangingPreview(t *testing.T) {
 	if m.mode != ModeRail {
 		t.Fatalf("second toggle mode = %q, want rail", m.mode)
 	}
-	updated, cmd = m.Update(petTickMsg(time.Now()))
+	updated, cmd = m.Update(petTickMsg{at: time.Now(), epoch: m.epoch})
 	m = watchModel(t, updated)
 	if m.petTicking || cmd != nil {
 		t.Fatalf("rail should stop pet timer, ticking=%v cmd=%#v", m.petTicking, cmd)

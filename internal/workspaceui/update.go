@@ -1,4 +1,4 @@
-package tui
+package workspaceui
 
 import (
 	"fmt"
@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/cengebretson/orc/internal/config"
+	"github.com/cengebretson/orc/internal/doctor"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -20,8 +21,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		m.viewport.Width = msg.Width - 4
-		m.viewport.Height = msg.Height - 6
+		m.viewport.Width = max(1, msg.Width-4)
+		m.viewport.Height = max(1, msg.Height-6)
 		// viewport-backed views hold content pre-rendered at the old width;
 		// rebuild it (the dashboard and detail views render from m.width live)
 		switch m.view {
@@ -37,13 +38,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tickMsg:
+		if m.inactive || msg.epoch != m.epoch {
+			return m, nil
+		}
 		interval := m.refreshInterval
 		if interval == 0 {
 			interval = defaultRefreshInterval
 		}
-		return m, tea.Batch(loadData(m.root), tickEvery(interval))
+		return m, tea.Batch(loadData(m.root), tickEvery(interval, m.epoch))
 
 	case dataMsg:
+		m.lastRefresh = time.Now()
+		if msg.err != nil {
+			m.loadErr = msg.err
+			m.healthItems = []doctor.Check{{Group: "workspace", Name: config.Filename, Status: doctor.Fail, Detail: msg.err.Error()}}
+			m.refreshStructuredViewer()
+			return m, nil
+		}
+		m.loadErr = nil
 		m.features = msg.features
 		m.healthItems = msg.healthItems
 		m.artifactPolicy = msg.artifactPolicy
@@ -53,14 +65,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.allWorkers = msg.allWorkers
 		m.workflows = msg.workflows
 		m.repos = msg.repos
+		m.routes = msg.routes
 		m.sectionItems = msg.sectionItems
 		m.refreshInterval = msg.refreshInterval
 		if m.quote == "" {
 			m.quote = pickQuote(msg.quotes)
 		}
-		m.lastRefresh = time.Now()
 		if rows := m.visibleFeatures(); m.cursor >= len(rows) && len(rows) > 0 {
 			m.cursor = len(rows) - 1
+		}
+		m.refreshStructuredViewer()
+		if m.view == viewWorkflowDetail {
+			m.reRenderWorkflowDetail()
 		}
 		return m, nil
 
@@ -68,6 +84,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleKey(msg)
 
 	case rainbowTickMsg:
+		if m.inactive {
+			return m, nil
+		}
 		if m.rainbowStep > 0 {
 			m.rainbowStep--
 			if m.rainbowStep > 0 {
@@ -157,7 +176,7 @@ func (m Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "3":
 		m.toggleSection("workers")
 	case "4":
-		m.toggleSection("routes")
+		m.toggleSection("repositories")
 
 	case "up", "k":
 		if m.focusedPane == "section" {
@@ -360,6 +379,7 @@ func (m *Model) openSectionItem() {
 		checks := m.healthItems
 		m.openViewer(func(w int) string { return renderHealthReport(checks, w) },
 			"doctor report", "Health", viewDashboard)
+		m.viewerKind = "health"
 		return
 	}
 	items := m.sectionItems[m.sectionFocus]
@@ -371,6 +391,8 @@ func (m *Model) openSectionItem() {
 	case "workers":
 		m.charSheetWorker = workerForPath(f.path, m.allWorkers)
 		m.openViewer(workerRenderer(f.path, m.features), f.label, sectionLabel(m.sectionFocus), viewDashboard)
+		m.viewerKind = "worker"
+		m.viewerPath = f.path
 	case "workflows":
 		workflowName := f.id
 		if workflowName == "" {
@@ -382,6 +404,13 @@ func (m *Model) openSectionItem() {
 		m.viewport = viewport.New(m.width-4, m.height-6)
 		m.viewport.SetContent(content)
 		m.view = viewWorkflowDetail
+	case "repositories":
+		repos := append([]config.Repo(nil), m.repos...)
+		routes := append([]config.RepoRoute(nil), m.routes...)
+		features := append([]*featureRow(nil), m.features...)
+		m.openViewer(func(w int) string { return renderRoutingReport(repos, routes, features, w) },
+			"map", "Repositories", viewDashboard)
+		m.viewerKind = "repositories"
 	default:
 		m.openViewer(fileRenderer(f.path), f.label, sectionLabel(m.sectionFocus), viewDashboard)
 	}
@@ -390,13 +419,37 @@ func (m *Model) openSectionItem() {
 // openViewer switches to the file viewer, rendering content via render at the
 // current width. render is retained so the viewer re-flows on resize.
 func (m *Model) openViewer(render func(width int) string, title, context string, returnView viewState) {
-	m.viewport = viewport.New(m.width-4, m.height-6)
-	m.viewport.SetContent(render(m.width - 4))
+	viewerWidth := max(1, m.width-4)
+	m.viewport = viewport.New(viewerWidth, max(1, m.height-6))
+	m.viewport.SetContent(render(viewerWidth))
 	m.viewerTitle = title
 	m.viewerContext = context
 	m.viewerReturn = returnView
 	m.viewerRender = render
+	m.viewerKind = ""
+	m.viewerPath = ""
 	m.view = viewFile
+}
+
+func (m *Model) refreshStructuredViewer() {
+	if m.view != viewFile {
+		return
+	}
+	switch m.viewerKind {
+	case "health":
+		checks := append([]doctor.Check(nil), m.healthItems...)
+		m.viewerRender = func(w int) string { return renderHealthReport(checks, w) }
+	case "repositories":
+		repos := append([]config.Repo(nil), m.repos...)
+		routes := append([]config.RepoRoute(nil), m.routes...)
+		features := append([]*featureRow(nil), m.features...)
+		m.viewerRender = func(w int) string { return renderRoutingReport(repos, routes, features, w) }
+	case "worker":
+		m.viewerRender = workerRenderer(m.viewerPath, m.features)
+	default:
+		return
+	}
+	m.reRenderViewerFile()
 }
 
 // fileRenderer returns a width-aware renderer for a markdown file path.
@@ -462,16 +515,32 @@ func (m Model) handleWorkflowDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case "esc", "b":
 		m.view = viewDashboard
-	case "up", "k", "left", "h":
+	case "left", "h":
 		if m.wfDetailCursor > 0 {
 			m.wfDetailCursor--
 			m.reRenderWorkflowDetailAndScroll()
 		}
-	case "down", "j", "right", "l":
+	case "right", "l":
 		if m.wfDetailCursor < wfDetailTotal(m.wfDetailName, m.workflows)-1 {
 			m.wfDetailCursor++
 			m.reRenderWorkflowDetailAndScroll()
 		}
+	case "up", "k":
+		m.viewport.ScrollUp(1)
+	case "down", "j":
+		m.viewport.ScrollDown(1)
+	case "pgup":
+		m.viewport.PageUp()
+	case "pgdown":
+		m.viewport.PageDown()
+	case "ctrl+u":
+		m.viewport.HalfPageUp()
+	case "ctrl+d":
+		m.viewport.HalfPageDown()
+	case "g", "home":
+		m.viewport.GotoTop()
+	case "G", "end":
+		m.viewport.GotoBottom()
 	case "enter":
 		stageName, advance, stepNum, total := wfDetailSelectedStage(m.wfDetailName, m.wfDetailCursor, m.workflows)
 		if stageName != "" {
@@ -502,6 +571,22 @@ func (m Model) handleFileKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.viewport.SetYOffset(m.detailScroll)
 		}
 		m.view = m.viewerReturn
+	case "up", "k":
+		m.viewport.ScrollUp(1)
+	case "down", "j":
+		m.viewport.ScrollDown(1)
+	case "pgup":
+		m.viewport.PageUp()
+	case "pgdown":
+		m.viewport.PageDown()
+	case "ctrl+u":
+		m.viewport.HalfPageUp()
+	case "ctrl+d":
+		m.viewport.HalfPageDown()
+	case "g", "home":
+		m.viewport.GotoTop()
+	case "G", "end":
+		m.viewport.GotoBottom()
 	case "left", "h":
 		switch m.viewerReturn {
 		case viewDetail:
@@ -642,9 +727,9 @@ func (m *Model) reRenderViewerFile() {
 
 // ── Commands ──────────────────────────────────────────────────────
 
-func tickEvery(d time.Duration) tea.Cmd {
+func tickEvery(d time.Duration, epoch uint64) tea.Cmd {
 	return tea.Tick(d, func(t time.Time) tea.Msg {
-		return tickMsg(t)
+		return tickMsg{at: t, epoch: epoch}
 	})
 }
 

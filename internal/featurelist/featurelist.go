@@ -29,6 +29,10 @@ type Feature struct {
 
 type Options struct {
 	IncludeArchived bool
+	// Config and Workers let callers reuse one immutable workspace snapshot
+	// instead of loading the same workspace context for each projection.
+	Config          *config.Config
+	Workers         []*workers.Worker
 	TmuxAvailable   func() bool
 	ListSessions    func() []string
 	WindowAttention func(session, window string) string
@@ -45,10 +49,13 @@ func Collect(root string, opts Options) ([]*Feature, error) {
 		opts.WindowAttention = tmux.WindowAttention
 	}
 
-	ctx, _ := workspacectx.Load(root)
-	var cfg *config.Config
-	var allWorkers []*workers.Worker
-	if ctx != nil {
+	cfg := opts.Config
+	allWorkers := opts.Workers
+	if cfg == nil {
+		ctx, err := workspacectx.Load(root)
+		if err != nil {
+			return nil, err
+		}
 		cfg = ctx.Config
 		allWorkers = ctx.Workers
 	}

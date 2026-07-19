@@ -11,6 +11,7 @@ import (
 
 	"github.com/cengebretson/orc/internal/searchmatch"
 	"github.com/cengebretson/orc/internal/telemetry"
+	terminalui "github.com/cengebretson/orc/internal/ui"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -125,9 +126,9 @@ func (m Model) View() string {
 			if i == m.cursor {
 				prefix = "> "
 			}
-			b.WriteString(truncate(prefix+candidate.summary(m.now), width))
+			b.WriteString(terminalui.Truncate(prefix+candidate.summary(m.now), width))
 			b.WriteString("\n")
-			b.WriteString(truncate("    "+cwdLabel(candidate.Live.CWD), width))
+			b.WriteString(terminalui.Truncate("    "+cwdLabel(candidate.Live.CWD), width))
 			b.WriteString("\n")
 		}
 	}
@@ -209,36 +210,9 @@ func emptyDash(value string) string {
 	return value
 }
 
-func truncate(value string, width int) string {
-	if width <= 0 {
-		return ""
-	}
-	if len(value) <= width {
-		return value
-	}
-	if width == 1 {
-		return value[:1]
-	}
-	return value[:width-1] + "…"
-}
-
 func cwdLabel(cwd string) string {
 	if cwd == "" {
 		return "-"
 	}
 	return filepath.Clean(cwd)
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }

@@ -358,7 +358,7 @@ aliases: {}
 			t.Fatalf("orc.yaml missing %q:\n%s", want, orcYAML)
 		}
 	}
-	for _, unwanted := range []string{"auto_archive: false", `theme: ""`, "tui_refresh: 0"} {
+	for _, unwanted := range []string{"auto_archive: false", `theme: ""`, "workspace_refresh: 0"} {
 		if strings.Contains(orcYAML, unwanted) {
 			t.Fatalf("orc.yaml contains generated zero value %q:\n%s", unwanted, orcYAML)
 		}

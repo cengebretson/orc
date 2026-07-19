@@ -66,11 +66,14 @@ func ParseMode(value string) (Mode, error) {
 	}
 }
 
-type petTickMsg time.Time
+type petTickMsg struct {
+	at    time.Time
+	epoch uint64
+}
 
-func petTick() tea.Cmd {
+func petTick(epoch uint64) tea.Cmd {
 	return tea.Tick(petAnimationInterval, func(t time.Time) tea.Msg {
-		return petTickMsg(t)
+		return petTickMsg{at: t, epoch: epoch}
 	})
 }
 

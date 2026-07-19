@@ -1,13 +1,10 @@
-package tui
+package workspaceui
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
-	"github.com/cengebretson/orc/internal/config"
-	"github.com/cengebretson/orc/internal/doctor"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -133,15 +130,13 @@ func (m Model) viewDashboard() string {
 		styleDim.Render(fmt.Sprintf("%d", len(m.workerNames))),
 		wkContent, leftW, wkFocused) + "\n")
 
-	rtFocused := m.focusedPane == "section" && m.sectionFocus == "routes"
-	var rtContent []string
+	rtFocused := m.focusedPane == "section" && m.sectionFocus == "repositories"
+	rtContent := renderRepoRoutingOverview(m.repos, m.routes, leftInnerW-4)
 	if rtFocused {
-		rtContent = renderNavigableList(m.sectionItems["routes"], m.sectionCursor)
-	} else {
-		rtContent = renderRepoList(m.repos, leftInnerW-4)
+		rtContent = append(rtContent, "", styleDim.Render("enter to inspect repositories"))
 	}
-	left.WriteString(m.sectionBox("routes", "4", "Routes",
-		styleDim.Render(fmt.Sprintf("%d repos", len(m.repos))),
+	left.WriteString(m.sectionBox("repositories", "4", "Repositories",
+		styleDim.Render(fmt.Sprintf("%d repos  ·  %d routes", len(m.repos), len(m.routes))),
 		rtContent, leftW, rtFocused))
 
 	// ── Top block: left column + right box (logo + quote) ───────────
@@ -264,7 +259,7 @@ func (m Model) viewDashboard() string {
 	b.WriteString(drawBoxLabeledWith(featuresTitle, tableLines, outerW, featuresBorderColor) + "\n")
 
 	// ── Help bar ─────────────────────────────────────────────────────
-	if !m.searching {
+	if !m.searching && !m.embedded {
 		var helpItems []string
 		helpItems = append(helpItems,
 			helpItem("↑↓", "navigate"),
@@ -285,177 +280,6 @@ func (m Model) viewDashboard() string {
 
 // healthIconStyle maps a check status to its glyph and color, shared by the
 // dashboard health overview, the inline issue lines, and the full report.
-func healthIconStyle(s doctor.Status) (string, lipgloss.Style) {
-	switch s {
-	case doctor.OK:
-		return "✓", styleHealthOK
-	case doctor.Warning:
-		return "⚠", styleHealthWarn
-	default:
-		return "✗", styleHealthErr
-	}
-}
-
-// renderHealthLines renders health items grouped by their Group field.
-// Items with no group flow together on wrapped rows. Each new group gets a
-// header line and its items indented on their own wrapped rows below it.
-func (m Model) renderHealthLines(maxW int) []string {
-	sep := styleDivider.Render("  ·  ")
-	sepW := lipgloss.Width(sep)
-	indent := "  "
-	indentW := 2
-
-	flushRow := func(rows *[]string, row string) {
-		if row != "" {
-			*rows = append(*rows, row)
-		}
-	}
-
-	var rows []string
-	row := ""
-	rowW := 0
-	currentGroup := ""
-
-	for _, item := range m.healthItems {
-		icon, s := healthIconStyle(item.Status)
-		part := s.Render(icon + " " + strings.TrimSpace(item.Name))
-
-		// group boundary — flush current row and emit header
-		if item.Group != currentGroup {
-			flushRow(&rows, row)
-			row = ""
-			rowW = 0
-			currentGroup = item.Group
-			if currentGroup != "" {
-				rows = append(rows, styleDim.Render(currentGroup))
-			}
-		}
-
-		prefix := ""
-		prefixW := 0
-		if currentGroup != "" {
-			prefix = indent
-			prefixW = indentW
-		}
-
-		pW := lipgloss.Width(part)
-		if rowW > 0 && rowW+sepW+pW > maxW {
-			flushRow(&rows, row)
-			row = prefix
-			rowW = prefixW
-		}
-		if rowW > prefixW {
-			row += sep
-			rowW += sepW
-		} else if rowW == 0 {
-			row = prefix
-			rowW = prefixW
-		}
-		row += part
-		rowW += pW
-	}
-	flushRow(&rows, row)
-	return rows
-}
-
-// healthSummaryExtra renders a compact "N ✗  M ⚠" badge of non-OK checks for
-// the collapsed Health summary, or "" when everything is healthy.
-func (m Model) healthSummaryExtra() string {
-	warns, fails := 0, 0
-	for _, c := range m.healthItems {
-		switch c.Status {
-		case doctor.Warning:
-			warns++
-		case doctor.Fail:
-			fails++
-		}
-	}
-	var parts []string
-	if fails > 0 {
-		parts = append(parts, styleHealthErr.Render(fmt.Sprintf("%d ✗", fails)))
-	}
-	if warns > 0 {
-		parts = append(parts, styleHealthWarn.Render(fmt.Sprintf("%d ⚠", warns)))
-	}
-	return strings.Join(parts, styleDim.Render("  "))
-}
-
-// healthIssueLines returns one explanatory line per non-OK check — icon, name,
-// and the doctor detail — so the expanded dashboard explains problems instead of
-// just flagging them. OK checks stay in the compact wrapped overview.
-func (m Model) healthIssueLines(maxW int) []string {
-	var lines []string
-	for _, c := range m.healthItems {
-		if c.Status == doctor.OK {
-			continue
-		}
-		icon, st := healthIconStyle(c.Status)
-		head := icon + " " + strings.TrimSpace(c.Name)
-		line := st.Render(head)
-		if c.Detail != "" {
-			budget := maxW - lipgloss.Width(head) - 3
-			if budget > 1 {
-				line += styleDim.Render(" — " + truncate(c.Detail, budget))
-			}
-		}
-		lines = append(lines, line)
-	}
-	return lines
-}
-
-// renderHealthReport renders the full doctor report — every check with its
-// group, status icon, name, and detail — for the Health drill-in viewer. This
-// mirrors `orc doctor` output, styled with the active theme.
-func renderHealthReport(checks []doctor.Check, width int) string {
-	if len(checks) == 0 {
-		return styleDim.Render("No health checks.")
-	}
-	if width < 20 {
-		width = 20
-	}
-	nameW := 0
-	for _, c := range checks {
-		if w := lipgloss.Width(c.Name); w > nameW {
-			nameW = w
-		}
-	}
-	// Column where the detail text begins: "   " + icon + "  " + name + "  ".
-	detailCol := 3 + 1 + 2 + nameW + 2
-	detailW := width - detailCol
-	if detailW < 8 {
-		detailW = 8
-	}
-
-	var b strings.Builder
-	currentGroup := "\x00" // sentinel so the first group prints even when ""
-	for _, c := range checks {
-		if c.Group != currentGroup {
-			currentGroup = c.Group
-			if currentGroup != "" {
-				b.WriteString(" " + styleSection.Render(currentGroup) + "\n")
-			}
-		}
-		icon, st := healthIconStyle(c.Status)
-		prefix := "   " + st.Render(icon) + "  " + styleSubtext.Render(padRight(c.Name, nameW)) + "  "
-		if c.Detail == "" {
-			b.WriteString(strings.TrimRight(prefix, " ") + "\n")
-			continue
-		}
-		// Wrap long details to fit the width; continuation lines align under
-		// the detail column so the report re-flows cleanly on resize.
-		wrapped := strings.Split(wrapText(c.Detail, detailW), "\n")
-		b.WriteString(prefix + styleDim.Render(wrapped[0]) + "\n")
-		indent := strings.Repeat(" ", detailCol)
-		for _, cont := range wrapped[1:] {
-			b.WriteString(indent + styleDim.Render(cont) + "\n")
-		}
-	}
-	return strings.TrimRight(b.String(), "\n")
-}
-
-// sectionBox renders a collapsible labeled box.
-// Collapsed: just the top+bottom border with title and summary in the border line.
-// Expanded: full box with content.
 func (m Model) sectionBox(key, keyStr, name, summary string, content []string, outerW int, focused bool) string {
 	innerW := outerW - 2
 	borderColor := activeTheme.Palette.Surface1
@@ -486,21 +310,6 @@ func (m Model) sectionBox(key, keyStr, name, summary string, content []string, o
 		indented = append(indented, "  "+l)
 	}
 	return drawBoxLabeledWith(title, indented, outerW, borderColor)
-}
-
-// renderNavigableList renders a list of section items with a cursor indicator.
-func renderNavigableList(items []sectionItem, cursor int) []string {
-	var lines []string
-	for i, item := range items {
-		label := labelWithDimID(item.label, item.id)
-		if i == cursor {
-			lines = append(lines, styleHealthOK.Render("▶")+"  "+styleSubtext.Render(label)+
-				styleDim.Render("  enter to view"))
-		} else {
-			lines = append(lines, "   "+styleDim.Render(label))
-		}
-	}
-	return lines
 }
 
 func renderWorkerGroups(groups []workerGroup, maxW int) []string {
@@ -648,135 +457,6 @@ func renderNameList(maxW int, names []string) []string {
 }
 
 // renderRepoList renders repos as "name — purpose" lines.
-func renderRepoList(repos []config.Repo, maxW int) []string {
-	if len(repos) == 0 {
-		return []string{styleDim.Render("No repos configured. Edit orc.yaml to add repos.")}
-	}
-	var lines []string
-	for _, r := range repos {
-		name := styleSubtext.Render(r.Name)
-		sep := styleDivider.Render("  —  ")
-		purpose := styleDim.Render(r.Purpose)
-		var badges []string
-		if r.WorktreeSetup != "" {
-			badges = append(badges, styleHealthOK.Render("setup"))
-		}
-		if len(r.AgentHints) > 0 {
-			badges = append(badges, styleStatusWaiting.Render("hints"))
-		}
-		badgeText := ""
-		if len(badges) > 0 {
-			badgeText = styleDim.Render("  ") + strings.Join(badges, styleDim.Render(" "))
-		}
-		line := name + badgeText + sep + purpose
-		if lipgloss.Width(line) > maxW {
-			purpose = styleDim.Render(truncate(r.Purpose, maxW-lipgloss.Width(name+badgeText+sep)))
-			line = name + badgeText + sep + purpose
-		}
-		lines = append(lines, line)
-	}
-	return lines
-}
-
-func artifactPolicyStyle(policy string) lipgloss.Style {
-	if policy == "block" {
-		return styleHealthWarn
-	}
-	return styleHealthOK
-}
-
-// renderRouteChain renders the workflow stage sequence with colored arrows and loop stage annotations.
-func renderRouteChain(chain []routeStep, loops []repairLoop, maxW int) []string {
-	if len(chain) == 0 {
-		return nil
-	}
-	sep := styleDivider.Render("  ")
-	sepW := lipgloss.Width(sep)
-
-	// build index: workflow name → x-offset in rendered row
-	chipOffsets := map[string]int{}
-
-	var rows []string
-	row := ""
-	rowW := 0
-	for i, step := range chain {
-		chip := styleSubtext.Render(stepLabel(step))
-		chipW := lipgloss.Width(chip)
-
-		var arrow string
-		var arrowW int
-		if i < len(chain)-1 {
-			if chain[i].advance == "manual" {
-				arrow = sep + styleStatusWaiting.Render("→") + sep
-			} else {
-				arrow = sep + styleHealthOK.Render("→") + sep
-			}
-			arrowW = sepW*2 + 1
-		}
-
-		needed := chipW + arrowW
-		if rowW > 0 && rowW+needed > maxW {
-			rows = append(rows, row)
-			row = ""
-			rowW = 0
-		}
-		chipOffsets[step.name] = rowW
-		row += chip
-		rowW += chipW
-		if arrow != "" {
-			row += arrow
-			rowW += arrowW
-		}
-	}
-	if row != "" {
-		rows = append(rows, row)
-	}
-
-	// loop stage annotations: ↺ name positioned under target chip
-	if len(loops) > 0 {
-		// group loops by target for layout
-		type loopAnnotation struct {
-			offset int
-			label  string
-		}
-		var annotations []loopAnnotation
-		for _, lp := range loops {
-			offset, ok := chipOffsets[lp.target]
-			if !ok {
-				continue
-			}
-			loopLabel := lp.label
-			if loopLabel == "" {
-				loopLabel = lp.name
-			}
-			label := styleStatusWaiting.Render("↺ ") + styleSubtext.Render(loopLabel)
-			annotations = append(annotations, loopAnnotation{offset: offset, label: label})
-		}
-		// sort by offset so we build the line left-to-right
-		sort.Slice(annotations, func(i, j int) bool {
-			return annotations[i].offset < annotations[j].offset
-		})
-		if len(annotations) > 0 {
-			loopLine := ""
-			loopW := 0
-			for _, ann := range annotations {
-				if ann.offset > loopW {
-					loopLine += strings.Repeat(" ", ann.offset-loopW)
-					loopW = ann.offset
-				}
-				connector := styleDivider.Render("└╴")
-				full := connector + ann.label
-				w := lipgloss.Width(full)
-				loopLine += full
-				loopW += w
-			}
-			rows = append(rows, loopLine)
-		}
-	}
-
-	return rows
-}
-
 func (m Model) renderTable(rows []*featureRow, w int, selectedIdx int) string {
 	const (
 		wTicket  = 12

@@ -89,6 +89,7 @@ func TestBuildWatchCommandQuotesArguments(t *testing.T) {
 		Wide:      true,
 		View:      "pet",
 		PetLayout: "column",
+		Demo:      true,
 	})
 
 	for _, want := range []string{
@@ -99,6 +100,7 @@ func TestBuildWatchCommandQuotesArguments(t *testing.T) {
 		"--wide",
 		"--view pet",
 		"--pet-layout column",
+		"--demo",
 	} {
 		if !strings.Contains(cmd, want) {
 			t.Fatalf("buildWatchCommand() missing %q in %q", want, cmd)

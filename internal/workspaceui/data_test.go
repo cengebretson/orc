@@ -1,4 +1,4 @@
-package tui
+package workspaceui
 
 import (
 	"errors"
@@ -48,6 +48,25 @@ func TestBrokenRowSurfaced(t *testing.T) {
 	detail := renderBrokenFeature(broken)
 	if !strings.Contains(detail, "could not be parsed") || !strings.Contains(detail, "mapping values") {
 		t.Errorf("renderBrokenFeature missing error context:\n%s", detail)
+	}
+}
+
+func TestLoadDataSurfacesInvalidConfigWithoutPanicking(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, config.Filename), []byte("unknown_key: true\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	msg, ok := loadData(root)().(dataMsg)
+	if !ok || msg.err == nil {
+		t.Fatalf("loadData message = %#v, want configuration error", msg)
+	}
+	updated, _ := New(root).Update(msg)
+	m, ok := updated.(Model)
+	if !ok {
+		t.Fatalf("updated model = %T, want workspaceui.Model", updated)
+	}
+	if m.loadErr == nil || len(m.healthItems) != 1 || m.healthItems[0].Name != config.Filename {
+		t.Fatalf("invalid configuration was not surfaced in health: err=%v checks=%+v", m.loadErr, m.healthItems)
 	}
 }
 

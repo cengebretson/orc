@@ -2,7 +2,7 @@
 #
 # Single config file for repos, workflows, and workspace settings.
 # Run `orc doctor` to verify the workspace.
-# After editing, the TUI picks up changes on the next auto-refresh.
+# After editing, the dashboard picks up changes on the next auto-refresh.
 
 # settings:
 #   default_workflow: default     # workflow used by `orc work` when --workflow is omitted
@@ -10,8 +10,8 @@
 #   auto_archive: false           # archive tickets automatically when the last stage completes
 #   auto_tmux: false              # always use tmux for new tickets (same as orc work --tmux)
 #   auto_next: false              # always launch the first stage after orc work (same as orc work --next)
-#   tui_refresh: 60               # TUI auto-refresh interval in seconds (default: 60)
-#   theme: catppuccin-mocha       # TUI color theme (default: catppuccin-mocha)
+#   workspace_refresh: 60         # Workspace dashboard refresh interval in seconds (default: 60)
+#   theme: catppuccin-mocha       # Dashboard color theme (default: catppuccin-mocha)
 #   context_pressure:             # live provider context percentage color boundaries
 #     green: 0
 #     yellow: 70

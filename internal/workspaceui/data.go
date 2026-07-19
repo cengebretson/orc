@@ -1,4 +1,4 @@
-package tui
+package workspaceui
 
 import (
 	"os"
@@ -8,21 +8,22 @@ import (
 
 	"github.com/cengebretson/orc/internal/config"
 	"github.com/cengebretson/orc/internal/contextpressure"
-	"github.com/cengebretson/orc/internal/doctor"
-	"github.com/cengebretson/orc/internal/featurelist"
-	"github.com/cengebretson/orc/internal/sessionlist"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/workers"
+	"github.com/cengebretson/orc/internal/workspacesnapshot"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 func loadData(root string) tea.Cmd {
 	return func() tea.Msg {
-		features := collectFeatures(root)
-		report := doctor.Run(root)
+		snapshot, err := workspacesnapshot.Load(root)
+		if err != nil {
+			return dataMsg{err: err}
+		}
+		features := collectFeatures(snapshot)
 
 		// build workflow chains from workflows.yaml
-		workflowCfg, _ := config.Load(root)
+		workflowCfg := snapshot.Config
 		var chains []workflowChain
 		for _, wfName := range workflowCfg.Names() {
 			stages := workflowCfg.StageNames(wfName)
@@ -83,7 +84,7 @@ func loadData(root string) tea.Cmd {
 			chains = []workflowChain{{name: "", steps: steps}}
 		}
 		// worker names
-		allWorkers, _ := workers.Load(filepath.Join(root, "workers"))
+		allWorkers := snapshot.Workers
 		var workerNames []string
 		workerGroupsByName := map[string][]sectionItem{}
 		for _, w := range allWorkers {
@@ -118,38 +119,37 @@ func loadData(root string) tea.Cmd {
 			si["workers"] = append(si["workers"], group.items...)
 		}
 
-		var repos []config.Repo
-		if cfg, err := config.Load(root); err == nil {
-			repos = cfg.Repos
-		}
+		repos := snapshot.Config.Repos
+		routes := snapshot.Config.Routing
 
 		// routes: repository routing now lives in orc.yaml
 		configPath := filepath.Join(root, config.Filename)
 		if _, err := os.Stat(configPath); err == nil {
-			si["routes"] = []sectionItem{{label: config.Filename, path: configPath}}
+			si["repositories"] = []sectionItem{{label: "repository configuration", path: configPath}}
 		}
 
 		return dataMsg{
 			features:        features,
-			healthItems:     report.Checks,
+			healthItems:     snapshot.Health,
 			workerNames:     workerNames,
 			workerGroups:    workerGroups,
 			workflowGroups:  workflowGroups,
 			allWorkers:      allWorkers,
 			workflows:       chains,
 			repos:           repos,
+			routes:          routes,
 			sectionItems:    si,
-			refreshInterval: workflowCfg.TuiRefreshInterval(),
+			refreshInterval: workflowCfg.WorkspaceRefreshInterval(),
 			artifactPolicy:  workflowCfg.ArtifactPolicy(),
 			quotes:          workflowCfg.Settings.Quotes,
 		}
 	}
 }
 
-func collectFeatures(root string) []*featureRow {
-	workflowCfg, _ := config.Load(root)
-	features, _ := featurelist.Collect(root, featurelist.Options{IncludeArchived: true})
-	liveByFeature := sessionlist.ManagedTelemetry(root, features)
+func collectFeatures(snapshot *workspacesnapshot.Snapshot) []*featureRow {
+	workflowCfg := snapshot.Config
+	features := snapshot.Features
+	liveByFeature := snapshot.Telemetry
 	thresholds := workflowCfg.ContextPressureThresholds()
 	rows := make([]*featureRow, 0, len(features))
 	for _, f := range features {
@@ -312,7 +312,7 @@ func repairTargetLabel(s repairStep) string {
 // top-level context docs followed by each stage's output files. Stage outputs
 // are discovered by scanning the feature dir's subfolders rather than assuming
 // fixed stage names — each stage writes to a subfolder matching its name, which
-// is policy in orc.yaml, not something the TUI should hardcode. Subfolders are
+// is policy in orc.yaml, not something the Workspace view should hardcode. Subfolders are
 // ordered by the ticket's own stage history (pipeline order), with any
 // remaining folders appended alphabetically.
 func buildFileList(featureDir string, s *state.State) []detailFile {

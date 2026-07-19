@@ -53,10 +53,10 @@ func Validate(cfg *Config, workerIDs []string) ValidationErrors {
 	errs = append(errs, validateAliasTargets("aliases.workers", cfg.Aliases.Workers)...)
 	errs = append(errs, validateRepos(cfg.Repos)...)
 	errs = append(errs, validateRepoRoutes(cfg.Routing, cfg.Repos)...)
-	if cfg.Settings.TuiRefresh < 0 {
+	if cfg.Settings.WorkspaceRefresh < 0 {
 		errs = append(errs, ValidationError{
-			Path:    "settings.tui_refresh",
-			Message: "tui_refresh must be zero or greater",
+			Path:    "settings.workspace_refresh",
+			Message: "workspace_refresh must be zero or greater",
 		})
 	}
 	if cfg.Settings.ArtifactPolicy != "" && cfg.Settings.ArtifactPolicy != "warn" && cfg.Settings.ArtifactPolicy != "block" {

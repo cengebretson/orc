@@ -1,4 +1,4 @@
-package tui
+package workspaceui
 
 import (
 	"fmt"
@@ -27,19 +27,21 @@ func (m Model) viewDetail() string {
 	if m.detail == nil {
 		return ""
 	}
-	outerW := m.width - 2
+	outerW := max(4, m.width-2)
 	var b strings.Builder
 	b.WriteString("\n" + drawBox(styleDetailTitle.Render(" "+m.detail.s.Slug+" "), nil, outerW) + "\n")
 	b.WriteString(m.viewport.View())
-	help := strings.Join([]string{
-		helpItem("tab/←→", "cycle files"),
-		helpItem("↑↓/pgup/pgdn", "scroll"),
-		helpItem("enter", "view file"),
-		helpItem("t", "attach"),
-		helpItem("esc", "back"),
-		helpItem("q", "quit"),
-	}, "  ")
-	b.WriteString("\n" + styleHelp.Render(" "+help))
+	if !m.embedded {
+		help := strings.Join([]string{
+			helpItem("tab/←→", "cycle files"),
+			helpItem("↑↓/pgup/pgdn", "scroll"),
+			helpItem("enter", "view file"),
+			helpItem("t", "attach"),
+			helpItem("esc", "back"),
+			helpItem("q", "quit"),
+		}, "  ")
+		b.WriteString("\n" + styleHelp.Render(" "+help))
+	}
 	return b.String()
 }
 
@@ -58,7 +60,7 @@ func (m Model) renderDetailBody() string {
 	})
 	// The body renders inside the viewport (width m.width-4), so build the boxes
 	// to that width — the title bar in viewDetail keeps the full m.width-2.
-	outerW := m.width - 4
+	outerW := max(4, m.width-4)
 	innerW := outerW - 2
 	var b strings.Builder
 
@@ -173,13 +175,13 @@ func (m Model) renderDetailBody() string {
 		)
 		wTimingStage := minTimingStage
 		for _, st := range rep.Stages {
-			wTimingStage = maxInt(wTimingStage, lipgloss.Width(st.Stage))
+			wTimingStage = max(wTimingStage, lipgloss.Width(st.Stage))
 		}
 		totalLabel := "total"
 		if rep.Open {
 			totalLabel = "total so far"
 		}
-		wTimingStage = maxInt(wTimingStage, lipgloss.Width(totalLabel))
+		wTimingStage = max(wTimingStage, lipgloss.Width(totalLabel))
 		maxTimingStage := innerW - wActive - wWall - wVisits - 7
 		if maxTimingStage < minTimingStage {
 			maxTimingStage = minTimingStage
@@ -224,8 +226,8 @@ func (m Model) renderDetailBody() string {
 		wStage := minStage
 		wWorker := minWorker
 		for _, h := range s.History {
-			wStage = maxInt(wStage, lipgloss.Width(h.Stage))
-			wWorker = maxInt(wWorker, lipgloss.Width(h.Worker))
+			wStage = max(wStage, lipgloss.Width(h.Stage))
+			wWorker = max(wWorker, lipgloss.Width(h.Worker))
 		}
 		available := innerW - wAt - minResult - 7
 		if available < minStage+minWorker {
@@ -234,12 +236,12 @@ func (m Model) renderDetailBody() string {
 		if wStage+wWorker > available {
 			over := wStage + wWorker - available
 			if wWorker > minWorker {
-				shrink := minInt(over, wWorker-minWorker)
+				shrink := min(over, wWorker-minWorker)
 				wWorker -= shrink
 				over -= shrink
 			}
 			if over > 0 && wStage > minStage {
-				wStage -= minInt(over, wStage-minStage)
+				wStage -= min(over, wStage-minStage)
 			}
 		}
 		wResult := innerW - wAt - wStage - wWorker - 7
@@ -319,28 +321,14 @@ func labelWithDimID(label, id string) string {
 	return label + styleDim.Render(" ("+id+")")
 }
 
-func maxInt(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-func minInt(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 func joinColumns(left, right, gap string) string {
 	leftLines := strings.Split(strings.TrimRight(left, "\n"), "\n")
 	rightLines := strings.Split(strings.TrimRight(right, "\n"), "\n")
 	leftW := 0
 	for _, line := range leftLines {
-		leftW = maxInt(leftW, lipgloss.Width(line))
+		leftW = max(leftW, lipgloss.Width(line))
 	}
-	n := maxInt(len(leftLines), len(rightLines))
+	n := max(len(leftLines), len(rightLines))
 	out := make([]string, 0, n)
 	for i := 0; i < n; i++ {
 		leftLine := ""
@@ -359,49 +347,56 @@ func joinColumns(left, right, gap string) string {
 // ── File viewer ───────────────────────────────────────────────────
 
 func (m Model) viewFile() string {
-	outerW := m.width - 2
+	outerW := max(4, m.width-2)
 	var b strings.Builder
 	title := styleDetailTitle.Render(" "+m.viewerContext) +
 		styleDim.Render(" · ") +
-		styleSubtext.Render(m.viewerTitle+" ")
+		styleSubtext.Render(m.viewerTitle) +
+		styleDim.Render(fmt.Sprintf("  ·  %.0f%% ", m.viewport.ScrollPercent()*100))
 	b.WriteString("\n" + drawBox(title, nil, outerW) + "\n")
 	b.WriteString(m.viewport.View())
-	helpItems := []string{
-		helpItem("↑↓/pgup/pgdn", "scroll"),
+	if !m.embedded {
+		helpItems := []string{
+			helpItem("↑↓/pgup/pgdn", "scroll"),
+		}
+		switch m.viewerReturn {
+		case viewDetail:
+			helpItems = append(helpItems, helpItem("←→", "prev/next file"))
+		case viewWorkflowDetail:
+			helpItems = append(helpItems, helpItem("←→", "prev/next stage"))
+		}
+		helpItems = append(helpItems,
+			helpItem("esc", "back"),
+			helpItem("q", "quit"),
+		)
+		help := strings.Join(helpItems, "  ")
+		b.WriteString("\n" + styleHelp.Render("  "+help))
 	}
-	switch m.viewerReturn {
-	case viewDetail:
-		helpItems = append(helpItems, helpItem("←→", "prev/next file"))
-	case viewWorkflowDetail:
-		helpItems = append(helpItems, helpItem("←→", "prev/next stage"))
-	}
-	helpItems = append(helpItems,
-		helpItem("esc", "back"),
-		helpItem("q", "quit"),
-	)
-	help := strings.Join(helpItems, "  ")
-	b.WriteString("\n" + styleHelp.Render("  "+help))
 	return b.String()
 }
 
 // ── Workflow detail view ──────────────────────────────────────────
 
 func (m Model) viewWorkflowDetailPage() string {
-	outerW := m.width - 2
+	outerW := max(4, m.width-2)
 	var b strings.Builder
 	title := styleDetailTitle.Render(" Workflows") +
 		styleDim.Render(" · ") +
-		styleSubtext.Render(workflowDisplayWithID(m.wfDetailName, m.workflows)+" ")
+		styleSubtext.Render(workflowDisplayWithID(m.wfDetailName, m.workflows)) +
+		styleDim.Render(fmt.Sprintf("  ·  %.0f%% ", m.viewport.ScrollPercent()*100))
 	b.WriteString("\n" + drawBox(title, nil, outerW) + "\n")
 	b.WriteString(m.viewport.View())
-	help := strings.Join([]string{
-		helpItem("↑↓/←→", "select stage"),
-		helpItem("pgup/pgdn", "scroll"),
-		helpItem("enter", "view stage"),
-		helpItem("esc", "back"),
-		helpItem("q", "quit"),
-	}, "  ")
-	b.WriteString("\n" + styleHelp.Render("  "+help))
+	if !m.embedded {
+		help := strings.Join([]string{
+			helpItem("←→", "select stage"),
+			helpItem("↑↓/j/k", "scroll"),
+			helpItem("pgup/pgdn", "scroll page"),
+			helpItem("enter", "view stage"),
+			helpItem("esc", "back"),
+			helpItem("q", "quit"),
+		}, "  ")
+		b.WriteString("\n" + styleHelp.Render("  "+help))
+	}
 	return b.String()
 }
 
@@ -629,7 +624,7 @@ func renderActiveFeatureRows(rows []activeFeatureRow, width int) []string {
 	if width < 20 {
 		width = 20
 	}
-	ticketW := minInt(14, maxInt(8, width/3))
+	ticketW := min(14, max(8, width/3))
 	stageW := width - ticketW - 2
 	if stageW < 1 {
 		stageW = 1

@@ -31,15 +31,15 @@ type RepoRoute struct {
 }
 
 type Settings struct {
-	DefaultWorkflow string                   `yaml:"default_workflow"`
-	ArtifactPolicy  string                   `yaml:"artifact_policy,omitempty"`
-	AutoArchive     bool                     `yaml:"auto_archive"`
-	AutoTmux        bool                     `yaml:"auto_tmux"`
-	AutoNext        bool                     `yaml:"auto_next"`
-	TuiRefresh      int                      `yaml:"tui_refresh"` // seconds; 0 means use default (60)
-	Quotes          []string                 `yaml:"quotes"`
-	Theme           string                   `yaml:"theme"` // e.g. "catppuccin-mocha"; defaults to catppuccin-mocha
-	ContextPressure *ContextPressureSettings `yaml:"context_pressure,omitempty"`
+	DefaultWorkflow  string                   `yaml:"default_workflow"`
+	ArtifactPolicy   string                   `yaml:"artifact_policy,omitempty"`
+	AutoArchive      bool                     `yaml:"auto_archive"`
+	AutoTmux         bool                     `yaml:"auto_tmux"`
+	AutoNext         bool                     `yaml:"auto_next"`
+	WorkspaceRefresh int                      `yaml:"workspace_refresh"` // seconds; 0 means use default (60)
+	Quotes           []string                 `yaml:"quotes"`
+	Theme            string                   `yaml:"theme"` // e.g. "catppuccin-mocha"; defaults to catppuccin-mocha
+	ContextPressure  *ContextPressureSettings `yaml:"context_pressure,omitempty"`
 }
 
 type ContextPressureSettings struct {
@@ -88,10 +88,10 @@ type Config struct {
 	Workflows map[string]WorkflowDef `yaml:"workflows"`
 }
 
-// TuiRefreshInterval returns the configured auto-refresh interval, defaulting to 60s.
-func (c *Config) TuiRefreshInterval() time.Duration {
-	if c.Settings.TuiRefresh > 0 {
-		return time.Duration(c.Settings.TuiRefresh) * time.Second
+// WorkspaceRefreshInterval returns the configured Workspace auto-refresh interval, defaulting to 60s.
+func (c *Config) WorkspaceRefreshInterval() time.Duration {
+	if c.Settings.WorkspaceRefresh > 0 {
+		return time.Duration(c.Settings.WorkspaceRefresh) * time.Second
 	}
 	return 60 * time.Second
 }

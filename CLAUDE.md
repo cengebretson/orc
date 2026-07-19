@@ -20,7 +20,7 @@ orc/
   internal/
     config/                       orc.yaml parsing — repos, workflows, loop stages, settings
     doctor/                       workspace + local tool readiness checks
-    featurelist/                  shared feature collection for CLI status and TUI rows
+    featurelist/                  shared feature collection for CLI status and Workspace rows
     report/                       time-in-stage derivation from STATE.yaml history
     health/                       workspace filesystem health checks
     orchestrator/                 launch, transition, and archive services

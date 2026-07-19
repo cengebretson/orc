@@ -3,19 +3,19 @@ package main
 import (
 	"fmt"
 
+	"github.com/cengebretson/orc/internal/dashboard"
 	"github.com/cengebretson/orc/internal/ticket"
 	"github.com/cengebretson/orc/internal/tmux"
-	"github.com/cengebretson/orc/internal/tui"
 	"github.com/cengebretson/orc/internal/watch"
 	"github.com/spf13/cobra"
 )
 
-func runTui(cmd *cobra.Command, args []string) error {
+func runDashboard(cmd *cobra.Command, args []string) error {
 	root, err := resolveRoot(globalWorkspace)
 	if err != nil {
 		return err
 	}
-	return tui.Run(root)
+	return dashboard.Run(root, dashboard.Options{Start: dashboard.SectionWorkspace})
 }
 
 func runAttach(cmd *cobra.Command, args []string) error {

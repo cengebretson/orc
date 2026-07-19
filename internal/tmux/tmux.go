@@ -448,6 +448,7 @@ type WatchToggleOptions struct {
 	Wide      bool
 	View      string
 	PetLayout string
+	Demo      bool
 	Layout    string
 	Size      string
 	ExecPath  string
@@ -552,6 +553,9 @@ func buildWatchCommand(opts WatchToggleOptions) string {
 	}
 	if opts.PetLayout != "" && opts.PetLayout != "responsive" {
 		argv = append(argv, "--pet-layout", opts.PetLayout)
+	}
+	if opts.Demo {
+		argv = append(argv, "--demo")
 	}
 	return shellJoin(argv)
 }

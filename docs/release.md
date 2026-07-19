@@ -12,7 +12,7 @@ The v1 release boundary includes:
   exact generated-workspace golden coverage.
 - Durable `STATE.yaml` workflow transitions, artifact policy, worktree setup,
   agent launch, JIT tasks, archive/delete, reporting, and local workflow packs.
-- TUI and watch views, exact tmux pane targeting, attention-driven focus, live
+- Dashboard Workspace and Live views, exact tmux pane targeting, attention-driven focus, live
   Claude/Codex telemetry, session search/resume, park/unpark recovery,
   repository grouping, and context-pressure presentation.
 
@@ -122,7 +122,7 @@ ticket/session name.
 
 In a second terminal, verify:
 
-- `orc watch` and `orc tui` show the durable ticket plus the optional live
+- `orc watch` and `orc dashboard` show the durable ticket plus the optional live
   provider overlay.
 - `/` filters by ticket, repository, branch, worker, engine, and provider model.
 - `a` focuses the exact agent pane and `i` selects the next attention item.

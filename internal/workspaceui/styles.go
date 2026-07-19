@@ -1,69 +1,32 @@
-package tui
+package workspaceui
 
 import (
-	"embed"
-	"encoding/json"
-	"fmt"
-	"strings"
 	"time"
 
 	"github.com/cengebretson/orc/internal/contextpressure"
+	terminalui "github.com/cengebretson/orc/internal/ui"
 	"github.com/charmbracelet/lipgloss"
 )
 
-//go:embed themes/*.json assets/logo.txt
-var themesFS embed.FS
-
-// Theme holds the palette and glamour style for a TUI theme.
-type Theme struct {
-	Palette struct {
-		Crust    string `json:"crust"`
-		Mantle   string `json:"mantle"`
-		Base     string `json:"base"`
-		Surface0 string `json:"surface0"`
-		Surface1 string `json:"surface1"`
-		Surface2 string `json:"surface2"`
-		Overlay0 string `json:"overlay0"`
-		Overlay1 string `json:"overlay1"`
-		Subtext0 string `json:"subtext0"`
-		Subtext1 string `json:"subtext1"`
-		Text     string `json:"text"`
-		Lavender string `json:"lavender"`
-		Blue     string `json:"blue"`
-		Sapphire string `json:"sapphire"`
-		Sky      string `json:"sky"`
-		Teal     string `json:"teal"`
-		Green    string `json:"green"`
-		Yellow   string `json:"yellow"`
-		Peach    string `json:"peach"`
-		Maroon   string `json:"maroon"`
-		Red      string `json:"red"`
-		Mauve    string `json:"mauve"`
-		Pink     string `json:"pink"`
-		Flamingo string `json:"flamingo"`
-	} `json:"palette"`
-	Glamour json.RawMessage `json:"glamour"`
-}
+// Theme holds the palette and glamour style for a dashboard theme.
+type Theme = terminalui.Theme
 
 var activeTheme Theme
 
 // LoadTheme loads a theme by name from the embedded themes directory.
 // Falls back to catppuccin-mocha if name is empty or not found.
 func LoadTheme(name string) error {
-	if name == "" {
-		name = "catppuccin-mocha"
-	}
-	data, err := themesFS.ReadFile("themes/" + name + ".json")
+	theme, err := terminalui.LoadTheme(name)
 	if err != nil {
-		return fmt.Errorf("theme %q not found", name)
+		return err
 	}
-	var t Theme
-	if err := json.Unmarshal(data, &t); err != nil {
-		return fmt.Errorf("parsing theme %q: %w", name, err)
-	}
-	activeTheme = t
-	initStyles()
+	SetTheme(theme)
 	return nil
+}
+
+func SetTheme(theme Theme) {
+	activeTheme = theme
+	initStyles()
 }
 
 func init() {
@@ -72,13 +35,7 @@ func init() {
 	}
 }
 
-var logo = func() string {
-	data, err := themesFS.ReadFile("assets/logo.txt")
-	if err != nil {
-		return ""
-	}
-	return strings.TrimRight(string(data), "\n")
-}()
+var logo = terminalui.Logo()
 
 // Style vars — initialized by initStyles(), called from LoadTheme.
 var (

@@ -283,11 +283,11 @@ var focusCmd = &cobra.Command{
 	RunE:  runFocus,
 }
 
-var tuiCmd = &cobra.Command{
-	Use:   "tui",
-	Short: "Open the interactive dashboard",
+var dashboardCmd = &cobra.Command{
+	Use:   "dashboard",
+	Short: "Open the unified Live and Workspace dashboard",
 	Args:  cobra.NoArgs,
-	RunE:  runTui,
+	RunE:  runDashboard,
 }
 
 var watchCmd = &cobra.Command{
@@ -302,6 +302,7 @@ var (
 	watchWide       bool
 	watchView       string
 	watchPetLayout  string
+	watchDemo       bool
 	watchTmuxToggle bool
 	watchTmuxLayout string
 	watchTmuxSize   string
@@ -400,6 +401,7 @@ func init() {
 	watchCmd.Flags().BoolVar(&watchWide, "wide", false, "Render the wider table layout")
 	watchCmd.Flags().StringVar(&watchView, "view", "rail", "Initial watch view: rail or pet")
 	watchCmd.Flags().StringVar(&watchPetLayout, "pet-layout", "responsive", "Initial pet card layout: responsive or column")
+	watchCmd.Flags().BoolVar(&watchDemo, "demo", false, "Preview watch with synthetic workflow, state, and context data")
 	watchCmd.Flags().BoolVar(&watchTmuxToggle, "tmux-toggle", false, "Toggle a narrow watch pane in the current tmux window")
 	watchCmd.Flags().StringVar(&watchTmuxLayout, "tmux-layout", "right", "Tmux toggle split layout: right or bottom")
 	watchCmd.Flags().StringVar(&watchTmuxSize, "tmux-size", "32", "Tmux toggle pane size, e.g. 32 or 25%")
@@ -440,7 +442,7 @@ func init() {
 	rootCmd.AddCommand(jitCmd)
 	rootCmd.AddCommand(attachCmd)
 	rootCmd.AddCommand(focusCmd)
-	rootCmd.AddCommand(tuiCmd)
+	rootCmd.AddCommand(dashboardCmd)
 	rootCmd.AddCommand(watchCmd)
 	rootCmd.AddCommand(helpAllCmd)
 	rootCmd.AddCommand(versionCmd)

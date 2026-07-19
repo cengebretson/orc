@@ -1,17 +1,18 @@
-package tui
+package workspaceui
 
 import (
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/cengebretson/orc/internal/ui"
 	"github.com/charmbracelet/lipgloss"
 )
 
 // renderBrokenFeature builds the file-viewer content for a feature whose
 // STATE.yaml could not be parsed: the parse error followed by the raw file so
 // the user can spot the problem (bad indentation, a stray field) without
-// leaving the TUI.
+// leaving the Workspace dashboard.
 func renderBrokenFeature(row *featureRow) string {
 	var b strings.Builder
 	b.WriteString(styleHealthErr.Render("⚠ STATE.yaml could not be parsed") + "\n\n")
@@ -32,6 +33,7 @@ func renderBrokenFeature(row *featureRow) string {
 
 // drawBox renders a plain rounded box (no title in border).
 func drawBox(title string, contentLines []string, outerW int) string {
+	outerW = max(4, outerW)
 	innerW := outerW - 2
 
 	var all []string
@@ -57,10 +59,11 @@ func drawBoxLabeled(title string, contentLines []string, outerW int) string {
 
 // drawBoxLabeledWith is drawBoxLabeled with a configurable border color.
 func drawBoxLabeledWith(title string, contentLines []string, outerW int, borderColor string) string {
+	outerW = max(4, outerW)
 	innerW := outerW - 2
 	bd := lipgloss.NewStyle().Foreground(lipgloss.Color(borderColor))
 
-	label := " " + title + " "
+	label := " " + ui.Truncate(title, max(1, innerW-3)) + " "
 	labelW := lipgloss.Width(label)
 	dashRight := innerW - 1 - labelW
 	if dashRight < 0 {
@@ -73,6 +76,7 @@ func drawBoxLabeledWith(title string, contentLines []string, outerW int, borderC
 	var lines []string
 	lines = append(lines, top)
 	for _, cl := range contentLines {
+		cl = ui.Truncate(cl, innerW)
 		clW := lipgloss.Width(cl)
 		pad := innerW - clW
 		if pad < 0 {
@@ -87,31 +91,12 @@ func drawBoxLabeledWith(title string, contentLines []string, outerW int, borderC
 // padRight pads s to at least width visible characters, using lipgloss.Width
 // to measure so ANSI escape codes don't throw off the count.
 func padRight(s string, width int) string {
-	w := lipgloss.Width(s)
-	if w >= width {
-		return s
-	}
-	return s + strings.Repeat(" ", width-w)
+	return ui.PadRight(s, width)
 }
 
 // wrapText wraps s to fit within maxW columns, breaking on word boundaries.
 func wrapText(s string, maxW int) string {
-	words := strings.Fields(s)
-	if len(words) == 0 {
-		return ""
-	}
-	var lines []string
-	line := words[0]
-	for _, w := range words[1:] {
-		if len(line)+1+len(w) <= maxW {
-			line += " " + w
-		} else {
-			lines = append(lines, line)
-			line = w
-		}
-	}
-	lines = append(lines, line)
-	return strings.Join(lines, "\n")
+	return ui.Wrap(s, maxW)
 }
 
 func fileExists(path string) bool {
@@ -120,11 +105,5 @@ func fileExists(path string) bool {
 }
 
 func truncate(s string, max int) string {
-	if max <= 0 {
-		return ""
-	}
-	if len(s) <= max {
-		return s
-	}
-	return s[:max-1] + "…"
+	return ui.Truncate(s, max)
 }

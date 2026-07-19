@@ -1,4 +1,4 @@
-package tui
+package workspaceui
 
 import (
 	"fmt"
@@ -105,18 +105,71 @@ func TestHealthSummaryExtra(t *testing.T) {
 
 func TestDashboardShowsArtifactPolicyAndRepoCapabilityBadges(t *testing.T) {
 	m := testModel(t)
+	m.expanded["repositories"] = true
 	m.artifactPolicy = "block"
 	m.repos = []config.Repo{{
 		Name:          "app",
+		Path:          "projects/app",
 		Purpose:       "primary app",
 		WorktreeSetup: "scripts/setup.sh",
 		AgentHints:    []string{"make test"},
 	}}
+	m.routes = []config.RepoRoute{{Labels: []string{"application"}, Components: []string{"web"}, Repos: []string{"app"}}}
 
 	out := ansi.Strip(m.viewDashboard())
-	for _, want := range []string{"artifacts block", "app", "setup", "hints"} {
+	for _, want := range []string{"artifacts block", "Repositories", "app", "projects/app", "setup", "hints", "label:application", "component:web", "→"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("dashboard missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestRepositoriesSectionIsCollapsedByDefault(t *testing.T) {
+	m := New(t.TempDir())
+	if m.expanded["repositories"] {
+		t.Fatal("Repositories section should start collapsed")
+	}
+}
+
+func TestRenderRoutingReportUsesStructuredRepositoryAndRulePanels(t *testing.T) {
+	repos := []config.Repo{{Name: "app", Path: "projects/app", Purpose: "Primary application", AgentHints: []string{"make test"}}}
+	routes := []config.RepoRoute{{Labels: []string{"application"}, Components: []string{"web"}, Repos: []string{"app"}}}
+	features := []*featureRow{
+		{s: &state.State{Ticket: "STORY-2", Status: "paused", Repos: map[string]state.Repo{"app": {}}}},
+		{s: &state.State{Ticket: "STORY-1", Status: "active", Repos: map[string]state.Repo{"app": {}}}},
+		{s: &state.State{Ticket: "STORY-3", Status: "done", Repos: map[string]state.Repo{"app": {}}}},
+	}
+	out := ansi.Strip(renderRoutingReport(repos, routes, features, 72))
+	for _, want := range []string{"Repository map", "app", "projects/app", "Primary application", "2 features", "1 active", "1 paused", "STORY-1, STORY-2", "Optional route 1", "exact metadata", "label:application", "component:web", "selects", "app"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("routing report missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "STORY-3") {
+		t.Errorf("routing report should omit completed work:\n%s", out)
+	}
+	for _, want := range []string{"│  1 repositories", "│  path", "│  label:application"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("routing report should use consistent inner padding %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestRoutingReportFitsNarrowAndWideTerminals(t *testing.T) {
+	repos := []config.Repo{{
+		Name:          "application-with-a-long-name",
+		Path:          "projects/application-with-a-very-long-directory-name",
+		Purpose:       "Primary multilingual application 界界 with a deliberately long description",
+		WorktreeSetup: "scripts/setup-worktree.sh",
+		AgentHints:    []string{"make test"},
+	}}
+	routes := []config.RepoRoute{{Labels: []string{"full-stack-application"}, Repos: []string{"application-with-a-long-name"}}}
+	for _, width := range []int{20, 24, 32, 72, 120} {
+		out := renderRoutingReport(repos, routes, nil, width)
+		for lineNo, line := range strings.Split(out, "\n") {
+			if got := lipgloss.Width(line); got > width {
+				t.Fatalf("width %d line %d occupied %d cells:\n%s", width, lineNo+1, got, out)
+			}
 		}
 	}
 }
@@ -167,7 +220,7 @@ func TestRenderHealthReport(t *testing.T) {
 	plain := ansi.Strip(renderHealthReport(checks, 80))
 
 	for _, want := range []string{
-		"workspace", "config", "tools",
+		"Health summary", "workspace", "config", "tools", "passing", "warning", "failing",
 		"✓", "⚠", "✗",
 		"AGENTS.md", "worktrees/", "not created yet",
 		"orc.yaml", "valid", "codex", "not found on PATH",
@@ -175,6 +228,12 @@ func TestRenderHealthReport(t *testing.T) {
 		if !strings.Contains(plain, want) {
 			t.Errorf("health report missing %q:\n%s", want, plain)
 		}
+	}
+	if boxes := strings.Count(plain, "╭─"); boxes != 4 {
+		t.Errorf("health report panels = %d, want summary + 3 groups:\n%s", boxes, plain)
+	}
+	if got := lipgloss.Width(renderHealthReport(checks, 80)); got > 80 {
+		t.Errorf("health report width = %d, want <= 80", got)
 	}
 }
 

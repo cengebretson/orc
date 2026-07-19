@@ -1,15 +1,21 @@
 package watch
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+	"time"
+
+	terminalui "github.com/cengebretson/orc/internal/ui"
+)
 
 func (m Model) renderRail() string {
 	width := max(12, m.width)
 	inner := max(8, width-1)
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("ORC"))
+	b.WriteString(renderWatchOverview(m.rows, inner, m.lastLoad, m.renderNow()))
 	if m.ticket != "" {
 		b.WriteString("\n")
-		b.WriteString(mutedStyle.Render(truncate(m.ticket, inner)))
+		b.WriteString(accentStyle.Render(truncate(m.ticket, inner)))
 	}
 	b.WriteString("\n\n")
 	if m.searching || m.searchBox.Value() != "" {
@@ -24,23 +30,11 @@ func (m Model) renderRail() string {
 		return b.String()
 	}
 
-	b.WriteString(sectionStyle.Render("SESSIONS"))
-	b.WriteString("\n")
 	if len(m.rows) == 0 {
-		b.WriteString(mutedStyle.Render("  none"))
+		b.WriteString(mutedStyle.Render("No active work"))
 	} else {
 		for i, r := range m.rows {
-			icon, label := displayState(r)
-			prefix := "  "
-			if i == m.cursor {
-				prefix = "> "
-			}
-			state := stateStyle(label).Render(icon)
-			line := prefix + state + " " + truncate(r.ticket, max(1, inner-4))
-			if i == m.cursor {
-				line = selectedStyle.Render(line)
-			}
-			b.WriteString(line)
+			b.WriteString(renderRailRow(r, i == m.cursor, inner, m.renderNow(), m.uiFrame))
 			if i != len(m.rows)-1 {
 				b.WriteString("\n")
 			}
@@ -49,9 +43,9 @@ func (m Model) renderRail() string {
 
 	b.WriteString("\n\n")
 	if r, ok := m.selectedWork(); ok {
-		b.WriteString(sectionStyle.Render("DETAIL"))
-		b.WriteString("\n")
-		b.WriteString(renderRailDetail(r, inner))
+		cardWidth := max(1, inner-4)
+		contentWidth := max(8, cardWidth-2)
+		b.WriteString(selectedCardStyle.Width(cardWidth).Render(renderRailDetailAt(r, contentWidth, m.renderNow())))
 		b.WriteString("\n\n")
 	}
 	if m.message != "" {
@@ -59,66 +53,116 @@ func (m Model) renderRail() string {
 		b.WriteString("\n")
 	}
 
-	b.WriteString(mutedStyle.Render("/ filter  enter expand"))
-	b.WriteString("\n")
-	b.WriteString(mutedStyle.Render("a attach  i focus  q quit"))
-	return b.String()
+	return strings.TrimRight(b.String(), "\n")
+}
+
+func renderRailRow(r row, selected bool, width int, now time.Time, frame int) string {
+	icon, label := displayState(r)
+	icon = animatedStateIcon(r, icon, label, now, frame)
+	style := selectedRowStyle
+	if now.Before(r.celebrateUntil) || r.demoCelebration {
+		style = doneFlashStyle
+	} else if now.Before(r.flashUntil) {
+		style = transitionRowStyle
+	}
+	if selected {
+		content := "▌ " + icon + " " + truncate(r.ticket, max(1, width-4))
+		return style.Width(width).Render(content)
+	}
+	if now.Before(r.celebrateUntil) || r.demoCelebration || now.Before(r.flashUntil) {
+		return style.Width(width).Render("  " + icon + " " + truncate(r.ticket, max(1, width-4)))
+	}
+	return "  " + stateStyle(label).Render(icon) + " " + truncate(r.ticket, max(1, width-4))
+}
+
+func (m Model) renderNow() time.Time {
+	if !m.now.IsZero() {
+		return m.now
+	}
+	if !m.lastLoad.IsZero() {
+		return m.lastLoad
+	}
+	return time.Now()
+}
+
+func animatedStateIcon(r row, icon, label string, now time.Time, frame int) string {
+	if now.Before(r.celebrateUntil) || r.demoCelebration {
+		if frame%2 == 0 {
+			return "✦"
+		}
+		return "★"
+	}
+	if label == "active" && r.tmuxState == "live" && frame%2 == 1 {
+		return "◉"
+	}
+	return icon
 }
 
 func (m Model) renderWorkListWide(b *strings.Builder, width int) {
-	ticketW := min(18, max(10, width/4))
-	stageW := min(18, max(10, width/5))
-	workerW := min(18, max(8, width/5))
-	stateW := 10
-	contextW := 8
+	ticketW, stageW, workerW, stateW, contextW, tmuxW := wideColumnWidths(width)
 
-	b.WriteString(mutedStyle.Render(linef("%-2s%-*s  %-*s  %-*s  %-*s  %-*s  %s",
-		"",
-		ticketW, "Ticket",
-		stageW, "Stage",
-		workerW, "Worker",
-		stateW, "State",
-		contextW, "Context",
-		"Tmux",
-	)))
+	b.WriteString(mutedStyle.Render("  " +
+		terminalui.Cell("Ticket", ticketW) + "  " +
+		terminalui.Cell("Stage", stageW) + "  " +
+		terminalui.Cell("Worker", workerW) + "  " +
+		terminalui.Cell("State", stateW) + "  " +
+		terminalui.Cell("Context", contextW) + "  " +
+		terminalui.Cell("Tmux", tmuxW)))
 	b.WriteString("\n")
 	for i, r := range m.rows {
 		icon, label := displayState(r)
+		icon = animatedStateIcon(r, icon, label, m.renderNow(), m.uiFrame)
 		stateText := icon + " " + label
 		prefix := "  "
 		if i == m.cursor {
-			prefix = "> "
+			prefix = "▌ "
 		}
-		linePrefix := linef("%-2s%-*s  %-*s  %-*s  %-*s  ",
-			prefix,
-			ticketW, truncate(r.ticket, ticketW),
-			stageW, truncate(r.stage, stageW),
-			workerW, truncate(r.worker, workerW),
-			stateW, truncate(stateText, stateW),
-		)
-		if i == m.cursor {
-			line := linePrefix + linef("%-*s  %s", contextW, r.context.Label(), r.tmuxState)
-			b.WriteString(selectedStyle.Render(line))
+		linePrefix := terminalui.Cell(prefix, 2) +
+			terminalui.Cell(r.ticket, ticketW) + "  " +
+			terminalui.Cell(r.stage, stageW) + "  " +
+			terminalui.Cell(r.worker, workerW) + "  " +
+			terminalui.Cell(stateText, stateW) + "  "
+		tmuxText := truncate(r.tmuxState, tmuxW)
+		line := linePrefix + terminalui.Cell(r.context.Label(), contextW) + "  " + terminalui.Cell(tmuxText, tmuxW)
+		flash := m.renderNow().Before(r.celebrateUntil) || r.demoCelebration || m.renderNow().Before(r.flashUntil)
+		if i == m.cursor || flash {
+			style := selectedRowStyle
+			if m.renderNow().Before(r.celebrateUntil) || r.demoCelebration {
+				style = doneFlashStyle
+			} else if m.renderNow().Before(r.flashUntil) {
+				style = transitionRowStyle
+			}
+			b.WriteString(style.Render(line))
 		} else {
 			b.WriteString(stateStyle(label).Render(linePrefix))
 			b.WriteString(padStyledRight(renderContextPressure(r.context), contextW))
-			b.WriteString(stateStyle(label).Render("  " + r.tmuxState))
+			b.WriteString(stateStyle(label).Render("  "))
+			b.WriteString(padStyledRight(stateStyle(label).Render(tmuxText), tmuxW))
 		}
 		b.WriteString("\n")
 	}
 }
 
+func wideColumnWidths(width int) (ticketW, stageW, workerW, stateW, contextW, tmuxW int) {
+	stateW, contextW = 10, 8
+	if width < 68 {
+		stateW, contextW = 8, 7
+	}
+	// Prefix and the five two-column gaps consume 12 columns. Everything else
+	// is distributed so the table expands exactly with the terminal.
+	available := max(29, width-12-stateW-contextW)
+	tmuxW = max(4, available/7)
+	remaining := max(25, available-tmuxW)
+	ticketW = max(9, remaining*34/100)
+	stageW = max(8, remaining*33/100)
+	workerW = max(8, remaining-ticketW-stageW)
+	return
+}
+
 func (m Model) renderWide() string {
 	width := max(40, m.width)
 	var b strings.Builder
-	title := "ORC WATCH"
-	if m.ticket != "" {
-		title += " " + m.ticket
-	}
-	b.WriteString(titleStyle.Render(title))
-	if !m.lastLoad.IsZero() {
-		b.WriteString(mutedStyle.Render("  " + m.lastLoad.Format("15:04:05")))
-	}
+	b.WriteString(renderWatchOverview(m.rows, width, m.lastLoad, m.renderNow()))
 	b.WriteString("\n\n")
 	if m.searching || m.searchBox.Value() != "" {
 		b.WriteString(m.renderFilter(width))
@@ -139,12 +183,17 @@ func (m Model) renderWide() string {
 		m.renderWorkListWide(&b, width)
 		b.WriteString("\n")
 	}
+	if r, ok := m.selectedWork(); ok {
+		panelWidth := max(1, width-2)
+		contentWidth := max(8, panelWidth-2)
+		b.WriteString(selectedCardStyle.Width(panelWidth).Render(renderRailDetailAt(r, contentWidth, m.renderNow())))
+		b.WriteString("\n\n")
+	}
 
 	if m.message != "" {
 		b.WriteString(mutedStyle.Render(truncate(m.message, width)))
 		b.WriteString("\n")
 	}
-	b.WriteString(mutedStyle.Render("/ filter  j/k move  enter preview  a attach  i focus  r refresh  q quit"))
 	return strings.TrimRight(b.String(), "\n")
 }
 
@@ -152,7 +201,7 @@ func (m Model) renderFilter(width int) string {
 	if m.searching {
 		return truncate(m.searchBox.View(), width)
 	}
-	return mutedStyle.Render(truncate(linef("/ %s  (%d/%d)", m.searchBox.Value(), len(m.rows), len(m.allRows)), width))
+	return mutedStyle.Render(truncate(fmt.Sprintf("/ %s  (%d/%d)", m.searchBox.Value(), len(m.rows), len(m.allRows)), width))
 }
 
 func (m Model) renderPreview() string {
@@ -163,174 +212,42 @@ func (m Model) renderPreview() string {
 	return content
 }
 
-func (m Model) previewContent() string {
-	if r, ok := m.selectedWork(); ok {
-		return m.workPreviewContent(r)
+func (m Model) renderHelp() string {
+	width := max(24, m.width)
+	inner := min(48, max(20, width-4))
+	lines := []string{
+		selectedStyle.Render("NAVIGATE"),
+		"j / k, ↑ / ↓   move selection",
+		"enter, n        details / back",
+		"/               filter work",
+		"",
+		selectedStyle.Render("DETAILS"),
+		"j / k, ↑ / ↓   scroll lines",
+		"pgup / pgdn     scroll half page",
+		"ctrl+u / ctrl+d scroll half page",
+		"g / G           top / bottom",
+		"",
+		selectedStyle.Render("ACT"),
+		"a               attach selected",
+		"i               focus attention",
+		"r               refresh now",
+		"",
+		selectedStyle.Render("VIEW"),
+		"v               rail / pets",
+		"l               pet layout",
+		"? / esc         close help",
+		"q               quit",
 	}
-	return mutedStyle.Render("No item selected.")
-}
-
-func renderRailDetail(r row, width int) string {
-	icon, label := displayState(r)
+	var content strings.Builder
+	for i, line := range lines {
+		content.WriteString(truncate(line, inner))
+		if i != len(lines)-1 {
+			content.WriteString("\n")
+		}
+	}
 	var b strings.Builder
-	b.WriteString(stateStyle(label).Render(icon + " " + truncate(label, width-2)))
-	if r.stage != "" {
-		b.WriteString("\n")
-		b.WriteString(mutedStyle.Render("  " + truncate(r.stage, max(1, width-2))))
-	}
-	if r.worker != "" && r.worker != "-" {
-		b.WriteString("\n")
-		b.WriteString(mutedStyle.Render("  " + truncate(r.worker, max(1, width-2))))
-	}
-	if r.tmuxState != "" && r.tmuxState != "-" {
-		b.WriteString("\n")
-		b.WriteString(mutedStyle.Render("  " + truncate("tmux "+r.tmuxState, max(1, width-2))))
-	}
-	if r.attention != "" {
-		b.WriteString("\n")
-		b.WriteString(mutedStyle.Render("  " + truncate("attention "+r.attention, max(1, width-2))))
-	}
-	if r.context.Observed {
-		b.WriteString("\n")
-		b.WriteString("  context " + renderContextPressure(r.context))
-	}
-	if r.next != "" {
-		b.WriteString("\n\n")
-		b.WriteString(sectionStyle.Render(promptLabel(r)))
-		b.WriteString("\n")
-		b.WriteString(wrap(r.next, width))
-	}
-	return b.String()
-}
-
-func promptLabel(r row) string {
-	_, label := displayState(r)
-	if label == "blocked" {
-		return "Blocker"
-	}
-	return "Next"
-}
-
-func renderHistory(rows []historyRow, width, limit int) string {
-	if len(rows) == 0 {
-		return mutedStyle.Render("none")
-	}
-	start := 0
-	if limit > 0 && len(rows) > limit {
-		start = len(rows) - limit
-	}
-	if width < 48 {
-		return renderNarrowHistory(rows[start:], width)
-	}
-	dateW := 10
-	stageW := min(18, max(10, width/5))
-	workerW := min(14, max(8, width/6))
-	resultW := max(8, width-dateW-stageW-workerW-8)
-	var b strings.Builder
-	for i, h := range rows[start:] {
-		at := h.at
-		if len(at) > dateW {
-			at = at[:dateW]
-		}
-		line := linef("%-*s  %-*s  %-*s  %s",
-			dateW, truncate(at, dateW),
-			stageW, truncate(h.stage, stageW),
-			workerW, truncate(h.worker, workerW),
-			truncate(h.result, resultW),
-		)
-		b.WriteString(mutedStyle.Render(line))
-		if i != len(rows[start:])-1 {
-			b.WriteString("\n")
-		}
-	}
-	return b.String()
-}
-
-func renderNarrowHistory(rows []historyRow, width int) string {
-	var b strings.Builder
-	for i, h := range rows {
-		at := h.at
-		if len(at) > 10 {
-			at = at[:10]
-		}
-		meta := strings.TrimSpace(strings.Join([]string{at, h.stage, h.worker}, " "))
-		b.WriteString(mutedStyle.Render(truncate(meta, width)))
-		if h.result != "" {
-			b.WriteString("\n")
-			b.WriteString(wrap(h.result, width))
-		}
-		if i != len(rows)-1 {
-			b.WriteString("\n")
-		}
-	}
-	return b.String()
-}
-
-func (m Model) workPreviewContent(r row) string {
-	icon, label := displayState(r)
-	width := max(20, m.width)
-	bodyW := max(12, width-2)
-
-	var b strings.Builder
-	b.WriteString(titleStyle.Render("ORC"))
+	b.WriteString(watchHeaderStyle.Width(inner + 4).Render(" ORC WATCH · HELP"))
 	b.WriteString("\n\n")
-	b.WriteString(selectedStyle.Render(truncate(r.ticket, bodyW)))
-	b.WriteString("\n")
-	b.WriteString(truncate(r.stage, bodyW))
-	b.WriteString("\n")
-	b.WriteString(mutedStyle.Render(truncate(r.worker, bodyW)))
-	b.WriteString("\n\n")
-	b.WriteString(stateStyle(label).Render(icon + " " + label))
-	if r.tmuxState != "" && r.tmuxState != "-" {
-		b.WriteString("\n")
-		b.WriteString(mutedStyle.Render("tmux " + r.tmuxState))
-	}
-	if r.attention != "" {
-		b.WriteString("\n")
-		b.WriteString(mutedStyle.Render("attention " + r.attention))
-	}
-	if r.context.Observed {
-		b.WriteString("\n")
-		b.WriteString("context " + renderContextPressure(r.context))
-	}
-	if r.loadErr != nil {
-		b.WriteString("\n\n")
-		b.WriteString(blockedStyle.Render("Error"))
-		b.WriteString("\n")
-		b.WriteString(wrap(r.loadErr.Error(), bodyW))
-	} else if r.next != "" {
-		b.WriteString("\n\n")
-		b.WriteString(mutedStyle.Render(promptLabel(r)))
-		b.WriteString("\n")
-		b.WriteString(wrap(r.next, bodyW))
-	}
-	if len(r.history) > 0 {
-		b.WriteString("\n\n")
-		b.WriteString(sectionStyle.Render("History"))
-		b.WriteString("\n")
-		b.WriteString(renderHistory(r.history, bodyW, 8))
-	}
-	b.WriteString("\n\n")
-	b.WriteString(mutedStyle.Render("esc back  q quit"))
+	b.WriteString(selectedCardStyle.Width(inner).Render(content.String()))
 	return b.String()
-}
-
-func wrap(s string, width int) string {
-	width = max(8, width)
-	words := strings.Fields(s)
-	if len(words) == 0 {
-		return ""
-	}
-	var lines []string
-	line := words[0]
-	for _, word := range words[1:] {
-		if len(line)+1+len(word) > width {
-			lines = append(lines, line)
-			line = word
-			continue
-		}
-		line += " " + word
-	}
-	lines = append(lines, line)
-	return strings.Join(lines, "\n")
 }

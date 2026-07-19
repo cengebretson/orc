@@ -107,9 +107,9 @@ Go 1.24.2 or newer. Two optional tools unlock additional features:
 | Tool | Purpose | Install |
 |------|---------|---------|
 | `tmux` | Session management — `orc work` launches and attaches agent sessions | `brew install tmux` |
-| `chafa` | Character-art portraits in `orc tui` (`!` character sheet) on terminals without Kitty graphics support | `brew install chafa` |
+| `chafa` | Character-art portraits in `orc dashboard` (`!` character sheet) on terminals without Kitty graphics support | `brew install chafa` |
 
-**Pixel portraits:** on kitty and Ghostty, `orc tui` renders portraits as true
+**Pixel portraits:** on kitty and Ghostty, `orc dashboard` renders portraits as true
 pixel images natively (Kitty graphics protocol, Unicode placeholders) — no
 extra tools needed. Inside tmux, add this to your `tmux.conf` so the one-time
 image transmission reaches the outer terminal:
@@ -206,7 +206,7 @@ launch command without executing it.
 You can also use the dashboard:
 
 ```bash
-orc tui
+orc dashboard
 ```
 
 ## Example workflow
@@ -291,7 +291,7 @@ When a session is paused (`orc mark <ticket> pause`), the reason is recorded in 
 orc jit STORY-123 --worker default:zach "make sure the auth middleware handles token expiry correctly"
 ```
 
-The agent gets the same orientation prompt as `orc next` (reads `STATE.yaml`, `TICKET.md`, `SPEC.md`), then does the task; output lands in `features/<slug>/jit/<timestamp>/`. `runtime.jit` is written before launch so the task shows up in `orc status` and the TUI:
+The agent gets the same orientation prompt as `orc next` (reads `STATE.yaml`, `TICKET.md`, `SPEC.md`), then does the task; output lands in `features/<slug>/jit/<timestamp>/`. `runtime.jit` is written before launch so the task shows up in `orc status` and the dashboard:
 
 ```
 STORY-123   active   default:standard · default:develop + jit   default:bob
@@ -345,9 +345,15 @@ Or use the Claude Desktop settings UI. Requires a GitHub PAT with `repo` and `pu
 
 ## Gallery
 
-### Dashboard (`orc tui`)
+### Dashboard (`orc dashboard`)
 
-![orc tui — workspace dashboard showing features, workflows, workers, and routes](docs/tui.png)
+![orc dashboard — workspace view showing features, workflows, workers, and repositories](docs/dashboard.png)
+
+The dashboard keeps Live operations and Workspace exploration in one Bubble Tea
+application. `[` opens Live and `]` opens Workspace without discarding selection,
+filters, details, or scroll position. `orc watch` starts in Live and keeps its
+unchanged compact rail in narrow terminals; `orc dashboard` starts in Workspace.
+Press `?` for the shared navigation reference.
 
 ---
 
@@ -403,9 +409,10 @@ Or use the Claude Desktop settings UI. Requires a GitHub PAT with `repo` and `pu
   - A convenience over `tmux attach`: reads the real session name from `STATE.yaml`
     (named after the slug, and overridable), drops you on the *current stage's*
     window, and picks `switch-client` vs `attach-session` so it works whether or
-    not you're already inside tmux. The TUI's `t` key does the same.
+    not you're already inside tmux. The dashboard Workspace section's `t` key does the same.
 - `orc focus` — attach to the highest-priority live session that needs human attention
 - `orc watch [ticket]` — open the compact, attention-aware tmux session rail
+  - `--demo` — preview workflow, attention, context-trend, and completion visuals using read-only synthetic work
   - `/` — filter by ticket, slug, stage, worker, repository, branch, workflow/status, or attention state
   - `i` — jump to the next live `blocked`, `input`, or `review` session
   - `v` — toggle the default rail and animated little-orc pet view
@@ -414,11 +421,12 @@ Or use the Claude Desktop settings UI. Requires a GitHub PAT with `repo` and `pu
   - `--pet-layout column` — start with one pet card per row
   - `--tmux-toggle` — open or close the watch rail beside the current tmux pane
   - `--wide` — render the wider table layout
-- Both watch and TUI display matched provider context pressure using configurable
+- Both Live and Workspace dashboard sections display matched provider context pressure using configurable
   green/yellow/red percentage boundaries; unknown provider limits display `n/a`.
 - `orc archive <ticket>` — archive a completed feature, remove worktrees
 - `orc delete <ticket>` — permanently delete a feature folder (only allowed when status is `done` or `archived`)
-- `orc tui` — open the interactive dashboard; `/` uses the same multi-field filter as `orc watch`
+- `orc dashboard` — open the unified dashboard in Workspace; `[`/`]` switches
+  between Workspace and Live while preserving each section's state
 
 ### Agent commands
 

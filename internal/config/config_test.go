@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/cengebretson/orc/internal/config"
 )
@@ -44,6 +45,7 @@ settings:
   default_workflow: hotfix
   artifact_policy: block
   auto_archive: true
+  workspace_refresh: 15
   context_pressure:
     green: 10
     yellow: 65
@@ -63,6 +65,9 @@ repos: []
 	}
 	if !cfg.Settings.AutoArchive {
 		t.Error("auto_archive = false, want true")
+	}
+	if got := cfg.WorkspaceRefreshInterval(); got != 15*time.Second {
+		t.Errorf("WorkspaceRefreshInterval() = %s, want 15s", got)
 	}
 	if got := cfg.DefaultWorkflow(); got != "hotfix" {
 		t.Errorf("DefaultWorkflow() = %q, want \"hotfix\"", got)
@@ -145,6 +150,19 @@ settings:
 	_, err := config.Load(dir)
 	if err == nil || !strings.Contains(err.Error(), "field artifact_polciy not found") {
 		t.Fatalf("Load error = %v, want unknown field error", err)
+	}
+}
+
+func TestLoad_RejectsRemovedTuiRefresh(t *testing.T) {
+	dir := t.TempDir()
+	writeOrcYAML(t, dir, `
+settings:
+  tui_refresh: 15
+`)
+
+	_, err := config.Load(dir)
+	if err == nil || !strings.Contains(err.Error(), "field tui_refresh not found") {
+		t.Fatalf("Load error = %v, want removed tui_refresh field error", err)
 	}
 }
 

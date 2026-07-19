@@ -16,7 +16,7 @@ settings:
   auto_archive: false
   auto_tmux: false
   auto_next: false
-  tui_refresh: 60
+  workspace_refresh: 60
   theme: catppuccin-mocha
   context_pressure:
     green: 0
@@ -80,10 +80,10 @@ a repository.
 | `auto_archive` | No | Archives tickets automatically after the last stage completes. |
 | `auto_tmux` | No | Uses tmux for new ticket launches by default. Same intent as `orc work --tmux`. |
 | `auto_next` | No | Launches the first stage immediately after `orc work`. Same intent as `orc work --next`. |
-| `tui_refresh` | No | TUI refresh interval in seconds. Defaults to 60 when unset or zero. |
-| `theme` | No | TUI color theme. Defaults to `catppuccin-mocha`. |
-| `quotes` | No | Optional TUI status quotes. |
-| `context_pressure` | No | Green, yellow, and red percentage boundaries for live provider context usage in `orc watch` and `orc tui`. Defaults to `0`, `70`, and `90`; values must satisfy `0 <= green < yellow < red <= 100`. |
+| `workspace_refresh` | No | Workspace dashboard refresh interval in seconds. Defaults to 60 when unset or zero. |
+| `theme` | No | Dashboard color theme. Defaults to `catppuccin-mocha`. |
+| `quotes` | No | Optional dashboard status quotes. |
+| `context_pressure` | No | Green, yellow, and red percentage boundaries for live provider context usage in `orc watch` and `orc dashboard`. Defaults to `0`, `70`, and `90`; values must satisfy `0 <= green < yellow < red <= 100`. |
 
 ## Repos
 
@@ -113,7 +113,7 @@ Each workflow supports:
 
 | Field | Required | Meaning |
 |-------|----------|---------|
-| `description` | No | One-line summary of what the workflow is for. Shown in the TUI workflow detail. Packs set this so a pack's description survives install. |
+| `description` | No | One-line summary of what the workflow is for. Shown in the dashboard workflow detail. Packs set this so a pack's description survives install. |
 | `stages` | Yes | Ordered list of stages (below). |
 
 Each workflow stage supports:
