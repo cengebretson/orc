@@ -6,6 +6,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added `make release-check`, a deterministic fresh-workspace smoke test that
+  validates agent setup output, repository configuration, first-ticket doctor,
+  lifecycle transitions, archive behavior, and both initialization variants;
+  CI now runs it on every push and pull request.
+
+### Fixed
+
+- Included the generated `.gitignore` in the shared atomic workspace mutation
+  plan so initialization counts it, reports write failures, and rolls it back
+  consistently with every other scaffold file.
+
 ## [0.15.0] - 2026-07-19
 
 ### Changed

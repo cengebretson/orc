@@ -1,4 +1,4 @@
-.PHONY: build install clean test lint tidy fmt check
+.PHONY: build install clean test lint tidy fmt check release-check
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS = -ldflags "-X main.version=$(VERSION)"
@@ -31,3 +31,6 @@ fmt:
 	gofmt -l -w ./cmd ./internal
 
 check: lint test
+
+release-check: build
+	ORC_BIN="$(CURDIR)/orc" ./scripts/release-check

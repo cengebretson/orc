@@ -1,0 +1,156 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+project_root="$(cd "$script_dir/.." && pwd)"
+orc_bin="${ORC_BIN:-$project_root/orc}"
+tmp_base="${TMPDIR:-/tmp}"
+qa_root="$(mktemp -d "${tmp_base%/}/orc-release-check.XXXXXX")"
+
+cleanup() {
+	rm -rf "$qa_root"
+}
+trap cleanup EXIT
+
+fail() {
+	printf 'release-check: %s\n' "$*" >&2
+	exit 1
+}
+
+step() {
+	printf '→ %s\n' "$*"
+}
+
+require_contains() {
+	local path="$1"
+	local pattern="$2"
+	local description="$3"
+	if ! grep -Eq "$pattern" "$path"; then
+		printf '%s\n' "----- $path -----" >&2
+		sed -n '1,200p' "$path" >&2
+		fail "$description"
+	fi
+}
+
+run_expect_failure() {
+	local output="$1"
+	shift
+	if "$@" >"$output" 2>&1; then
+		printf '%s\n' "----- $output -----" >&2
+		sed -n '1,200p' "$output" >&2
+		fail "command unexpectedly succeeded: $*"
+	fi
+}
+
+if [[ ! -x "$orc_bin" ]]; then
+	fail "candidate binary is not executable: $orc_bin"
+fi
+
+workspace="$qa_root/workspace"
+repo="$qa_root/project"
+skip_workspace="$qa_root/skip-default-pack"
+tool_bin="$qa_root/bin"
+mkdir -p "$repo"
+git init -q -b main "$repo"
+printf '# Release check repository\n' >"$repo/README.md"
+git -C "$repo" add README.md
+git -C "$repo" -c user.name=orc-release-check -c user.email=orc-release-check@example.invalid \
+	commit -q -m "initial fixture"
+
+mkdir -p "$tool_bin"
+for tool in tmux claude codex; do
+	printf '#!/usr/bin/env bash\nexit 0\n' >"$tool_bin/$tool"
+	chmod +x "$tool_bin/$tool"
+done
+export PATH="$tool_bin:$PATH"
+
+step "initialize a default workspace"
+init_output="$qa_root/init.out"
+"$orc_bin" --workspace "$workspace" init --force >"$init_output"
+require_contains "$init_output" 'Done\. 40 created, 0 updated, 0 skipped\.' \
+	"default init did not report exactly 40 created files"
+[[ -f "$workspace/SETUP.md" ]] || fail "default init did not create SETUP.md"
+
+step "apply the deterministic post-agent setup contract"
+sed \
+	-e 's/^shared: pending$/shared: complete/' \
+	-e 's/^claude: pending$/claude: complete/' \
+	-e 's/^codex:  pending$/codex:  complete/' \
+	"$workspace/SETUP.md" >"$workspace/SETUP.md.next"
+mv "$workspace/SETUP.md.next" "$workspace/SETUP.md"
+
+sed \
+	-e 's/name: my-app/name: release-check/' \
+	-e "s#path: /absolute/path/to/my-app#path: $repo#" \
+	-e 's/purpose: Application code, APIs, tests/purpose: Disposable release-check repository/' \
+	"$workspace/orc.yaml" >"$workspace/orc.yaml.next"
+mv "$workspace/orc.yaml.next" "$workspace/orc.yaml"
+
+require_contains "$workspace/SETUP.md" '^shared: complete$' "shared setup status is incomplete"
+require_contains "$workspace/SETUP.md" '^claude: complete$' "Claude setup status is incomplete"
+require_contains "$workspace/SETUP.md" '^codex:  complete$' "Codex setup status is incomplete"
+if grep -q '/absolute/path/to/my-app' "$workspace/orc.yaml"; then
+	fail "orc.yaml still contains the repository placeholder"
+fi
+
+step "validate workspace configuration and pack resolution"
+"$orc_bin" --workspace "$workspace" doctor >"$qa_root/doctor-workspace.out"
+"$orc_bin" --workspace "$workspace" pack list >"$qa_root/pack-list.out"
+require_contains "$qa_root/pack-list.out" 'default' "default pack is not visible after setup"
+
+step "create and validate the first ticket"
+"$orc_bin" --workspace "$workspace" work ORC-QA-1 --slug release-smoke >"$qa_root/work.out"
+"$orc_bin" --workspace "$workspace" doctor ORC-QA-1 >"$qa_root/doctor-ticket.out"
+require_contains "$qa_root/doctor-ticket.out" 'STATE\.yaml\.next_action\.worker[[:space:]]+default:fred' \
+	"ticket doctor did not validate the configured first-stage worker"
+require_contains "$qa_root/doctor-ticket.out" 'All checks passed\.' \
+	"ticket doctor did not pass for a fresh feature"
+
+run_expect_failure "$qa_root/artifacts.out" \
+	"$orc_bin" --workspace "$workspace" artifacts ORC-QA-1 --all
+require_contains "$qa_root/artifacts.out" 'unchanged from template|missing' \
+	"artifact validation failed for an unexpected reason"
+
+"$orc_bin" --workspace "$workspace" next ORC-QA-1 --dry >"$qa_root/next-dry.out"
+require_contains "$qa_root/next-dry.out" '^Would run:$' "next --dry did not print a launch plan"
+
+step "exercise pause, resume, completion, and archive"
+"$orc_bin" --workspace "$workspace" mark ORC-QA-1 start >"$qa_root/mark-start.out"
+"$orc_bin" --workspace "$workspace" status ORC-QA-1 --json >"$qa_root/status-active.json"
+require_contains "$qa_root/status-active.json" '"Status"[[:space:]]*:[[:space:]]*"active"' \
+	"status JSON did not record the active transition"
+
+"$orc_bin" --workspace "$workspace" mark ORC-QA-1 pause "release QA pause" >"$qa_root/mark-pause.out"
+"$orc_bin" --workspace "$workspace" status ORC-QA-1 --json >"$qa_root/status-paused.json"
+require_contains "$qa_root/status-paused.json" '"Status"[[:space:]]*:[[:space:]]*"paused"' \
+	"status JSON did not record the paused transition"
+require_contains "$qa_root/status-paused.json" 'release QA pause' \
+	"status JSON did not retain the pause reason"
+
+"$orc_bin" --workspace "$workspace" mark ORC-QA-1 resume >"$qa_root/mark-resume.out"
+"$orc_bin" --workspace "$workspace" status ORC-QA-1 --json >"$qa_root/status-resumed.json"
+require_contains "$qa_root/status-resumed.json" '"Status"[[:space:]]*:[[:space:]]*"active"' \
+	"status JSON did not record the resume transition"
+
+"$orc_bin" --workspace "$workspace" mark ORC-QA-1 "done" --result "release QA complete" >"$qa_root/mark-done.out"
+"$orc_bin" --workspace "$workspace" archive ORC-QA-1 >"$qa_root/archive.out"
+[[ -d "$workspace/features/_archive/ORC-QA-1-release-smoke" ]] || \
+	fail "archive did not move the completed feature under features/_archive"
+[[ ! -d "$workspace/features/ORC-QA-1-release-smoke" ]] || \
+	fail "archive left the active feature directory behind"
+
+step "initialize without the default pack"
+skip_output="$qa_root/init-skip.out"
+"$orc_bin" --workspace "$skip_workspace" init --force --skip-default-pack >"$skip_output"
+require_contains "$skip_output" 'Done\. 15 created, 0 updated, 0 skipped\.' \
+	"skip-default-pack init did not report exactly 15 created files"
+[[ -f "$skip_workspace/SETUP.md" ]] || fail "skip-default-pack init did not create SETUP.md"
+for path in packs/default stages/default workers/default; do
+	[[ ! -e "$skip_workspace/$path" ]] || \
+		fail "skip-default-pack init unexpectedly created $path"
+done
+if grep -q 'default:standard' "$skip_workspace/orc.yaml"; then
+	fail "skip-default-pack init unexpectedly configured the default workflow"
+fi
+
+printf '✓ release-check passed\n'

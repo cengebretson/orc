@@ -17,3 +17,4 @@ jobs:
         with:
           version: v2.12.2
       - run: make test
+      - run: make release-check

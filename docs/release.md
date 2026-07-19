@@ -55,57 +55,41 @@ go test -count=1 ./internal/workspace/... \
 
 ## 2. Fresh-workspace core QA
 
-Build the candidate first, then keep its absolute path while testing outside the
-repository:
+Run the deterministic, noninteractive release smoke test:
 
 ```sh
-ORC_BIN="$(pwd)/orc"
-QA_ROOT="$(mktemp -d /private/tmp/orc-release-qa.XXXXXX)"
-
-"$ORC_BIN" --workspace "$QA_ROOT" init --force
+make release-check
 ```
 
-Verify the scaffold reports 40 created files and includes `SETUP.md`. In the
-new workspace, let an agent follow the same setup path users receive:
+The target builds the candidate, creates disposable workspaces and a disposable
+Git repository under the system temporary directory, and verifies:
 
-```sh
-cd "$QA_ROOT"
-codex "Read SETUP.md and perform the workspace setup"
-# or: claude "Read SETUP.md and perform the workspace setup"
-```
-
-Point setup at a disposable Git repository, then return to the Orc checkout or
-use `$ORC_BIN` for every command:
-
-```sh
-"$ORC_BIN" --workspace "$QA_ROOT" doctor
-"$ORC_BIN" --workspace "$QA_ROOT" work ORC-QA-1 --slug release-smoke
-"$ORC_BIN" --workspace "$QA_ROOT" doctor ORC-QA-1
-"$ORC_BIN" --workspace "$QA_ROOT" next ORC-QA-1 --dry
-"$ORC_BIN" --workspace "$QA_ROOT" artifacts ORC-QA-1 --all
-
-"$ORC_BIN" --workspace "$QA_ROOT" mark ORC-QA-1 start
-"$ORC_BIN" --workspace "$QA_ROOT" mark ORC-QA-1 pause "release QA pause"
-"$ORC_BIN" --workspace "$QA_ROOT" mark ORC-QA-1 resume
-"$ORC_BIN" --workspace "$QA_ROOT" status ORC-QA-1 --json
-"$ORC_BIN" --workspace "$QA_ROOT" mark ORC-QA-1 done --result "release QA complete"
-"$ORC_BIN" --workspace "$QA_ROOT" archive ORC-QA-1
-```
-
-Confirm:
-
-- Workspace `doctor` reports a valid config, workers, workflows, repository, and
-  tools after agent-driven setup.
-- The initial ticket `doctor` and `artifacts --all` report missing, empty, or
-  unchanged scaffold artifacts and exit nonzero; this confirms incomplete
-  templates cannot masquerade as finished work.
+- Default initialization reports exactly 40 created files and includes
+  `SETUP.md`.
+- The deterministic post-agent setup contract produces a valid repository,
+  workflow, worker, and tool configuration.
+- Workspace and initial-ticket `doctor` checks pass, including the configured
+  first-stage worker in `STATE.yaml.next_action.worker`.
+- `artifacts --all` reports unchanged or missing scaffold artifacts and exits
+  nonzero, so incomplete templates cannot masquerade as finished work.
 - `next --dry` prints an argv-based launch plan without starting a provider.
 - Pause records the human-readable blocker; resume clears it.
 - JSON status remains valid after every transition.
 - Archive moves the completed feature under `features/_archive/`.
+- `--skip-default-pack` reports exactly 15 created files, retains `SETUP.md`,
+  and does not install the default workflow.
 
-Repeat `init` once with `--skip-default-pack`; it should report 15 created files,
-retain the agent-driven `SETUP.md`, and leave pack/workflow selection to setup.
+The target intentionally does not launch Claude or Codex. When `SETUP.md`,
+`AGENTS.md`, `RULES.md`, `TOOLS.md`, or the setup flow changes materially,
+also perform the user-facing agent check:
+
+```sh
+QA_ROOT="$(mktemp -d /private/tmp/orc-release-qa.XXXXXX)"
+./orc --workspace "$QA_ROOT" init --force
+cd "$QA_ROOT"
+codex "Read SETUP.md and perform the workspace setup"
+# or: claude "Read SETUP.md and perform the workspace setup"
+```
 
 ## 3. Live session QA
 
