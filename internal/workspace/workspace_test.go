@@ -186,6 +186,29 @@ func TestInit_ForceOverwrites(t *testing.T) {
 	}
 }
 
+func TestInit_ForceDryRunReportsUpdatesWithoutWriting(t *testing.T) {
+	dir := t.TempDir()
+	if err := workspace.Init(workspace.InitOptions{Root: dir}); err != nil {
+		t.Fatalf("first Init: %v", err)
+	}
+	agentsPath := filepath.Join(dir, "AGENTS.md")
+	if err := os.WriteFile(agentsPath, []byte("custom"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := workspace.Init(workspace.InitOptions{Root: dir, Force: true, DryRun: true}); err != nil {
+			t.Fatalf("forced dry-run: %v", err)
+		}
+	})
+	if !strings.Contains(out, "update AGENTS.md") {
+		t.Fatalf("forced dry-run did not report update:\n%s", out)
+	}
+	if got, err := os.ReadFile(agentsPath); err != nil || string(got) != "custom" {
+		t.Fatalf("forced dry-run changed AGENTS.md: %q, %v", got, err)
+	}
+}
+
 func TestInit_DefaultPackInstallsWorkers(t *testing.T) {
 	dir := t.TempDir()
 

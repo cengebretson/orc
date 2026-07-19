@@ -37,11 +37,6 @@ type PackInfo struct {
 	Engines     []string `yaml:"engines"`
 }
 
-type fileEntry struct {
-	dest    string
-	content string
-}
-
 type packInstallInfo struct {
 	SourceType  string `yaml:"source_type"`
 	SourceRef   string `yaml:"source_ref"`
@@ -58,12 +53,20 @@ func Init(opts InitOptions) error {
 	if err != nil {
 		return err
 	}
-
-	if opts.DryRun {
-		return printDryRun(root, entries)
+	policy := skipExisting
+	if opts.Force {
+		policy = replaceExisting
+	}
+	plan, err := planMutations(root, entries, mutationPlanOptions{existing: policy})
+	if err != nil {
+		return err
 	}
 
-	return writeEntries(root, entries, opts.Force)
+	if opts.DryRun {
+		return printDryRun(plan)
+	}
+
+	return writeEntries(plan, opts.Force)
 }
 
 // loadPack reads and parses a pack's pack.yaml.
@@ -491,12 +494,12 @@ func setDefaultWorkflow(s, wf string) string {
 	return strings.Join(lines, "\n")
 }
 
-func printDryRun(root string, entries []fileEntry) error {
-	fmt.Printf("Dry run — workspace root: %s\n\n", root)
+func printDryRun(plan mutationPlan) error {
+	fmt.Printf("Dry run — workspace root: %s\n\n", plan.root)
 
 	dirs := map[string]bool{}
-	for _, e := range entries {
-		dir := filepath.Dir(e.dest)
+	for _, file := range plan.files {
+		dir := filepath.Dir(file.entry.dest)
 		if dir != "." {
 			dirs[dir] = true
 		}
@@ -509,61 +512,44 @@ func printDryRun(root string, entries []fileEntry) error {
 
 	fmt.Println()
 
-	for _, e := range entries {
-		dest := filepath.Join(root, e.dest)
-		if _, err := os.Stat(dest); err == nil {
-			fmt.Printf("  skip   %s (already exists)\n", e.dest)
-		} else {
-			fmt.Printf("  create %s\n", e.dest)
+	for _, file := range plan.files {
+		suffix := ""
+		if file.action == skipFile {
+			suffix = " (already exists)"
 		}
+		fmt.Printf("  %-6s %s%s\n", file.action.String(), file.entry.dest, suffix)
 	}
 
-	printSetupNextSteps(root, true)
+	printSetupNextSteps(plan.root, true)
 
 	return nil
 }
 
-func writeEntries(root string, entries []fileEntry, force bool) error {
-	created := 0
-	skipped := 0
-
-	for _, e := range entries {
-		dest := filepath.Join(root, e.dest)
-
-		if _, err := os.Stat(dest); err == nil && !force {
-			fmt.Printf("  skip   %s\n", e.dest)
-			skipped++
-			continue
-		}
-
-		if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
-			return fmt.Errorf("creating directory for %s: %w", e.dest, err)
-		}
-
-		if err := os.WriteFile(dest, []byte(e.content), 0644); err != nil {
-			return fmt.Errorf("writing %s: %w", e.dest, err)
-		}
-
-		fmt.Printf("  create %s\n", e.dest)
-		created++
+func writeEntries(plan mutationPlan, force bool) error {
+	result, err := plan.Apply()
+	if err != nil {
+		return err
+	}
+	for _, file := range plan.files {
+		fmt.Printf("  %-6s %s\n", file.action.String(), file.entry.dest)
 	}
 
 	// always create empty dirs that hold runtime artifacts
 	runtimeDirs := []string{"worktrees", "projects", "features"}
 	for _, dir := range runtimeDirs {
-		path := filepath.Join(root, dir)
+		path := filepath.Join(plan.root, dir)
 		if err := os.MkdirAll(path, 0755); err != nil {
 			return fmt.Errorf("creating %s: %w", dir, err)
 		}
 	}
 
-	writeGitignore(root, force)
+	writeGitignore(plan.root, force)
 
-	fmt.Printf("\nDone. %d created, %d skipped.\n", created, skipped)
-	if skipped > 0 {
+	fmt.Printf("\nDone. %d created, %d updated, %d skipped.\n", result.created, result.updated, result.skipped)
+	if result.skipped > 0 {
 		fmt.Println("Use --force to overwrite existing files.")
 	}
-	printSetupNextSteps(root, false)
+	printSetupNextSteps(plan.root, false)
 
 	return nil
 }

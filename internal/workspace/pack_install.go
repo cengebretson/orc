@@ -471,71 +471,22 @@ func runtimeEntriesForManifest(manifest PackManifestV1) []string {
 }
 
 func writePackInstallEntries(root string, entries []fileEntry) error {
-	for _, e := range entries {
-		dest := filepath.Join(root, e.dest)
-		if e.dest == config.Filename {
-			continue
-		}
-		if _, err := os.Stat(dest); err == nil {
-			return fmt.Errorf("install would overwrite existing file %s", e.dest)
-		} else if err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("checking %s: %w", e.dest, err)
-		}
-	}
-
-	var created []string
-	for _, e := range entries {
-		dest := filepath.Join(root, e.dest)
-		if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
-			rollbackPackInstall(root, created)
-			return fmt.Errorf("creating directory for %s: %w", e.dest, err)
-		}
-		if e.dest == config.Filename {
-			if err := writeFileAtomic(dest, []byte(e.content), 0o644); err != nil {
-				rollbackPackInstall(root, created)
-				return fmt.Errorf("writing %s: %w", e.dest, err)
-			}
-			fmt.Printf("  update %s\n", e.dest)
-			continue
-		}
-		if err := os.WriteFile(dest, []byte(e.content), 0o644); err != nil {
-			rollbackPackInstall(root, created)
-			return fmt.Errorf("writing %s: %w", e.dest, err)
-		}
-		created = append(created, e.dest)
-		fmt.Printf("  create %s\n", e.dest)
-	}
-	fmt.Printf("\nPack installed. %d files updated.\n", len(entries))
-	return nil
-}
-
-func writeFileAtomic(dest string, data []byte, perm os.FileMode) error {
-	tmp, err := os.CreateTemp(filepath.Dir(dest), "."+filepath.Base(dest)+".tmp-*")
+	plan, err := planMutations(root, entries, mutationPlanOptions{
+		existing:     rejectExisting,
+		allowUpdates: map[string]bool{config.Filename: true},
+	})
 	if err != nil {
 		return err
 	}
-	tmpName := tmp.Name()
-	defer func() {
-		_ = os.Remove(tmpName)
-	}()
-	if _, err := tmp.Write(data); err != nil {
-		_ = tmp.Close()
+	result, err := plan.Apply()
+	if err != nil {
 		return err
 	}
-	if err := tmp.Chmod(perm); err != nil {
-		_ = tmp.Close()
-		return err
+	for _, file := range plan.files {
+		fmt.Printf("  %-6s %s\n", file.action.String(), file.entry.dest)
 	}
-	if err := tmp.Close(); err != nil {
-		return err
-	}
-	return os.Rename(tmpName, dest)
-}
-
-func rollbackPackInstall(root string, created []string) {
-	for i := len(created) - 1; i >= 0; i-- {
-		_ = os.Remove(filepath.Join(root, created[i]))
-	}
+	fmt.Printf("\nPack installed. %d created, %d updated.\n", result.created, result.updated)
+	return nil
 }
 
 func joinLines(lines []string) string {
