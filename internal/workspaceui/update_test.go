@@ -309,6 +309,40 @@ func TestHandleKeyWorkerFileViewer(t *testing.T) {
 	}
 }
 
+// TestOperationalBannerAppearsOnTicketDetailAndFileDrillIn covers the two
+// scrollable views that don't go through a destination's own direct header:
+// the ticket detail page (opened from a feature row) and a plain file
+// viewer drilled into from a section list. Both should still pin the shared
+// banner above their scrollable content, matching every other embedded view.
+func TestOperationalBannerAppearsOnTicketDetailAndFileDrillIn(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "bob.md")
+	if err := os.WriteFile(path, []byte("---\nid: bob\nname: Bob\nengine: claude\n---\n\nbody"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	m := testModel(t)
+	m.embedded = true
+	m.data.allWorkers = []*workers.Worker{{ID: "bob", Name: "Bob", Engine: "claude", FilePath: path}}
+	m.navigation.items[sectionWorkers] = []sectionItem{{label: "Bob", id: "bob", path: path}}
+
+	m, _ = press(t, m, "enter")
+	if m.view != viewDetail {
+		t.Fatalf("enter on a feature row should open viewDetail, got %v", m.view)
+	}
+	if out := ansi.Strip(m.View()); !strings.Contains(out, "3 FEATURES") || !strings.Contains(out, "STORY-1-some-feature") {
+		t.Fatalf("ticket detail missing pinned banner or title:\n%s", out)
+	}
+	m, _ = press(t, m, "esc")
+
+	m, _ = press(t, m, "shift+tab", "enter")
+	if m.view != viewFile {
+		t.Fatalf("view = %v, want viewFile", m.view)
+	}
+	if out := ansi.Strip(m.View()); !strings.Contains(out, "3 FEATURES") {
+		t.Fatalf("file drill-in missing pinned banner:\n%s", out)
+	}
+}
+
 func TestWorkersDestinationSelectsInlineDetailsAndKeepsCharacterSheet(t *testing.T) {
 	dir := t.TempDir()
 	bobPath := filepath.Join(dir, "bob.md")

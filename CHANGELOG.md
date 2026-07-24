@@ -13,6 +13,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- The ticket detail page and any drilled-into file viewer (a stage file, a
+  worker opened from its section list, a ticket's linked document) now pin
+  the shared operational banner above their scrollable content too, so it
+  stays visible while scrolling instead of scrolling away with the rest of
+  the page — consistent with every other Workspace view.
+
 - Workflows now opens directly into its route chain and stage table, filling
   the terminal height with the shared operational banner pinned above it,
   matching Health, Workers, and Repositories instead of landing on a sparse

@@ -157,10 +157,13 @@ func (m Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					feature: row,
 					files:   buildFileList(row.featureDir, row.s),
 				}
-				m.viewer.viewport = viewport.New(m.width-4, m.height-6)
+				// Set view before measuring height: viewerHeight consults
+				// m.view (via directDestinationHeader) to size the viewport
+				// around the pinned banner+title header above it.
+				m.view = viewDetail
+				m.viewer.viewport = viewport.New(max(1, m.width-4), m.viewerHeight())
 				m.viewer.viewport.SetContent(m.renderDetailBody())
 				m.detail.scroll = 0
-				m.view = viewDetail
 			}
 		}
 	}
@@ -309,16 +312,17 @@ func (m *Model) openSectionItem() {
 
 // enterWorkflowDetail opens the full-height route chain and stage table for
 // the named workflow at the given stage cursor, scrolling the selected stage
-// into view. returnView is viewDashboard when drilling in from the section
-// list ("back" returns to the list) or the self-referential viewWorkflowDetail
-// when opened directly from the tab bar (marks it as having no drill-in
-// parent, so the shared banner renders the same as the other destinations).
+// into view. returnView only affects "back": viewDashboard when drilling in
+// from the section list returns there, while the self-referential
+// viewWorkflowDetail used when opened directly from the tab bar means there
+// is no drill-in parent to return to. Both cases render the same pinned
+// header.
 func (m *Model) enterWorkflowDetail(name string, cursor int, returnView viewState) {
 	m.navigation.workflowName = name
 	m.navigation.workflowCursor = cursor
-	// Set view/returnView before measuring height: viewerHeight consults
-	// isDirectWorkflow, which reads both, to size the viewport around the
-	// pinned banner+title header instead of overflowing past it.
+	// Set view before measuring height: viewerHeight consults m.view (via
+	// directDestinationHeader) to size the viewport around the pinned
+	// banner+title header instead of overflowing past it.
 	m.view = viewWorkflowDetail
 	m.viewer = viewerState{returnView: returnView}
 	width, height := max(1, m.width-4), m.viewerHeight()

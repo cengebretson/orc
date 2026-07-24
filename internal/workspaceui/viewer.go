@@ -10,17 +10,15 @@ import (
 )
 
 func (m *Model) openViewer(render func(width int) string, title, context string, returnView viewState) {
-	viewerWidth := max(1, m.width-4)
-	view := viewport.New(viewerWidth, max(1, m.height-6))
-	view.SetContent(render(viewerWidth))
-	m.viewer = viewerState{
-		viewport:   view,
-		title:      title,
-		context:    context,
-		returnView: returnView,
-		render:     render,
-	}
+	// Set view/viewer state before measuring height: viewerHeight consults it
+	// (via directDestinationHeader) to size the viewport around whatever
+	// pinned header applies, instead of overflowing past it.
 	m.view = viewFile
+	m.viewer = viewerState{title: title, context: context, returnView: returnView, render: render}
+	viewerWidth := max(1, m.width-4)
+	view := viewport.New(viewerWidth, m.viewerHeight())
+	view.SetContent(render(viewerWidth))
+	m.viewer.viewport = view
 }
 
 func (m *Model) openHealthReport(returnView viewState) {
@@ -85,12 +83,14 @@ func (m Model) isDirectWorkers() bool {
 	return m.embedded && m.viewer.kind == viewerWorker && m.viewer.returnView == viewFile
 }
 
-// isDirectWorkflow reports whether the workflow detail view was opened
-// straight from the tab bar rather than drilled into from the section list.
-func (m Model) isDirectWorkflow() bool {
-	return m.embedded && m.view == viewWorkflowDetail && m.viewer.returnView == viewWorkflowDetail
-}
-
+// directDestinationHeader returns the pinned banner (and any destination-
+// specific summary) shown above the scrollable viewport for the current
+// view, or "" when none applies (non-embedded mode, or a view with no
+// pinned header). The four isDirectX cases below cover Health, Repositories,
+// and Workers opened straight from the tab bar, each with its own summary
+// box; the remaining cases cover every other embedded scrollable page —
+// Workflows (direct or drilled-in), the ticket detail page, and the generic
+// file/report viewer — with the shared banner above their existing title.
 func (m Model) directDestinationHeader() string {
 	switch {
 	case m.isDirectHealth():
@@ -99,8 +99,12 @@ func (m Model) directDestinationHeader() string {
 		return m.directRepositoryHeader()
 	case m.isDirectWorkers():
 		return m.directWorkerHeader()
-	case m.isDirectWorkflow():
+	case m.embedded && m.view == viewWorkflowDetail:
 		return m.directWorkflowHeader()
+	case m.embedded && m.view == viewDetail:
+		return m.detailPinnedHeader()
+	case m.embedded && m.view == viewFile:
+		return m.genericFileHeader()
 	default:
 		return ""
 	}
@@ -125,15 +129,40 @@ func (m Model) directWorkerHeader() string {
 }
 
 // directWorkflowHeader renders the pinned banner and workflow title shown
-// above the route chain when the Workflows tab is opened directly. Building
-// it here (rather than inline in viewWorkflowDetailPage) lets viewerHeight
-// measure its exact line count so the viewport underneath is never over- or
-// under-sized.
+// above the route chain, whether the Workflows tab was opened directly or
+// drilled into from the section list — both cases show the same title, so
+// there's no need to distinguish them here. Building it here (rather than
+// inline in viewWorkflowDetailPage) lets viewerHeight measure its exact line
+// count so the viewport underneath is never over- or under-sized.
 func (m Model) directWorkflowHeader() string {
 	outerW := max(4, m.width-2)
 	title := styleDetailTitle.Render(" Workflows") +
 		styleDim.Render(" · ") +
 		styleSubtext.Render(workflowDisplayWithID(m.navigation.workflowName, m.data.workflows)) +
+		styleDim.Render(fmt.Sprintf("  ·  %.0f%% ", m.viewer.viewport.ScrollPercent()*100))
+	return "\n" + m.operationalBanner(outerW) + "\n" + drawBox(title, nil, outerW) + "\n"
+}
+
+// detailPinnedHeader renders the shared banner and ticket title shown above
+// the scrollable ticket detail body (State, Repos, Timing, History, Files).
+func (m Model) detailPinnedHeader() string {
+	if m.detail.feature == nil {
+		return ""
+	}
+	outerW := max(4, m.width-2)
+	title := styleDetailTitle.Render(" " + m.detail.feature.s.Slug + " ")
+	return "\n" + m.operationalBanner(outerW) + "\n" + drawBox(title, nil, outerW) + "\n"
+}
+
+// genericFileHeader renders the shared banner above a plain file or report
+// viewer opened by drilling into a section item — a stage file, a ticket's
+// linked document, a broken feature's state file — as opposed to the
+// destination-specific direct headers above.
+func (m Model) genericFileHeader() string {
+	outerW := max(4, m.width-2)
+	title := styleDetailTitle.Render(" "+m.viewer.context) +
+		styleDim.Render(" · ") +
+		styleSubtext.Render(m.viewer.title) +
 		styleDim.Render(fmt.Sprintf("  ·  %.0f%% ", m.viewer.viewport.ScrollPercent()*100))
 	return "\n" + m.operationalBanner(outerW) + "\n" + drawBox(title, nil, outerW) + "\n"
 }

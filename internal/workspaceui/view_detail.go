@@ -22,6 +22,9 @@ func (m Model) viewDetail() string {
 	if m.detail.feature == nil {
 		return ""
 	}
+	if header := m.directDestinationHeader(); header != "" {
+		return header + m.viewer.viewport.View()
+	}
 	outerW := max(4, m.width-2)
 	var b strings.Builder
 	b.WriteString("\n" + drawBox(styleDetailTitle.Render(" "+m.detail.feature.s.Slug+" "), nil, outerW) + "\n")
