@@ -1,8 +1,8 @@
 # orc watch spec
 
-`orc watch` is the Live entry point to Orc's shared dashboard. It is meant to
-run as a compact tmux-side rail in a narrow split and gains Live/Workspace
-section navigation when rendered wide.
+`orc watch` is Orc's dedicated Live entry point. It is meant to run as a compact
+tmux-side rail in a narrow split and uses its richer table layout when rendered
+wide; workspace exploration lives in `orc dashboard`.
 
 ## Goals
 
@@ -10,8 +10,8 @@ section navigation when rendered wide.
 - Let a user quickly select a ticket and act on its prompt.
 - Keep `STATE.yaml` as the durable source of truth.
 - Optionally consume `tmux-attention` as a transient backup signal.
-- Keep Workspace as the broad configuration, health, and detail browser within
-  the shared dashboard application.
+- Keep the dashboard's Features tab as the durable work browser while sharing
+  Live session state, attention, tmux, and context telemetry.
 
 ## Non-goals
 
@@ -59,12 +59,11 @@ green/yellow/red context pressure and trends; workflow progress; attention;
 history; and the completion treatment. Attach and focus are disabled in demo
 mode. Demo mode does not require an initialized workspace.
 
-At 56 columns and wider, watch runs inside the shared dashboard shell. `[` opens
-Live and `]` opens Workspace; switching preserves each section's selection,
-filter, drill-in, and scroll state. Below that width, adaptive watch renders the
-Live rail directly with no extra shell chrome. `orc dashboard` uses the same
-application but starts in Workspace. The dashboard navigation replaces the
-former `ORC WATCH` banner in wide layouts.
+At 56 columns and wider, watch uses its wide Live table and selected-work panel.
+Below that width it renders the compact rail. It remains separate from dashboard
+navigation at every width. `orc dashboard` starts in the merged Live tab and
+folds the same operational session cues into its Features table and shared
+banner.
 
 See [Tmux integration](tmux.md) for copyable watch popup and split bindings,
 workspace selection, and syntax verification. Orc never installs those bindings.
@@ -330,9 +329,8 @@ fresh launch does not have a resumable provider identity.
 
 ## Interactions
 
-`orc watch` is the Live section of the shared Bubble Tea dashboard. Narrow
-terminals keep the compact rail without dashboard chrome; wider terminals can
-switch to Workspace with `[` and `]` without losing Live selection or details.
+`orc watch` is the dedicated Live Bubble Tea view. Narrow terminals use the
+compact rail; wider terminals use the richer Live table without dashboard tabs.
 
 Keybindings:
 
@@ -352,7 +350,6 @@ Keybindings:
 | `pgup` / `pgdown`, `ctrl+u` / `ctrl+d` | scroll details by page or half-page |
 | `g` / `G` | jump to the top or bottom of details |
 | `esc` | close details or clear filtering; quit when already at the top level |
-| `[` / `]` | switch between Live and Workspace in the wide dashboard |
 | `q` | quit watch pane |
 | `?` | toggle the compact key help overlay |
 

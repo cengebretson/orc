@@ -150,7 +150,7 @@ func appendConfigChecks(report *Report, root string, lookPath func(string) (stri
 	ctx, errs, err := workspacectx.LoadValidated(root)
 	if err != nil {
 		report.Checks = append(report.Checks, Check{
-			Group:  "config",
+			Group:  "orc.yaml",
 			Name:   "workspace",
 			Status: Fail,
 			Detail: err.Error(),
@@ -158,12 +158,6 @@ func appendConfigChecks(report *Report, root string, lookPath func(string) (stri
 		return
 	}
 	if len(errs) == 0 {
-		report.Checks = append(report.Checks, Check{
-			Group:  "config",
-			Name:   config.Filename,
-			Status: OK,
-			Detail: "valid",
-		})
 		if ctx != nil && ctx.Config != nil {
 			appendRepoReadinessChecks(report, root, ctx.Config, lookPath)
 		}
@@ -171,7 +165,7 @@ func appendConfigChecks(report *Report, root string, lookPath func(string) (stri
 	}
 	for _, err := range errs {
 		report.Checks = append(report.Checks, Check{
-			Group:  "config",
+			Group:  "orc.yaml",
 			Name:   err.Path,
 			Status: Fail,
 			Detail: err.Message,
@@ -196,7 +190,7 @@ func appendRepoReadinessChecks(report *Report, root string, cfg *config.Config, 
 		checkName := "repos." + name + ".worktree_setup"
 		if !worktreesetup.ReferencesWorktreePath(repo.WorktreeSetup) {
 			report.Checks = append(report.Checks, Check{
-				Group:  "config",
+				Group:  "orc.yaml",
 				Name:   checkName,
 				Status: Warning,
 				Detail: "does not include {{worktree_path}}; command may create a worktree outside orc state",
@@ -205,7 +199,7 @@ func appendRepoReadinessChecks(report *Report, root string, cfg *config.Config, 
 		report.Checks = append(report.Checks, worktreeSetupCommandCheck(root, checkName+".command", repo.WorktreeSetup, lookPath))
 		if len(repo.AgentHints) == 0 {
 			report.Checks = append(report.Checks, Check{
-				Group:  "config",
+				Group:  "orc.yaml",
 				Name:   "repos." + name + ".agent_hints",
 				Status: Warning,
 				Detail: "none configured; agents may miss repo-specific setup and test guidance",
@@ -215,7 +209,7 @@ func appendRepoReadinessChecks(report *Report, root string, cfg *config.Config, 
 	if hasWorktreeSetup {
 		if info, err := os.Stat(filepath.Join(root, "worktrees")); err != nil || !info.IsDir() {
 			report.Checks = append(report.Checks, Check{
-				Group:  "config",
+				Group:  "orc.yaml",
 				Name:   "worktrees/",
 				Status: Warning,
 				Detail: "missing; setup commands expect workspace worktrees/ destinations",
@@ -227,10 +221,10 @@ func appendRepoReadinessChecks(report *Report, root string, cfg *config.Config, 
 func worktreeSetupCommandCheck(root, name, setup string, lookPath func(string) (string, error)) Check {
 	command := firstCommandToken(setup)
 	if command == "" {
-		return Check{Group: "config", Name: name, Status: Warning, Detail: "empty setup command"}
+		return Check{Group: "orc.yaml", Name: name, Status: Warning, Detail: "empty setup command"}
 	}
 	if shellBuiltins[command] {
-		return Check{Group: "config", Name: name, Status: OK, Detail: "starts with shell builtin " + command + "; not checked"}
+		return Check{Group: "orc.yaml", Name: name, Status: OK, Detail: "starts with shell builtin " + command + "; not checked"}
 	}
 	if strings.Contains(command, "/") {
 		path := command
@@ -239,20 +233,20 @@ func worktreeSetupCommandCheck(root, name, setup string, lookPath func(string) (
 		}
 		info, err := os.Stat(path)
 		if err != nil {
-			return Check{Group: "config", Name: name, Status: Warning, Detail: "command path not found: " + command}
+			return Check{Group: "orc.yaml", Name: name, Status: Warning, Detail: "command path not found: " + command}
 		}
 		if info.IsDir() {
-			return Check{Group: "config", Name: name, Status: Warning, Detail: "command path is a directory: " + command}
+			return Check{Group: "orc.yaml", Name: name, Status: Warning, Detail: "command path is a directory: " + command}
 		}
 		if info.Mode().Perm()&0o111 == 0 {
-			return Check{Group: "config", Name: name, Status: Warning, Detail: "command is not executable: " + command}
+			return Check{Group: "orc.yaml", Name: name, Status: Warning, Detail: "command is not executable: " + command}
 		}
-		return Check{Group: "config", Name: name, Status: OK, Detail: "command found: " + command}
+		return Check{Group: "orc.yaml", Name: name, Status: OK, Detail: "command found: " + command}
 	}
 	if _, err := lookPath(command); err != nil {
-		return Check{Group: "config", Name: name, Status: Warning, Detail: "command not found in PATH: " + command}
+		return Check{Group: "orc.yaml", Name: name, Status: Warning, Detail: "command not found in PATH: " + command}
 	}
-	return Check{Group: "config", Name: name, Status: OK, Detail: "command found: " + command}
+	return Check{Group: "orc.yaml", Name: name, Status: OK, Detail: "command found: " + command}
 }
 
 // shellBuiltins are command tokens that never resolve via PATH on every
@@ -417,7 +411,7 @@ func appendStateLockChecks(report *Report, root string, fix bool) {
 	err := filepath.WalkDir(featuresDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			report.Checks = append(report.Checks, Check{
-				Group:  "state locks",
+				Group:  "workspace",
 				Name:   filepath.Base(path),
 				Status: Fail,
 				Detail: err.Error(),
@@ -443,7 +437,7 @@ func appendStateLockChecks(report *Report, root string, fix bool) {
 		lock, err := state.InspectLock(featureDir)
 		if err != nil {
 			report.Checks = append(report.Checks, Check{
-				Group:  "state locks",
+				Group:  "workspace",
 				Name:   rel,
 				Status: Fail,
 				Detail: err.Error(),
@@ -475,7 +469,7 @@ func appendStateLockChecks(report *Report, root string, fix bool) {
 			status = OK
 		}
 		report.Checks = append(report.Checks, Check{
-			Group:  "state locks",
+			Group:  "workspace",
 			Name:   rel,
 			Status: status,
 			Detail: detail,
@@ -484,7 +478,7 @@ func appendStateLockChecks(report *Report, root string, fix bool) {
 	})
 	if err != nil {
 		report.Checks = append(report.Checks, Check{
-			Group:  "state locks",
+			Group:  "workspace",
 			Name:   "scan",
 			Status: Fail,
 			Detail: err.Error(),
@@ -493,7 +487,7 @@ func appendStateLockChecks(report *Report, root string, fix bool) {
 	}
 	if !found {
 		report.Checks = append(report.Checks, Check{
-			Group:  "state locks",
+			Group:  "workspace",
 			Name:   state.Filename + ".lock",
 			Status: OK,
 			Detail: "none found",

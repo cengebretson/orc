@@ -14,6 +14,12 @@ func tickEvery(d time.Duration, epoch uint64) tea.Cmd {
 	})
 }
 
+func liveTickEvery(d time.Duration, epoch uint64) tea.Cmd {
+	return tea.Tick(d, func(t time.Time) tea.Msg {
+		return liveTickMsg{at: t, epoch: epoch}
+	})
+}
+
 func attachTmux(session, window string) tea.Cmd {
 	return tea.ExecProcess(
 		newTmuxCmd(session, window),

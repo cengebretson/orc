@@ -10,14 +10,14 @@ import (
 func TestWorkspaceOverviewFor(t *testing.T) {
 	lastRefresh := time.Date(2026, 7, 19, 12, 0, 0, 0, time.UTC)
 	view := workspaceOverviewFor([]*featureRow{
-		{s: &state.State{Status: "active"}},
+		{s: &state.State{Status: "active"}, tmuxLive: true},
 		{s: &state.State{Status: "paused"}},
 		{s: nil},
 	}, lastRefresh, lastRefresh.Add(5*time.Second))
 
-	if view.features != 3 || view.active != 1 || view.paused != 1 || view.broken != 1 {
-		t.Fatalf("counts = features %d, active %d, paused %d, broken %d; want 3, 1, 1, 1",
-			view.features, view.active, view.paused, view.broken)
+	if view.features != 3 || view.running != 1 || view.paused != 1 || view.needs != 1 || view.broken != 1 {
+		t.Fatalf("counts = features %d, running %d, paused %d, needs %d, broken %d; want 3, 1, 1, 1, 1",
+			view.features, view.running, view.paused, view.needs, view.broken)
 	}
 	if view.refreshAge != 5*time.Second {
 		t.Fatalf("refreshAge = %s, want 5s", view.refreshAge)

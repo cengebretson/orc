@@ -10,6 +10,7 @@ import (
 	"github.com/cengebretson/orc/internal/doctor"
 	"github.com/cengebretson/orc/internal/searchmatch"
 	"github.com/cengebretson/orc/internal/state"
+	terminalui "github.com/cengebretson/orc/internal/ui"
 	"github.com/cengebretson/orc/internal/workers"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -51,27 +52,16 @@ type tickMsg struct {
 	at    time.Time
 	epoch uint64
 }
+type liveTickMsg struct {
+	at    time.Time
+	epoch uint64
+}
 type rainbowTickMsg struct{}
 
-const rainbowSteps = 48 // 4 cycles × 12 colors at 80ms each ≈ 3.8s
-
-var rainbowPalette = []string{
-	"#cba6f7", // mauve
-	"#f5c2e7", // pink
-	"#f2cdcd", // flamingo
-	"#f38ba8", // red
-	"#fab387", // peach
-	"#f9e2af", // yellow
-	"#a6e3a1", // green
-	"#94e2d5", // teal
-	"#89dceb", // sky
-	"#74c7ec", // sapphire
-	"#89b4fa", // blue
-	"#b4befe", // lavender
-}
+const rainbowSteps = terminalui.RainbowSteps // 4 cycles × 12 colors ≈ 3.8s
 
 func rainbowTick() tea.Cmd {
-	return tea.Tick(80*time.Millisecond, func(time.Time) tea.Msg { return rainbowTickMsg{} })
+	return tea.Tick(terminalui.RainbowInterval, func(time.Time) tea.Msg { return rainbowTickMsg{} })
 }
 
 type dataMsg struct {
@@ -89,6 +79,12 @@ type dataMsg struct {
 	sectionItems    map[sectionID][]sectionItem
 	refreshInterval time.Duration
 	quotes          []string
+	config          *config.Config
+}
+
+type liveDataMsg struct {
+	err      error
+	features []*featureRow
 }
 
 type routeStep struct {
@@ -207,6 +203,7 @@ type Model struct {
 }
 
 type workspaceData struct {
+	config         *config.Config
 	features       []*featureRow
 	healthItems    []doctor.Check
 	artifactPolicy string
@@ -221,6 +218,7 @@ type workspaceData struct {
 
 type lifecycleState struct {
 	lastRefresh     time.Time
+	lastLiveRefresh time.Time
 	refreshInterval time.Duration
 	inactive        bool
 	epoch           uint64
@@ -228,9 +226,10 @@ type lifecycleState struct {
 }
 
 type navigationState struct {
-	expanded      map[sectionID]bool
-	featureCursor int
-	showArchived  bool
+	expanded       map[sectionID]bool
+	featureCursor  int
+	showArchived   bool
+	sectionCursors map[sectionID]int
 
 	workflowName   string
 	workflowCursor int
@@ -297,9 +296,10 @@ func New(root string) Model {
 			lastRefresh: time.Now(),
 		},
 		navigation: navigationState{
-			pane:     paneFeatures,
-			items:    map[sectionID][]sectionItem{},
-			expanded: defaultSectionExpansion(),
+			pane:           paneFeatures,
+			items:          map[sectionID][]sectionItem{},
+			expanded:       defaultSectionExpansion(),
+			sectionCursors: map[sectionID]int{},
 		},
 		filter: searchState{input: ti},
 	}
@@ -330,21 +330,61 @@ func (m Model) IsActive() bool {
 	return !m.lifecycle.inactive
 }
 
+// HealthIssueCount returns the warnings and failures surfaced by the Health
+// destination so the shared shell can badge its tab.
+func (m Model) HealthIssueCount() int {
+	count := 0
+	for _, item := range m.data.healthItems {
+		if item.Status != doctor.OK {
+			count++
+		}
+	}
+	return count
+}
+
 // CanSwitchSection reports whether the shared dashboard shell can consume a
 // section-switch or help key without stealing text from the ticket filter.
 func (m Model) CanSwitchSection() bool {
 	return !m.filter.active
 }
 
+// SetDestination selects a top-level Workspace view without rebuilding the
+// model, preserving filters, cursors, and loaded data.
+func (m Model) SetDestination(destination Destination) Model {
+	m.view = viewDashboard
+	section := sectionForDestination(destination)
+	if section == sectionNone {
+		m.blurSectionFocus()
+		return m
+	}
+	m.focusSection(section)
+	switch destination {
+	case DestinationHealth:
+		m.openHealthReport(viewFile)
+	case DestinationRepositories:
+		m.openRepositoryReport(viewFile)
+	case DestinationWorkers:
+		m.openWorkerReport(viewFile)
+	}
+	return m
+}
+
 // ── Init ─────────────────────────────────────────────────────────
 
-const defaultRefreshInterval = 60 * time.Second
+const (
+	defaultRefreshInterval     = 60 * time.Second
+	defaultLiveRefreshInterval = 2 * time.Second
+)
 
 func (m Model) Init() tea.Cmd {
 	if m.lifecycle.inactive {
 		return nil
 	}
-	return tea.Batch(loadData(m.root), tickEvery(defaultRefreshInterval, m.lifecycle.epoch))
+	return tea.Batch(
+		loadData(m.root),
+		tickEvery(defaultRefreshInterval, m.lifecycle.epoch),
+		liveTickEvery(defaultLiveRefreshInterval, m.lifecycle.epoch),
+	)
 }
 
 // ── section navigation ─────────────────────────────────────────────

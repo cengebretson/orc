@@ -21,6 +21,18 @@ const (
 	sectionRepositories
 )
 
+// Destination identifies a top-level Workspace view exposed to the shared
+// dashboard shell. Workspace keeps the underlying navigation and view state.
+type Destination uint8
+
+const (
+	DestinationFeatures Destination = iota
+	DestinationWorkflows
+	DestinationWorkers
+	DestinationRepositories
+	DestinationHealth
+)
+
 type sectionSpec struct {
 	id              sectionID
 	shortcut        string
@@ -34,6 +46,21 @@ var workspaceSections = []sectionSpec{
 	{id: sectionWorkflows, shortcut: "2", title: "Workflows"},
 	{id: sectionWorkers, shortcut: "3", title: "Workers"},
 	{id: sectionRepositories, shortcut: "4", title: "Repositories"},
+}
+
+func sectionForDestination(destination Destination) sectionID {
+	switch destination {
+	case DestinationWorkflows:
+		return sectionWorkflows
+	case DestinationWorkers:
+		return sectionWorkers
+	case DestinationRepositories:
+		return sectionRepositories
+	case DestinationHealth:
+		return sectionHealth
+	default:
+		return sectionNone
+	}
 }
 
 func sectionSpecFor(id sectionID) sectionSpec {

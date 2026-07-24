@@ -141,7 +141,21 @@ func loadData(root string) tea.Cmd {
 			refreshInterval: workflowCfg.WorkspaceRefreshInterval(),
 			artifactPolicy:  workflowCfg.ArtifactPolicy(),
 			quotes:          workflowCfg.Settings.Quotes,
+			config:          workflowCfg,
 		}
+	}
+}
+
+func loadLiveData(root string, cfg *config.Config, allWorkers []*workers.Worker) tea.Cmd {
+	return func() tea.Msg {
+		if cfg == nil {
+			return liveDataMsg{}
+		}
+		items, err := workspacesnapshot.LoadItems(root, cfg, allWorkers)
+		if err != nil {
+			return liveDataMsg{err: err}
+		}
+		return liveDataMsg{features: collectFeatures(&workspacesnapshot.Snapshot{Items: items})}
 	}
 }
 
@@ -178,6 +192,23 @@ func collectFeatures(snapshot *workspacesnapshot.Snapshot) []*featureRow {
 		})
 	}
 	return rows
+}
+
+func mergeLiveFeatures(current, fresh []*featureRow) []*featureRow {
+	byDir := make(map[string]*featureRow, len(current))
+	for _, row := range current {
+		byDir[filepath.Clean(row.featureDir)] = row
+	}
+	merged := make([]*featureRow, 0, len(fresh))
+	for _, row := range fresh {
+		if existing := byDir[filepath.Clean(row.featureDir)]; existing != nil {
+			*existing = *row
+			merged = append(merged, existing)
+			continue
+		}
+		merged = append(merged, row)
+	}
+	return merged
 }
 
 func workerDisplayName(cfg *config.Config, w *workers.Worker) string {

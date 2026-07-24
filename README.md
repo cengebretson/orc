@@ -349,11 +349,21 @@ Or use the Claude Desktop settings UI. Requires a GitHub PAT with `repo` and `pu
 
 ![orc dashboard — workspace view showing features, workflows, workers, and repositories](docs/dashboard.png)
 
-The dashboard keeps Live operations and Workspace exploration in one Bubble Tea
-application. `[` opens Live and `]` opens Workspace without discarding selection,
-filters, details, or scroll position. `orc watch` starts in Live and keeps its
-unchanged compact rail in narrow terminals; `orc dashboard` starts in Workspace.
-Press `?` for the shared navigation reference.
+The dashboard keeps Live operations and workspace exploration in one Bubble Tea
+application with top-level Live, Workflows, Workers, Repositories, and
+Health tabs. `[`/`]` cycles tabs and `1`–`5` jumps directly to one without
+discarding loaded data, filters, or selection. At widths below 56 columns the
+dashboard hides configuration tabs and switches to the compact Live rail;
+widening restores the previously selected tab. Health becomes
+`HEALTH ⚠ N` when checks need attention. Health opens directly with a pinned
+summary and scrollable grouped checks, while the operational banner on the
+Live, Workflows, and Workers tabs reports total features, running sessions,
+paused work, and items needing attention. Repositories opens directly into a
+pinned routing summary with responsive repository and route cards. Features
+refreshes live session telemetry every two seconds while full Workspace and
+Health discovery retains the slower
+`settings.workspace_refresh` interval. `orc watch` remains the dedicated compact
+Live rail; `orc dashboard` starts in Live. Press `?` for navigation help.
 
 ---
 
@@ -421,12 +431,12 @@ Press `?` for the shared navigation reference.
   - `--pet-layout column` — start with one pet card per row
   - `--tmux-toggle` — open or close the watch rail beside the current tmux pane
   - `--wide` — render the wider table layout
-- Both Live and Workspace dashboard sections display matched provider context pressure using configurable
+- Both `orc watch` and the merged Live dashboard tab display matched provider context pressure using configurable
   green/yellow/red percentage boundaries; unknown provider limits display `n/a`.
 - `orc archive <ticket>` — archive a completed feature, remove worktrees
 - `orc delete <ticket>` — permanently delete a feature folder (only allowed when status is `done` or `archived`)
-- `orc dashboard` — open the unified dashboard in Workspace; `[`/`]` switches
-  between Workspace and Live while preserving each section's state
+- `orc dashboard` — open the unified dashboard in Live; `[`/`]` cycles Live,
+  Workflows, Workers, Repositories, and Health, while `1`–`5` jumps directly
 
 ### Agent commands
 

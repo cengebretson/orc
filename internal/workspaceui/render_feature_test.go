@@ -83,6 +83,24 @@ func TestRenderTable(t *testing.T) {
 	}
 }
 
+func TestRenderTableUsesLiveAttentionStates(t *testing.T) {
+	review := testRow("STORY-1", "active", "code-review")
+	review.s.Runtime.Tmux = &state.TmuxRuntime{Session: "story-1"}
+	review.tmuxLive = true
+	review.attention = "review"
+
+	stopped := testRow("STORY-2", "active", "develop")
+	stopped.s.Runtime.Tmux = &state.TmuxRuntime{Session: "story-2"}
+
+	blocked := testRow("STORY-3", "paused", "develop")
+	out := ansi.Strip((Model{}).renderTable([]*featureRow{review, stopped, blocked}, 140, -1))
+	for _, want := range []string{"◆ review", "× stopped", "! blocked"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("Features table missing live state %q:\n%s", want, out)
+		}
+	}
+}
+
 func TestRenderContextPressureThresholdsAndUnknownLimit(t *testing.T) {
 	thresholds := contextpressure.Thresholds{Green: 40, Yellow: 70, Red: 90}
 	tests := []struct {

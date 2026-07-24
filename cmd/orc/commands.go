@@ -230,7 +230,7 @@ var focusCmd = &cobra.Command{
 
 var dashboardCmd = &cobra.Command{
 	Use:   "dashboard",
-	Short: "Open the unified Live and Workspace dashboard",
+	Short: "Open the unified workspace and live-operations dashboard",
 	Args:  cobra.NoArgs,
 	RunE:  runDashboard,
 }

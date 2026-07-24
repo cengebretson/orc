@@ -38,23 +38,33 @@ func Load(root string) (*Snapshot, error) {
 	if err != nil {
 		return nil, err
 	}
-	features, err := featurelist.Collect(root, featurelist.Options{
-		IncludeArchived: true,
-		Config:          ctx.Config,
-		Workers:         ctx.Workers,
-	})
+	items, err := LoadItems(root, ctx.Config, ctx.Workers)
 	if err != nil {
-		return nil, fmt.Errorf("loading features: %w", err)
+		return nil, err
 	}
-	liveByFeature := sessionlist.ManagedTelemetry(root, features)
-	thresholds := ctx.Config.ContextPressureThresholds()
-	items := buildItems(features, liveByFeature, thresholds)
 	return &Snapshot{
 		Config:  ctx.Config,
 		Workers: ctx.Workers,
 		Items:   items,
 		Health:  doctor.Run(root).Checks,
 	}, nil
+}
+
+// LoadItems refreshes durable feature state and live session telemetry without
+// rerunning the slower workspace health checks used by a full Snapshot.
+func LoadItems(root string, cfg *config.Config, allWorkers []*workers.Worker) ([]*WorkItem, error) {
+	features, err := featurelist.Collect(root, featurelist.Options{
+		IncludeArchived: true,
+		Config:          cfg,
+		Workers:         allWorkers,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("loading features: %w", err)
+	}
+	liveByFeature := sessionlist.ManagedTelemetry(root, features)
+	thresholds := cfg.ContextPressureThresholds()
+	items := buildItems(features, liveByFeature, thresholds)
+	return items, nil
 }
 
 func buildItems(features []*featurelist.Feature, liveByFeature map[string]telemetry.Live, thresholds contextpressure.Thresholds) []*WorkItem {

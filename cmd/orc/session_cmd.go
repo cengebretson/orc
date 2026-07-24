@@ -15,7 +15,12 @@ func runDashboard(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	return dashboard.Run(root, dashboard.Options{Start: dashboard.SectionWorkspace})
+	return dashboard.Run(root, dashboard.Options{
+		Start:     dashboard.SectionFeatures,
+		Adaptive:  true,
+		Version:   version,
+		BuildDate: buildDate,
+	})
 }
 
 func runAttach(cmd *cobra.Command, args []string) error {

@@ -9,6 +9,9 @@ import (
 )
 
 func (m Model) viewFile() string {
+	if header := m.directDestinationHeader(); header != "" {
+		return header + m.viewer.viewport.View()
+	}
 	outerW := max(4, m.width-2)
 	var b strings.Builder
 	title := styleDetailTitle.Render(" "+m.viewer.context) +

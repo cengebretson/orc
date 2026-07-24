@@ -63,8 +63,10 @@ func runWatch(cmd *cobra.Command, args []string) error {
 		Demo:      watchDemo,
 	}
 	return dashboard.Run(root, dashboard.Options{
-		Start:    dashboard.SectionLive,
-		Adaptive: true,
-		Watch:    watchOpts,
+		Start:     dashboard.SectionLive,
+		Adaptive:  true,
+		Version:   version,
+		BuildDate: buildDate,
+		Watch:     watchOpts,
 	})
 }

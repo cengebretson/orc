@@ -15,7 +15,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.viewer.viewport.Width = max(1, msg.Width-4)
-		m.viewer.viewport.Height = max(1, msg.Height-6)
+		m.viewer.viewport.Height = m.viewerHeight()
 		// viewport-backed views hold content pre-rendered at the old width;
 		// rebuild it (the dashboard and detail views render from m.width live)
 		switch m.view {
@@ -40,8 +40,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, tea.Batch(loadData(m.root), tickEvery(interval, m.lifecycle.epoch))
 
+	case liveTickMsg:
+		if m.lifecycle.inactive || msg.epoch != m.lifecycle.epoch {
+			return m, nil
+		}
+		return m, tea.Batch(
+			loadLiveData(m.root, m.data.config, m.data.allWorkers),
+			liveTickEvery(defaultLiveRefreshInterval, m.lifecycle.epoch),
+		)
+
 	case dataMsg:
 		m.lifecycle.lastRefresh = time.Now()
+		m.lifecycle.lastLiveRefresh = m.lifecycle.lastRefresh
 		if msg.err != nil {
 			m.lifecycle.loadErr = msg.err
 			m.data.healthItems = []doctor.Check{{Group: "workspace", Name: config.Filename, Status: doctor.Fail, Detail: msg.err.Error()}}
@@ -49,7 +59,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.lifecycle.loadErr = nil
+		cfg := msg.config
+		if cfg == nil {
+			cfg = m.data.config
+		}
 		m.data = workspaceData{
+			config:         cfg,
 			features:       msg.features,
 			healthItems:    msg.healthItems,
 			artifactPolicy: msg.artifactPolicy,
@@ -72,6 +87,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.refreshStructuredViewer()
 		if m.view == viewWorkflowDetail {
 			m.reRenderWorkflowDetail()
+		}
+		return m, nil
+
+	case liveDataMsg:
+		if msg.err != nil || msg.features == nil {
+			return m, nil
+		}
+		m.lifecycle.lastLiveRefresh = time.Now()
+		m.data.features = mergeLiveFeatures(m.data.features, msg.features)
+		if rows := m.visibleFeatures(); m.navigation.featureCursor >= len(rows) && len(rows) > 0 {
+			m.navigation.featureCursor = len(rows) - 1
+		}
+		if m.view == viewDetail {
+			m.reRenderDetail()
 		}
 		return m, nil
 

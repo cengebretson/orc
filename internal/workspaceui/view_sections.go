@@ -11,7 +11,10 @@ func (m Model) sectionBox(spec sectionSpec, summary string, content []string, ou
 		borderColor = activeTheme.Palette.Mauve
 	}
 	bd := lipgloss.NewStyle().Foreground(lipgloss.Color(borderColor))
-	title := styleDim.Render(spec.shortcut) + " " + styleSection.Render(spec.title)
+	title := styleSection.Render(spec.title)
+	if !m.embedded {
+		title = styleDim.Render(spec.shortcut) + " " + title
+	}
 
 	if !m.navigation.expanded[spec.id] {
 		return terminalui.RenderLabeledPanel(terminalui.LabeledPanelOptions{

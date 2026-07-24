@@ -4,8 +4,9 @@ import "time"
 
 type workspaceOverviewView struct {
 	features   int
-	active     int
+	running    int
 	paused     int
+	needs      int
 	broken     int
 	refreshAge time.Duration
 }
@@ -20,11 +21,14 @@ func workspaceOverviewFor(features []*featureRow, lastRefresh, now time.Time) wo
 			view.broken++
 			continue
 		}
-		switch feature.s.Status {
-		case "active":
-			view.active++
-		case "paused":
+		if feature.tmuxLive {
+			view.running++
+		}
+		if feature.s.Status == "paused" {
 			view.paused++
+		}
+		if featureNeedsAttention(feature) {
+			view.needs++
 		}
 	}
 	return view

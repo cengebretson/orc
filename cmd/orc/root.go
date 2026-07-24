@@ -24,7 +24,10 @@ const banner = `
 orc · workspace orchestrator
 `
 
-var version = "dev"
+var (
+	version   = "dev"
+	buildDate = ""
+)
 
 var globalWorkspace string
 

@@ -12,9 +12,10 @@ The v1 release boundary includes:
   exact generated-workspace golden coverage.
 - Durable `STATE.yaml` workflow transitions, artifact policy, worktree setup,
   agent launch, JIT tasks, archive/delete, reporting, and local workflow packs.
-- Dashboard Workspace and Live views, exact tmux pane targeting, attention-driven focus, live
-  Claude/Codex telemetry, session search/resume, park/unpark recovery,
-  repository grouping, and context-pressure presentation.
+- Dashboard workspace views and the dedicated Live rail, exact tmux pane
+  targeting, attention-driven focus, live Claude/Codex telemetry, session
+  search/resume, park/unpark recovery, repository grouping, and context-pressure
+  presentation.
 
 The following are explicitly post-v1 and do not block a release:
 

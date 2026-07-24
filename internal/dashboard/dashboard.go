@@ -3,6 +3,7 @@
 package dashboard
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/cengebretson/orc/internal/config"
@@ -19,32 +20,60 @@ type Section int
 
 const (
 	SectionLive Section = iota
-	SectionWorkspace
+	SectionFeatures
+	SectionWorkflows
+	SectionWorkers
+	SectionRepositories
+	SectionHealth
+	SectionOrc
 )
+
+var sections = []Section{
+	SectionFeatures,
+	SectionWorkflows,
+	SectionWorkers,
+	SectionRepositories,
+	SectionHealth,
+}
 
 // Options configures the shared dashboard shell.
 type Options struct {
-	Start    Section
-	Adaptive bool
-	Watch    watch.Options
+	Start     Section
+	Adaptive  bool
+	Version   string
+	BuildDate string
+	Revision  string
+	Watch     watch.Options
 }
 
-// Model owns the shared shell and delegates section behavior to the existing
-// Live and Workspace models. Both children stay loaded so switching is instant.
+// Model owns the shared shell, delegates dashboard tabs to Workspace, and keeps
+// Live available as the adaptive standalone watch view.
 type Model struct {
-	section   Section
-	adaptive  bool
-	help      bool
-	width     int
-	height    int
-	live      watch.Model
-	workspace workspaceui.Model
+	section          Section
+	wideSection      Section
+	adaptive         bool
+	watchOnly        bool
+	help             bool
+	width            int
+	height           int
+	quote            string
+	quotes           []string
+	root             string
+	version          string
+	buildDate        string
+	revision         string
+	orcAnimationStep int
+	live             watch.Model
+	workspace        workspaceui.Model
 }
 
 var (
 	brandStyle    lipgloss.Style
 	navStyle      lipgloss.Style
 	selectedStyle lipgloss.Style
+	warningStyle  lipgloss.Style
+	logoStyle     lipgloss.Style
+	quoteStyle    lipgloss.Style
 	cardStyle     lipgloss.Style
 	keyStyle      lipgloss.Style
 )
@@ -58,31 +87,47 @@ func setTheme(theme terminalui.Theme) {
 	brandStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Text)).Bold(true)
 	navStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Overlay0))
 	selectedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Mauve)).Bold(true)
+	warningStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Yellow)).Bold(true)
+	logoStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Surface1))
+	quoteStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Overlay0)).Italic(true)
 	cardStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color(p.Mauve)).Padding(0, 1)
 	keyStyle = selectedStyle
 }
 
 // New constructs a dashboard without starting the terminal program.
 func New(root string, opts Options) (Model, error) {
+	quotes := []string{defaultLegacyQuote}
+	version, buildDate, revision := resolveBuildMetadata(opts.Version, opts.BuildDate, opts.Revision)
 	if cfg, err := config.Load(root); err == nil {
 		if theme, themeErr := terminalui.LoadTheme(cfg.Settings.Theme); themeErr == nil {
 			workspaceui.SetTheme(theme)
 			watch.SetTheme(theme)
 			setTheme(theme)
 		}
+		if len(cfg.Settings.Quotes) > 0 {
+			quotes = append([]string(nil), cfg.Settings.Quotes...)
+		}
 	}
 	live, err := watch.New(root, opts.Watch)
 	if err != nil {
 		return Model{}, err
 	}
-	workspace := workspaceui.NewEmbedded(root)
+	workspace := workspaceui.NewEmbedded(root).SetDestination(workspaceDestination(opts.Start))
 	live = live.SetActive(opts.Start == SectionLive)
-	workspace = workspace.SetActive(opts.Start == SectionWorkspace)
+	workspace = workspace.SetActive(opts.Start != SectionLive && opts.Start != SectionOrc)
 	return Model{
-		section:   opts.Start,
-		adaptive:  opts.Adaptive,
-		live:      live,
-		workspace: workspace,
+		section:     opts.Start,
+		wideSection: initialWideSection(opts.Start),
+		adaptive:    opts.Adaptive,
+		watchOnly:   opts.Adaptive && opts.Start == SectionLive,
+		quote:       chooseLegacyQuote(quotes),
+		quotes:      quotes,
+		root:        root,
+		version:     version,
+		buildDate:   buildDate,
+		revision:    revision,
+		live:        live,
+		workspace:   workspace,
 	}, nil
 }
 
@@ -107,8 +152,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		var sectionCmd tea.Cmd
-		if m.adaptive && !m.shellVisible() && m.section != SectionLive {
+		if m.adaptive && !m.watchOnly && m.width < 56 && m.section != SectionLive {
+			m.wideSection = m.section
 			sectionCmd = m.switchSection(SectionLive)
+			m.help = false
+		} else if m.adaptive && !m.watchOnly && m.width >= 56 && m.section == SectionLive {
+			sectionCmd = m.switchSection(initialWideSection(m.wideSection))
 			m.help = false
 		}
 		updated, sizeCmd := m.updateBoth(m.childSizeMsg())
@@ -124,17 +173,29 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if m.shellVisible() && m.canSwitchSection() {
+			shortcutSection, hasShortcut := sectionForShortcut(msg.String())
 			switch {
 			case key.Matches(msg, keys.help):
 				m.help = true
 				return m, nil
-			case key.Matches(msg, keys.live):
-				return m, m.switchSection(SectionLive)
-			case key.Matches(msg, keys.workspace):
-				return m, m.switchSection(SectionWorkspace)
+			case key.Matches(msg, keys.previous):
+				return m, m.switchSection(m.adjacentSection(-1))
+			case key.Matches(msg, keys.next):
+				return m, m.switchSection(m.adjacentSection(1))
+			case hasShortcut:
+				return m, m.switchSection(shortcutSection)
 			}
 		}
 		return m.updateActive(msg)
+	case orcTickMsg:
+		if m.section != SectionOrc || m.orcAnimationStep <= 0 {
+			return m, nil
+		}
+		m.orcAnimationStep--
+		if m.orcAnimationStep > 0 {
+			return m, orcTick()
+		}
+		return m, nil
 	case tea.MouseMsg:
 		return m.updateActive(msg)
 	default:
@@ -146,15 +207,31 @@ func (m *Model) switchSection(section Section) tea.Cmd {
 	if m.section == section {
 		return nil
 	}
-	m.live = m.live.SetActive(false)
-	m.workspace = m.workspace.SetActive(false)
+	workspaceWasActive := m.workspace.IsActive()
 	m.section = section
-	if section == SectionWorkspace {
+	switch section {
+	case SectionOrc:
+		m.live = m.live.SetActive(false)
+		m.workspace = m.workspace.SetActive(false)
+		m.quote = chooseNextLegacyQuote(m.quotes, m.quote)
+		m.orcAnimationStep = terminalui.RainbowSteps
+		return orcTick()
+	case SectionLive:
+		m.orcAnimationStep = 0
+		m.workspace = m.workspace.SetActive(false)
+		m.live = m.live.SetActive(true)
+		return m.live.Init()
+	default:
+		m.orcAnimationStep = 0
+		m.wideSection = section
+		m.workspace = m.workspace.SetDestination(workspaceDestination(section))
+		m.live = m.live.SetActive(false)
 		m.workspace = m.workspace.SetActive(true)
+		if workspaceWasActive {
+			return nil
+		}
 		return m.workspace.Init()
 	}
-	m.live = m.live.SetActive(true)
-	return m.live.Init()
 }
 
 func (m Model) View() string {
@@ -168,18 +245,26 @@ func (m Model) View() string {
 		return m.renderHelp()
 	}
 	body := m.live.View()
-	if m.section == SectionWorkspace {
+	if m.section == SectionOrc {
+		body = m.renderOrc()
+	} else if m.section != SectionLive {
 		body = m.workspace.View()
 	}
 	return m.renderHeader() + "\n" + body
 }
 
 func (m Model) shellVisible() bool {
+	if m.watchOnly {
+		return false
+	}
 	return !m.adaptive || m.width >= 56
 }
 
 func (m Model) canSwitchSection() bool {
-	if m.section == SectionWorkspace {
+	if m.section == SectionOrc {
+		return true
+	}
+	if m.section != SectionLive {
 		return m.workspace.CanSwitchSection()
 	}
 	return m.live.CanSwitchSection()
@@ -194,7 +279,7 @@ func (m Model) childSizeMsg() tea.WindowSizeMsg {
 }
 
 func (m Model) updateActive(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if m.section == SectionWorkspace {
+	if m.section != SectionLive {
 		updated, cmd := m.workspace.Update(msg)
 		if next, ok := updated.(workspaceui.Model); ok {
 			m.workspace = next
@@ -221,14 +306,113 @@ func (m Model) updateBoth(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) renderHeader() string {
-	live := navStyle.Render("LIVE")
-	workspace := navStyle.Render("WORKSPACE")
-	if m.section == SectionLive {
-		live = selectedStyle.Render("[ LIVE ]")
-	} else {
-		workspace = selectedStyle.Render("[ WORKSPACE ]")
+	items := make([]string, 0, len(sections))
+	for _, section := range sections {
+		items = append(items, renderNavigationItem(section, m.workspace.HealthIssueCount(), section == m.section))
 	}
-	return terminalui.Fit(brandStyle.Render(" ORC")+"  "+live+"  "+workspace, m.width)
+	brand := brandStyle.Render(" 👹 ORC")
+	if m.section == SectionOrc {
+		style := selectedStyle
+		if m.orcAnimationStep > 0 {
+			style = lipgloss.NewStyle().
+				Foreground(lipgloss.Color(terminalui.RainbowColor(m.orcAnimationStep, 0))).
+				Bold(true)
+		}
+		brand = style.Render("[ 👹 ORC ]")
+	}
+	full := brand + "  " + strings.Join(items, "  ")
+	if lipgloss.Width(full) <= m.width {
+		return full
+	}
+	if m.section == SectionOrc {
+		return terminalui.Fit(brand, m.width)
+	}
+	compact := brand + "  " + navStyle.Render("‹") + " " +
+		renderNavigationItem(m.section, m.workspace.HealthIssueCount(), true) + " " + navStyle.Render("›")
+	return terminalui.Fit(compact, m.width)
+}
+
+func initialWideSection(section Section) Section {
+	if section == SectionLive {
+		return SectionFeatures
+	}
+	return section
+}
+
+func navigationLabel(section Section, healthIssues int) string {
+	label := sectionLabel(section)
+	if section == SectionHealth && healthIssues > 0 {
+		return fmt.Sprintf("%s ⚠ %d", label, healthIssues)
+	}
+	return label
+}
+
+func renderNavigationItem(section Section, healthIssues int, selected bool) string {
+	style := navStyle
+	if selected {
+		style = selectedStyle
+	}
+	label := style.Render(sectionLabel(section))
+	if section == SectionHealth && healthIssues > 0 {
+		label += " " + warningStyle.Render(fmt.Sprintf("⚠ %d", healthIssues))
+	}
+	if selected {
+		return style.Render("[ ") + label + style.Render(" ]")
+	}
+	return label
+}
+
+func (m Model) adjacentSection(delta int) Section {
+	for index, section := range sections {
+		if section == m.section {
+			return sections[(index+delta+len(sections))%len(sections)]
+		}
+	}
+	return SectionFeatures
+}
+
+func sectionForShortcut(shortcut string) (Section, bool) {
+	if shortcut == "0" {
+		return SectionOrc, true
+	}
+	if len(shortcut) != 1 || shortcut[0] < '1' || shortcut[0] > '5' {
+		return SectionLive, false
+	}
+	return sections[int(shortcut[0]-'1')], true
+}
+
+func sectionLabel(section Section) string {
+	switch section {
+	case SectionLive:
+		return "LIVE"
+	case SectionFeatures:
+		return "LIVE"
+	case SectionWorkflows:
+		return "WORKFLOWS"
+	case SectionWorkers:
+		return "WORKERS"
+	case SectionRepositories:
+		return "REPOSITORIES"
+	case SectionHealth:
+		return "HEALTH"
+	default:
+		return ""
+	}
+}
+
+func workspaceDestination(section Section) workspaceui.Destination {
+	switch section {
+	case SectionWorkflows:
+		return workspaceui.DestinationWorkflows
+	case SectionWorkers:
+		return workspaceui.DestinationWorkers
+	case SectionRepositories:
+		return workspaceui.DestinationRepositories
+	case SectionHealth:
+		return workspaceui.DestinationHealth
+	default:
+		return workspaceui.DestinationFeatures
+	}
 }
 
 func (m Model) renderHelp() string {

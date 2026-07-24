@@ -51,6 +51,23 @@ func TestBrokenRowSurfaced(t *testing.T) {
 	}
 }
 
+func TestMergeLiveFeaturesUpdatesRowsInPlace(t *testing.T) {
+	current := testRow("STORY-1", "active", "develop")
+	current.featureDir = "/ws/features/story-1"
+	fresh := testRow("STORY-1", "active", "develop")
+	fresh.featureDir = current.featureDir
+	fresh.attention = "review"
+	fresh.tmuxLive = true
+
+	merged := mergeLiveFeatures([]*featureRow{current}, []*featureRow{fresh})
+	if len(merged) != 1 || merged[0] != current {
+		t.Fatalf("merge should preserve the existing row pointer: %#v", merged)
+	}
+	if current.attention != "review" || !current.tmuxLive {
+		t.Fatalf("live fields were not refreshed: attention=%q tmuxLive=%v", current.attention, current.tmuxLive)
+	}
+}
+
 func TestLoadDataSurfacesInvalidConfigWithoutPanicking(t *testing.T) {
 	root := t.TempDir()
 	if err := os.WriteFile(filepath.Join(root, config.Filename), []byte("unknown_key: true\n"), 0o600); err != nil {

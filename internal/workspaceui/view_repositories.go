@@ -2,6 +2,8 @@ package workspaceui
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -9,6 +11,43 @@ import (
 	"github.com/cengebretson/orc/internal/ui"
 	"github.com/charmbracelet/lipgloss"
 )
+
+func repositoriesForDisplay(root string, repos []config.Repo) []config.Repo {
+	display := append([]config.Repo(nil), repos...)
+	for index := range display {
+		display[index].Path = repositoryDisplayPath(root, display[index].Path)
+	}
+	return display
+}
+
+func repositoryDisplayPath(root, configured string) string {
+	configured = strings.TrimSpace(configured)
+	if configured == "" {
+		return ""
+	}
+	if root == "" {
+		return filepath.Clean(configured)
+	}
+	workspaceRoot, err := filepath.Abs(root)
+	if err != nil {
+		workspaceRoot = filepath.Clean(root)
+	}
+	resolved := configured
+	if !filepath.IsAbs(resolved) {
+		resolved = filepath.Join(workspaceRoot, resolved)
+	}
+	resolved = filepath.Clean(resolved)
+	if resolved == filepath.Clean(workspaceRoot) {
+		return "workspace root"
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		home = filepath.Clean(home)
+		if relative, relErr := filepath.Rel(home, resolved); relErr == nil && relative != "." && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+			return filepath.Join("~", relative)
+		}
+	}
+	return resolved
+}
 
 func renderRepoList(repos []config.Repo, maxW int) []string {
 	if len(repos) == 0 {
@@ -135,6 +174,73 @@ func padInspectorLines(lines []string) []string {
 		padded[i] = "  " + line
 	}
 	return padded
+}
+
+func renderRepositoryMapSummary(repos []config.Repo, routes []config.RepoRoute, width int) string {
+	outerW := max(20, width)
+	summary := []string{styleSubtext.Render(fmt.Sprintf("%d repositories  ·  %d optional metadata routes", len(repos), len(routes)))}
+	for _, text := range []string{
+		"ticket context  →  exact label/component match  →  selected repo set",
+		"no match  →  purpose + agent hints     ambiguous  →  pause for input",
+	} {
+		for _, line := range strings.Split(ui.Wrap(text, max(8, outerW-6)), "\n") {
+			summary = append(summary, styleDim.Render(line))
+		}
+	}
+	return drawBoxLabeledWith(styleHeader.Render("Repository map"), padInspectorLines(summary), outerW, activeTheme.Palette.Mauve)
+}
+
+func renderRepositoryDetails(repos []config.Repo, routes []config.RepoRoute, features []*featureRow, width int) string {
+	outerW := max(20, width)
+	work := summarizeRepoWork(features)
+	sections := make([]string, 0, len(repos)+len(routes))
+
+	if len(repos) == 0 {
+		sections = append(sections, drawBoxLabeled(styleSection.Render("Repositories"), padInspectorLines([]string{styleDim.Render("No repositories configured.")}), outerW))
+	} else {
+		for i := 0; i < len(repos); {
+			if outerW >= 90 && i+1 < len(repos) {
+				const gap = 2
+				leftW := (outerW - gap) / 2
+				rightW := outerW - gap - leftW
+				left := renderRepositoryInspectorCard(repos[i], work[repos[i].Name], leftW)
+				right := renderRepositoryInspectorCard(repos[i+1], work[repos[i+1].Name], rightW)
+				left, right = equalizeBoxHeights(left, right)
+				sections = append(sections, joinColumns(left, right, strings.Repeat(" ", gap)))
+				i += 2
+				continue
+			}
+			sections = append(sections, renderRepositoryInspectorCard(repos[i], work[repos[i].Name], outerW))
+			i++
+		}
+	}
+
+	if len(routes) == 0 {
+		contentW := max(1, outerW-6)
+		lines := []string{
+			styleDim.Render("No deterministic metadata routes configured."),
+			styleSubtext.Render(ui.Truncate("task scope  →  repo purpose + agent hints", contentW)),
+			styleStatusWaiting.Render(ui.Truncate("ambiguous  →  pause for input", contentW)),
+		}
+		sections = append(sections, drawBoxLabeled(styleSection.Render("Optional routing"), padInspectorLines(lines), outerW))
+	} else {
+		for i := 0; i < len(routes); {
+			if outerW >= 90 && i+1 < len(routes) {
+				const gap = 2
+				leftW := (outerW - gap) / 2
+				rightW := outerW - gap - leftW
+				left := renderRouteInspectorCard(routes[i], i+1, leftW)
+				right := renderRouteInspectorCard(routes[i+1], i+2, rightW)
+				left, right = equalizeBoxHeights(left, right)
+				sections = append(sections, joinColumns(left, right, strings.Repeat(" ", gap)))
+				i += 2
+				continue
+			}
+			sections = append(sections, renderRouteInspectorCard(routes[i], i+1, outerW))
+			i++
+		}
+	}
+	return strings.Join(sections, "\n")
 }
 
 func renderRoutingReport(repos []config.Repo, routes []config.RepoRoute, features []*featureRow, width int) string {

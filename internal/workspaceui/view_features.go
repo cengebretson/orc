@@ -3,6 +3,7 @@ package workspaceui
 import (
 	"strings"
 
+	"github.com/cengebretson/orc/internal/tmux"
 	"github.com/cengebretson/orc/internal/ui"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -50,7 +51,7 @@ func (m Model) renderTable(rows []*featureRow, w int, selectedIdx int) string {
 		}
 		s := row.s
 
-		icon := statusIcon(s.Status)
+		icon, displayStatus := featureDisplayState(row)
 		name := strings.TrimPrefix(s.Slug, s.Ticket+"-")
 		workflowLabel := row.workflowLabel
 		if workflowLabel == "" {
@@ -88,7 +89,7 @@ func (m Model) renderTable(rows []*featureRow, w int, selectedIdx int) string {
 			line := " " +
 				ui.PadRight(ticketCell, wTicket) + "  " +
 				ui.PadRight(ui.Truncate(name, wName), wName) + "  " +
-				ui.PadRight(ui.Truncate(icon+" "+s.Status, wStatus), wStatus) + "  " +
+				ui.PadRight(ui.Truncate(icon+" "+displayStatus, wStatus), wStatus) + "  " +
 				ui.PadRight(ui.Truncate(stageCell, wWorkflow), wWorkflow) + "  " +
 				ui.PadRight(ui.Truncate(plainWorker, wWorker), wWorker) + "  " +
 				ui.PadRight(row.context.Label(), wContext) + "  " +
@@ -99,7 +100,7 @@ func (m Model) renderTable(rows []*featureRow, w int, selectedIdx int) string {
 			if row.hasIssues {
 				ticketStyled = styleHealthWarn.Render(ticketCell)
 			}
-			statusCell := statusStyle(s.Status).Render(icon + " " + s.Status)
+			statusCell := featureStateStyle(row).Render(icon + " " + displayStatus)
 			nameCell := styleDim.Render(ui.Truncate(name, wName))
 			workerCell := styleDim.Render(ui.Truncate(plainWorker, wWorker))
 			contextCell := renderContextPressure(row.context)
@@ -126,6 +127,66 @@ func (m Model) renderTable(rows []*featureRow, w int, selectedIdx int) string {
 	}
 
 	return strings.Join(lines, "\n")
+}
+
+func featureDisplayState(row *featureRow) (string, string) {
+	if row == nil || row.s == nil {
+		return "!", "error"
+	}
+	switch row.s.Status {
+	case "paused":
+		return "!", "blocked"
+	case "done", "archived":
+		return "✓", row.s.Status
+	case "active":
+		if row.s.Runtime.Tmux != nil && !row.tmuxLive {
+			return "×", "stopped"
+		}
+		switch row.attention {
+		case tmux.AttentionInput:
+			return "!", "input"
+		case tmux.AttentionBlocked:
+			return "!", "blocked"
+		case tmux.AttentionReview:
+			return "◆", "review"
+		case tmux.AttentionDone:
+			return "✓", "done"
+		}
+		return "●", "active"
+	case "ready":
+		return "▶", "ready"
+	case "pending":
+		return "○", "pending"
+	default:
+		return statusIcon(row.s.Status), row.s.Status
+	}
+}
+
+func featureStateLabel(row *featureRow) string {
+	icon, label := featureDisplayState(row)
+	return icon + " " + label
+}
+
+func featureStateStyle(row *featureRow) lipgloss.Style {
+	_, label := featureDisplayState(row)
+	switch label {
+	case "blocked", "input", "stopped", "error":
+		return styleHealthErr
+	case "review":
+		return styleStatusInProgress
+	case "done":
+		return styleHealthOK
+	default:
+		if row != nil && row.s != nil {
+			return statusStyle(row.s.Status)
+		}
+		return styleSubtext
+	}
+}
+
+func featureNeedsAttention(row *featureRow) bool {
+	_, label := featureDisplayState(row)
+	return label == "blocked" || label == "input" || label == "review"
 }
 
 // brokenRow renders a feature whose STATE.yaml could not be parsed: ticket from

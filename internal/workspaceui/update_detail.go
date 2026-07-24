@@ -93,6 +93,10 @@ func (m Model) handleFileKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, keys.quit):
 		return m, tea.Quit
+	case m.isDirectWorkers() && key.Matches(msg, keys.up, keys.previous):
+		m.selectDirectWorker(-1)
+	case m.isDirectWorkers() && key.Matches(msg, keys.down, keys.next):
+		m.selectDirectWorker(1)
 	case key.Matches(msg, keys.back):
 		switch m.viewer.returnView {
 		case viewWorkflowDetail:

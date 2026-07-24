@@ -1,7 +1,8 @@
 .PHONY: build install clean test lint tidy fmt check release-check
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
-LDFLAGS = -ldflags "-X main.version=$(VERSION)"
+BUILD_DATE ?= $(shell date -u +%Y-%m-%d)
+LDFLAGS = -ldflags "-X main.version=$(VERSION) -X main.buildDate=$(BUILD_DATE)"
 MISE_CACHE_DIR ?= $(CURDIR)/.cache/mise
 GOCACHE ?= $(CURDIR)/.cache/go-build
 GOMODCACHE ?= $(CURDIR)/.cache/go-mod

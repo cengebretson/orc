@@ -13,6 +13,35 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+func renderWorkerSelector(groups []workerGroup, cursor, width int) string {
+	outerW := max(20, width)
+	total := 0
+	for _, group := range groups {
+		total += len(group.items)
+	}
+	var lines []string
+	itemIndex := 0
+	for _, group := range groups {
+		if len(group.items) == 0 {
+			continue
+		}
+		lines = append(lines, styleDim.Render(group.name))
+		for _, item := range group.items {
+			label := labelWithDimID(item.label, item.id)
+			if itemIndex == cursor {
+				lines = append(lines, "  "+styleHealthOK.Render("▶")+"  "+styleSubtext.Render(label))
+			} else {
+				lines = append(lines, "     "+styleDim.Render(label))
+			}
+			itemIndex++
+		}
+	}
+	if total == 0 {
+		lines = append(lines, styleDim.Render("No workers configured."))
+	}
+	return drawBoxLabeledWith(styleHeader.Render("Workers"), padInspectorLines(lines), outerW, activeTheme.Palette.Mauve)
+}
+
 func renderWorkerFile(path string, features []*featureRow, width int) (string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -90,14 +119,14 @@ func renderWorkerFile(path string, features []*featureRow, width int) (string, e
 
 		activeFeatureRows := activeWorkerFeatureRows(w.ID, features)
 		label := styleSection.Render(fmt.Sprintf("Active Features (%d)", len(activeFeatureRows)))
-		activeRows := renderActiveFeatureRows(activeFeatureRows, outerW-2)
+		activeRows := padInspectorLines(renderActiveFeatureRows(activeFeatureRows, outerW-6))
 		activeBox := drawBoxLabeled(label, activeRows, outerW)
 		if width >= 100 {
 			const gapW = 2
 			leftW := (outerW - gapW) / 2
 			rightW := outerW - gapW - leftW
 			detailsBox = drawBoxLabeledWith(styleHeader.Render(workerName), lines, leftW, activeTheme.Palette.Mauve)
-			activeRows = renderActiveFeatureRows(activeFeatureRows, rightW-2)
+			activeRows = padInspectorLines(renderActiveFeatureRows(activeFeatureRows, rightW-6))
 			activeBox = drawBoxLabeled(label, activeRows, rightW)
 			detailsBox, activeBox = equalizeBoxHeights(detailsBox, activeBox)
 			sb.WriteString(joinColumns(detailsBox, activeBox, "  ") + "\n")

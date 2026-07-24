@@ -82,8 +82,6 @@ var keys = keyMap{
 func HelpSections() []terminalui.HelpSection {
 	return []terminalui.HelpSection{
 		{Title: "WORKSPACE · NAVIGATE", Entries: []terminalui.HelpEntry{
-			terminalui.HelpEntryFor(keys.cycleForward),
-			{Keys: "1 / 2 / 3 / 4", Description: "health / workflows / workers / repos"},
 			terminalui.HelpEntryFor(keys.up),
 			terminalui.HelpEntryFor(keys.down),
 			terminalui.HelpEntryFor(keys.open),

@@ -6,6 +6,30 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Promoted the merged Live/Features view, Workflows, Workers, Repositories, and
+  Health into a unified dashboard tab bar with cyclic and direct-key navigation,
+  dedicated Workspace section views, preserved state, an adaptive compact
+  header, and a shared operational banner. Features now folds in Live attention
+  states and uses a lightweight two-second session refresh without rerunning
+  slower Health checks;
+  narrow dashboards switch to the Live rail and restore the selected tab when
+  widened, Health tabs badge non-OK checks in yellow, and `orc watch` remains the
+  dedicated Live rail. Health now opens its grouped checks directly beneath a
+  pinned summary, fills the available terminal height, and removes the redundant
+  report-title drill-in. Config validation is consolidated into the `orc.yaml`
+  panel, state-lock checks are consolidated into Workspace, and redundant
+  healthy config rows are omitted. Repositories now opens directly into a
+  pinned routing summary with responsive two-column repository and route cards,
+  removing its inspector drill-in. Repository paths are resolved for display,
+  use `~` home abbreviation, and identify the workspace root without exposing
+  raw relative traversal. A hidden `0` destination selects the Orc
+  title and brings back the original portrait and configured quotes,
+  automatically runs the classic rainbow animation, rotates to a new quote on
+  each visit, and shows
+  version, build, revision, and workspace metadata.
+
 ## [0.15.1] - 2026-07-19
 
 ### Added

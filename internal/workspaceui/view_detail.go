@@ -106,6 +106,11 @@ func (m Model) renderDetailBody() string {
 		stateLines = append(stateLines, fmt.Sprintf("%s  %s",
 			styleDetailLabel.Render(" Context "), renderContextPressure(m.detail.feature.context)))
 	}
+	if m.detail.feature.attention != "" {
+		stateLines = append(stateLines, fmt.Sprintf("%s  %s",
+			styleDetailLabel.Render(" Attention"),
+			featureStateStyle(m.detail.feature).Render(featureStateLabel(m.detail.feature))))
+	}
 	if summary.JIT != nil {
 		jit := summary.JIT
 		stateLines = append(stateLines,

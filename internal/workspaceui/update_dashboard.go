@@ -3,7 +3,6 @@ package workspaceui
 import (
 	"path/filepath"
 
-	"github.com/cengebretson/orc/internal/config"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -227,10 +226,16 @@ func (m *Model) cycleSectionFocus(forward bool) {
 }
 
 func (m *Model) focusSection(name sectionID) {
+	if m.navigation.sectionCursors == nil {
+		m.navigation.sectionCursors = map[sectionID]int{}
+	}
+	if m.navigation.pane == paneSection {
+		m.navigation.sectionCursors[m.navigation.section] = m.navigation.sectionCursor
+	}
 	m.collapseAutoExpandedSection()
 	m.navigation.pane = paneSection
 	m.navigation.section = name
-	m.navigation.sectionCursor = 0
+	m.navigation.sectionCursor = m.navigation.sectionCursors[name]
 	if !m.navigation.expanded[name] {
 		m.navigation.autoExpanded = name
 	}
@@ -238,6 +243,12 @@ func (m *Model) focusSection(name sectionID) {
 }
 
 func (m *Model) blurSectionFocus() {
+	if m.navigation.sectionCursors == nil {
+		m.navigation.sectionCursors = map[sectionID]int{}
+	}
+	if m.navigation.pane == paneSection {
+		m.navigation.sectionCursors[m.navigation.section] = m.navigation.sectionCursor
+	}
 	m.collapseAutoExpandedSection()
 	m.navigation.pane = paneFeatures
 	m.navigation.section = sectionNone
@@ -269,10 +280,7 @@ func (m *Model) toggleSection(name sectionID) {
 func (m *Model) openSectionItem() {
 	// Health has no list items — it drills straight into the full doctor report.
 	if m.navigation.section == sectionHealth {
-		checks := m.data.healthItems
-		m.openViewer(func(w int) string { return renderHealthReport(checks, w) },
-			"doctor report", "Health", viewDashboard)
-		m.viewer.kind = viewerHealth
+		m.openHealthReport(viewDashboard)
 		return
 	}
 	items := m.navigation.items[m.navigation.section]
@@ -299,12 +307,7 @@ func (m *Model) openSectionItem() {
 		m.viewer = viewerState{viewport: view}
 		m.view = viewWorkflowDetail
 	case sectionRepositories:
-		repos := append([]config.Repo(nil), m.data.repos...)
-		routes := append([]config.RepoRoute(nil), m.data.routes...)
-		features := append([]*featureRow(nil), m.data.features...)
-		m.openViewer(func(w int) string { return renderRoutingReport(repos, routes, features, w) },
-			"map", "Repositories", viewDashboard)
-		m.viewer.kind = viewerRepositories
+		m.openRepositoryReport(viewDashboard)
 	default:
 		m.openViewer(fileRenderer(f.path), f.label, sectionLabel(m.navigation.section), viewDashboard)
 	}

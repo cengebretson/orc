@@ -349,14 +349,14 @@ func renderCharacterSheet(m Model, w *workers.Worker) string {
 		f := q.f
 		st := statusStyle(f.s.Status)
 		slug := strings.TrimPrefix(f.s.Slug, f.s.Ticket+"-")
-		questLines = append(questLines,
-			fmt.Sprintf("  %s  %s  %s",
-				st.Render(statusIcon(f.s.Status)),
-				styleDetailLabel.Render(f.s.Ticket),
-				st.Render(f.s.Status),
-			),
-			fmt.Sprintf("     %s", styleDim.Render(ui.Truncate(slug, infoPanelW-6))),
+		prefix := fmt.Sprintf("  %s  %s  %s",
+			st.Render(statusIcon(f.s.Status)),
+			styleDetailLabel.Render(f.s.Ticket),
+			st.Render(f.s.Status),
 		)
+		separator := styleDivider.Render("  ·  ")
+		slugWidth := max(1, infoPanelW-lipgloss.Width(prefix)-lipgloss.Width(separator))
+		questLines = append(questLines, prefix+separator+styleDim.Render(ui.Truncate(slug, slugWidth)))
 	}
 	questPanel := mkPlain(infoPanelW).Render(strings.Join(questLines, "\n"))
 	leftColumn := lipgloss.JoinVertical(lipgloss.Left, infoPanel, questPanel)
@@ -373,5 +373,5 @@ func renderCharacterSheet(m Model, w *workers.Worker) string {
 		content = lipgloss.JoinVertical(lipgloss.Left, leftColumn, portraitPanel) + "\n" + dismiss
 	}
 
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Top, content)
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
 }

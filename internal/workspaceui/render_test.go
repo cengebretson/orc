@@ -1,6 +1,7 @@
 package workspaceui
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -61,6 +62,17 @@ func TestHealthSummaryExtra(t *testing.T) {
 	}
 }
 
+func TestHealthIssueCount(t *testing.T) {
+	m := Model{data: workspaceData{healthItems: []doctor.Check{
+		{Name: "ok", Status: doctor.OK},
+		{Name: "warning", Status: doctor.Warning},
+		{Name: "failure", Status: doctor.Fail},
+	}}}
+	if got := m.HealthIssueCount(); got != 2 {
+		t.Fatalf("HealthIssueCount() = %d, want 2", got)
+	}
+}
+
 func TestDashboardShowsArtifactPolicyAndRepoCapabilityBadges(t *testing.T) {
 	m := testModel(t)
 	m.navigation.expanded[sectionRepositories] = true
@@ -78,6 +90,42 @@ func TestDashboardShowsArtifactPolicyAndRepoCapabilityBadges(t *testing.T) {
 	for _, want := range []string{"artifacts block", "Repositories", "app", "projects/app", "setup", "hints", "label:application", "component:web", "→"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("dashboard missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestEmbeddedWorkspaceRendersOnlySelectedDestination(t *testing.T) {
+	m := testModel(t)
+	m.embedded = true
+	m = m.SetDestination(DestinationWorkflows)
+	out := ansi.Strip(m.viewDashboard())
+	if !strings.Contains(out, "Workflows") {
+		t.Fatalf("workflow destination missing its content:\n%s", out)
+	}
+	for _, hidden := range []string{"Workers", "Repositories", "Features  [a]"} {
+		if strings.Contains(out, hidden) {
+			t.Fatalf("workflow destination should hide %q:\n%s", hidden, out)
+		}
+	}
+}
+
+func TestOperationalBannerAppearsOnEveryWorkspaceDestination(t *testing.T) {
+	m := testModel(t)
+	m.embedded = true
+	m.data.features[0].s.Runtime.Tmux = &state.TmuxRuntime{Session: "story-1"}
+	m.data.features[0].tmuxLive = true
+
+	for _, destination := range []Destination{
+		DestinationFeatures,
+		DestinationWorkflows,
+		DestinationWorkers,
+	} {
+		m = m.SetDestination(destination)
+		out := ansi.Strip(m.View())
+		for _, want := range []string{"3 FEATURES", "● 1 RUNNING", "◐ 1 PAUSED", "! 1 NEEDS YOU"} {
+			if !strings.Contains(out, want) {
+				t.Fatalf("destination %v banner missing %q:\n%s", destination, want, out)
+			}
 		}
 	}
 }
@@ -132,6 +180,17 @@ func TestRoutingReportFitsNarrowAndWideTerminals(t *testing.T) {
 	}
 }
 
+func TestRepositoryDisplayPathResolvesConfiguredPath(t *testing.T) {
+	root := filepath.Join(string(filepath.Separator), "opt", "workspace", "orc")
+	if got := repositoryDisplayPath(root, "."); got != "workspace root" {
+		t.Fatalf("workspace-root path = %q, want workspace root", got)
+	}
+	want := filepath.Join(string(filepath.Separator), "opt", "project")
+	if got := repositoryDisplayPath(root, "../../project"); got != want {
+		t.Fatalf("resolved path = %q, want %q", got, want)
+	}
+}
+
 // Health is collapsed by default, so the issue badge must show in the summary
 // line without expanding the section.
 func TestDashboardCollapsedHealthShowsIssueCount(t *testing.T) {
@@ -172,16 +231,16 @@ func TestRenderHealthReport(t *testing.T) {
 	checks := []doctor.Check{
 		{Group: "workspace", Name: "AGENTS.md", Status: doctor.OK},
 		{Group: "workspace", Name: "worktrees/", Status: doctor.Warning, Detail: "not created yet"},
-		{Group: "config", Name: "orc.yaml", Status: doctor.OK, Detail: "valid"},
+		{Group: "orc.yaml", Name: "workflow refs", Status: doctor.OK, Detail: "all workers and stages exist"},
 		{Group: "tools", Name: "codex", Status: doctor.Fail, Detail: "not found on PATH"},
 	}
 	plain := ansi.Strip(renderHealthReport(checks, 80))
 
 	for _, want := range []string{
-		"Health summary", "workspace", "config", "tools", "passing", "warning", "failing",
+		"Health summary", "workspace", "orc.yaml", "tools", "passing", "warning", "failing",
 		"✓", "⚠", "✗",
 		"AGENTS.md", "worktrees/", "not created yet",
-		"orc.yaml", "valid", "codex", "not found on PATH",
+		"workflow refs", "all workers and stages exist", "codex", "not found on PATH",
 	} {
 		if !strings.Contains(plain, want) {
 			t.Errorf("health report missing %q:\n%s", want, plain)
@@ -192,6 +251,9 @@ func TestRenderHealthReport(t *testing.T) {
 	}
 	if got := lipgloss.Width(renderHealthReport(checks, 80)); got > 80 {
 		t.Errorf("health report width = %d, want <= 80", got)
+	}
+	if !strings.Contains(plain, "│  ✓ 2 passing") {
+		t.Errorf("health summary should use consistent inner padding:\n%s", plain)
 	}
 }
 

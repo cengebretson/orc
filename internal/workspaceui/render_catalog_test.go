@@ -133,6 +133,9 @@ Build features end to end.
 	if !strings.Contains(out, "STORY-7") {
 		t.Error("missing active feature ticket")
 	}
+	if line := firstLineContaining(out, "STORY-7"); !strings.Contains(line, "│  STORY-7") {
+		t.Errorf("active feature row should have inspector padding: %q", line)
+	}
 	if !strings.Contains(out, "Build features end to end.") {
 		t.Error("missing rendered markdown body")
 	}

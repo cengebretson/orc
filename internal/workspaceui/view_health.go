@@ -165,8 +165,74 @@ func renderHealthReport(checks []doctor.Check, width int) string {
 	if lipgloss.Width(statsLine) > outerW-4 {
 		summaryLines = stats
 	}
+	for index := range summaryLines {
+		summaryLines[index] = "  " + summaryLines[index]
+	}
 	sections := []string{drawBoxLabeledWith(styleHeader.Render("Health summary"), summaryLines, outerW, healthReportBorderColor(warnCount, failCount))}
 
+	for _, group := range groups {
+		groupOK, groupWarn, groupFail := healthReportCounts(group.checks)
+		title := group.name + "  ·  " + healthCountLabel(len(group.checks), "check", "checks")
+		if groupFail > 0 {
+			title += fmt.Sprintf("  ·  %d failing", groupFail)
+		}
+		if groupWarn > 0 {
+			title += "  ·  " + healthCountLabel(groupWarn, "warning", "warnings")
+		}
+		if groupFail == 0 && groupWarn == 0 {
+			title += fmt.Sprintf("  ·  %d passing", groupOK)
+		}
+		title = ui.Truncate(title, max(1, outerW-6))
+		lines := renderHealthGroupChecks(group.checks, outerW-4)
+		sections = append(sections, drawBoxLabeledWith(styleSection.Render(title), lines, outerW, healthReportBorderColor(groupWarn, groupFail)))
+	}
+	return strings.Join(sections, "\n")
+}
+
+func renderPinnedHealthSummary(checks []doctor.Check, width int) string {
+	outerW := max(20, width)
+	okCount, warnCount, failCount := healthReportCounts(checks)
+	stats := []string{
+		styleHealthOK.Render(fmt.Sprintf("✓ %d passing", okCount)),
+		styleHealthWarn.Render("⚠ " + healthCountLabel(warnCount, "warning", "warnings")),
+		styleHealthErr.Render(fmt.Sprintf("✗ %d failing", failCount)),
+	}
+	statsLine := strings.Join(stats, styleDim.Render("  ·  "))
+	summaryLines := []string{statsLine}
+	if lipgloss.Width(statsLine) > outerW-4 {
+		summaryLines = stats
+	}
+	for index := range summaryLines {
+		summaryLines[index] = "  " + summaryLines[index]
+	}
+	return drawBoxLabeledWith(styleHeader.Render("Health summary"), summaryLines, outerW, healthReportBorderColor(warnCount, failCount))
+}
+
+func renderHealthDetails(checks []doctor.Check, width int) string {
+	if len(checks) == 0 {
+		return styleDim.Render("No health checks.")
+	}
+	outerW := max(20, width)
+	type healthGroup struct {
+		name   string
+		checks []doctor.Check
+	}
+	groups := make([]healthGroup, 0)
+	groupIndex := map[string]int{}
+	for _, check := range checks {
+		name := strings.TrimSpace(check.Group)
+		if name == "" {
+			name = "general"
+		}
+		index, ok := groupIndex[name]
+		if !ok {
+			index = len(groups)
+			groupIndex[name] = index
+			groups = append(groups, healthGroup{name: name})
+		}
+		groups[index].checks = append(groups[index].checks, check)
+	}
+	sections := make([]string, 0, len(groups))
 	for _, group := range groups {
 		groupOK, groupWarn, groupFail := healthReportCounts(group.checks)
 		title := group.name + "  ·  " + healthCountLabel(len(group.checks), "check", "checks")

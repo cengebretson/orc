@@ -12,6 +12,7 @@ import (
 	"github.com/cengebretson/orc/internal/workers"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -100,6 +101,22 @@ func TestHandleKeyQuit(t *testing.T) {
 		if _, ok := cmd().(tea.QuitMsg); !ok {
 			t.Errorf("%s returned %T, want tea.QuitMsg", k, cmd())
 		}
+	}
+}
+
+func TestWorkspaceDestinationsPreserveSectionCursors(t *testing.T) {
+	m := testModel(t).SetDestination(DestinationWorkers)
+	m.navigation.sectionCursor = 2
+	m = m.SetDestination(DestinationWorkflows)
+	m.navigation.sectionCursor = 1
+
+	m = m.SetDestination(DestinationWorkers)
+	if got := m.navigation.sectionCursor; got != 2 {
+		t.Fatalf("worker cursor = %d, want 2", got)
+	}
+	m = m.SetDestination(DestinationWorkflows)
+	if got := m.navigation.sectionCursor; got != 1 {
+		t.Fatalf("workflow cursor = %d, want 1", got)
 	}
 }
 
@@ -292,6 +309,69 @@ func TestHandleKeyWorkerFileViewer(t *testing.T) {
 	}
 }
 
+func TestWorkersDestinationSelectsInlineDetailsAndKeepsCharacterSheet(t *testing.T) {
+	dir := t.TempDir()
+	bobPath := filepath.Join(dir, "bob.md")
+	janePath := filepath.Join(dir, "jane.md")
+	if err := os.WriteFile(bobPath, []byte("---\nid: bob\nname: Bob\nengine: claude\n---\n\nBob builds things."), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(janePath, []byte("---\nid: jane\nname: Jane\nengine: codex\n---\n\nJane reviews things."), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	m := testModel(t)
+	m.embedded = true
+	m.data.workerNames = []string{"Bob", "Jane"}
+	m.data.workerGroups = []workerGroup{{name: "local", items: []sectionItem{
+		{label: "Bob", id: "bob", path: bobPath},
+		{label: "Jane", id: "jane", path: janePath},
+	}}}
+	m.data.allWorkers = []*workers.Worker{
+		{ID: "bob", Name: "Bob", Engine: "claude", FilePath: bobPath},
+		{ID: "jane", Name: "Jane", Engine: "codex", FilePath: janePath},
+	}
+	m.navigation.items[sectionWorkers] = m.data.workerGroups[0].items
+	m = m.SetDestination(DestinationWorkers)
+
+	if m.view != viewFile || !m.isDirectWorkers() {
+		t.Fatalf("Workers destination = view %v kind %v, want direct worker inspector", m.view, m.viewer.kind)
+	}
+	body := ansi.Strip(m.View())
+	for _, want := range []string{"Workers", "▶  Bob", "Bob builds things"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("direct worker inspector missing %q:\n%s", want, body)
+		}
+	}
+	if strings.Contains(body, "enter to view") {
+		t.Fatalf("Workers destination should not require drill-in:\n%s", body)
+	}
+	if strings.Contains(body, "configured") || strings.Contains(body, "scroll details") {
+		t.Fatalf("Workers selector should contain only worker choices:\n%s", body)
+	}
+	if got := lipgloss.Height(m.View()); got != m.height {
+		t.Fatalf("Workers view height = %d, want terminal height %d", got, m.height)
+	}
+
+	m, _ = press(t, m, "j")
+	body = ansi.Strip(m.View())
+	if m.navigation.sectionCursor != 1 || !strings.Contains(body, "▶  Jane") || !strings.Contains(body, "Jane reviews things") {
+		t.Fatalf("selecting Jane should replace inline details, cursor=%d:\n%s", m.navigation.sectionCursor, body)
+	}
+	if m.viewer.viewport.YOffset != 0 {
+		t.Fatalf("changing workers should reset detail scroll, offset=%d", m.viewer.viewport.YOffset)
+	}
+
+	m, _ = press(t, m, "!")
+	if m.view != viewCharacterSheet || m.effects.charSheetWorker == nil || m.effects.charSheetWorker.ID != "jane" {
+		t.Fatalf("Bard's Tale should open for selected worker: view=%v worker=%+v", m.view, m.effects.charSheetWorker)
+	}
+	m, _ = press(t, m, "esc")
+	if m.view != viewFile || !m.isDirectWorkers() {
+		t.Fatalf("character sheet should return to inline Workers view, view=%v", m.view)
+	}
+}
+
 func TestHandleKeyHealthDrillInOpensReport(t *testing.T) {
 	m := testModel(t)
 	m.data.healthItems = []doctor.Check{
@@ -321,6 +401,84 @@ func TestHandleKeyHealthDrillInOpensReport(t *testing.T) {
 	m, _ = press(t, m, "esc")
 	if m.view != viewDashboard {
 		t.Errorf("esc should return to dashboard, got %v", m.view)
+	}
+}
+
+func TestHealthDestinationOpensScrollableReportDirectly(t *testing.T) {
+	m := testModel(t)
+	m.embedded = true
+	for i := 0; i < 20; i++ {
+		m.data.healthItems = append(m.data.healthItems, doctor.Check{
+			Group:  fmt.Sprintf("group-%d", i),
+			Name:   "check",
+			Status: doctor.OK,
+			Detail: "healthy",
+		})
+	}
+	m = m.SetDestination(DestinationHealth)
+	if m.view != viewFile || m.viewer.kind != viewerHealth {
+		t.Fatalf("Health destination = view %v kind %v, want direct report", m.view, m.viewer.kind)
+	}
+	body := ansi.Strip(m.View())
+	summary := strings.Index(body, "Health summary")
+	firstGroup := strings.Index(body, "group-0")
+	if summary < 0 || firstGroup < 0 || summary > firstGroup {
+		t.Fatalf("Health report should lead with its summary:\n%s", body)
+	}
+	if strings.Contains(body, "doctor report") || strings.Contains(body, "enter to view full report") {
+		t.Fatalf("Health destination should use the summary as its only header:\n%s", body)
+	}
+	if got := lipgloss.Height(m.View()); got != m.height {
+		t.Fatalf("Health view height = %d, want terminal height %d", got, m.height)
+	}
+
+	m, _ = press(t, m, "j")
+	if m.viewer.viewport.YOffset != 1 {
+		t.Fatalf("j should scroll direct Health report, offset=%d", m.viewer.viewport.YOffset)
+	}
+	if !strings.Contains(ansi.Strip(m.View()), "Health summary") {
+		t.Fatal("Health summary should remain pinned while details scroll")
+	}
+	m, _ = press(t, m, "esc")
+	if m.view != viewFile {
+		t.Fatalf("esc should not reveal the retired Health overview, view=%v", m.view)
+	}
+}
+
+func TestRepositoriesDestinationOpensMapDirectlyAndFitsTypicalWorkspace(t *testing.T) {
+	m := testModel(t)
+	m.embedded = true
+	m.data.repos = []config.Repo{
+		{Name: "app", Path: "projects/app", Purpose: "Primary application", AgentHints: []string{"run tests"}},
+		{Name: "api", Path: "projects/api", Purpose: "Service API", WorktreeSetup: "setup {{worktree_path}}"},
+	}
+	m.data.routes = []config.RepoRoute{
+		{Labels: []string{"application"}, Repos: []string{"app"}},
+		{Components: []string{"api"}, Repos: []string{"api"}},
+	}
+	m = m.SetDestination(DestinationRepositories)
+	if m.view != viewFile || m.viewer.kind != viewerRepositories {
+		t.Fatalf("Repositories destination = view %v kind %v, want direct map", m.view, m.viewer.kind)
+	}
+	body := ansi.Strip(m.View())
+	for _, want := range []string{
+		"Repository map", "2 repositories", "app", "projects/app", "Primary application",
+		"api", "projects/api", "Optional route 1", "Optional route 2", "selects",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("direct repository map missing %q:\n%s", want, body)
+		}
+	}
+	if strings.Contains(body, "enter to inspect repositories") || strings.Contains(body, "· map ·") {
+		t.Fatalf("Repositories should not render drill-in chrome:\n%s", body)
+	}
+	if lines, height := m.viewer.viewport.TotalLineCount(), m.viewer.viewport.Height; lines > height {
+		t.Fatalf("typical repository map requires scrolling: %d lines, viewport height %d", lines, height)
+	}
+
+	m, _ = press(t, m, "enter")
+	if m.view != viewFile {
+		t.Fatalf("enter should not open a second repository page, view=%v", m.view)
 	}
 }
 

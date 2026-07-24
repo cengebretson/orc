@@ -125,7 +125,7 @@ func TestRunWithOptionsReportsNoStateLocks(t *testing.T) {
 		},
 	})
 
-	check := findCheck(report, "state locks", "STATE.yaml.lock")
+	check := findCheck(report, "workspace", "STATE.yaml.lock")
 	if check == nil {
 		t.Fatal("state lock check not found")
 	}
@@ -137,22 +137,24 @@ func TestRunWithOptionsReportsNoStateLocks(t *testing.T) {
 	}
 }
 
-func TestRunWithOptionsReportsValidConfig(t *testing.T) {
+func TestRunWithOptionsDoesNotDuplicateValidConfig(t *testing.T) {
 	report := doctor.RunWithOptions(fixtureWorkspace(), doctor.Options{
 		LookPath: func(name string) (string, error) {
 			return "/bin/" + name, nil
 		},
 	})
 
-	check := findCheck(report, "config", "orc.yaml")
-	if check == nil {
-		t.Fatal("config check not found")
+	count := 0
+	for _, check := range report.Checks {
+		if check.Group == "orc.yaml" && check.Name == "orc.yaml" {
+			count++
+			if check.Detail == "valid" {
+				t.Fatal("redundant orc.yaml valid check should be omitted")
+			}
+		}
 	}
-	if check.Status != doctor.OK {
-		t.Fatalf("config status = %v, want OK: %s", check.Status, check.Detail)
-	}
-	if check.Detail != "valid" {
-		t.Fatalf("config detail = %q, want valid", check.Detail)
+	if count != 1 {
+		t.Fatalf("orc.yaml checks = %d, want one operational summary", count)
 	}
 }
 
@@ -186,7 +188,7 @@ engine: codex
 		},
 	})
 
-	check := findCheck(report, "config", "repos.app.worktree_setup")
+	check := findCheck(report, "orc.yaml", "repos.app.worktree_setup")
 	if check == nil {
 		t.Fatal("worktree_setup warning not found")
 	}
@@ -228,7 +230,7 @@ engine: codex
 		},
 	})
 
-	command := findCheck(report, "config", "repos.app.worktree_setup.command")
+	command := findCheck(report, "orc.yaml", "repos.app.worktree_setup.command")
 	if command == nil {
 		t.Fatal("worktree_setup command check not found")
 	}
@@ -236,7 +238,7 @@ engine: codex
 		t.Fatalf("command check = %#v, want missing path warning", command)
 	}
 
-	hints := findCheck(report, "config", "repos.app.agent_hints")
+	hints := findCheck(report, "orc.yaml", "repos.app.agent_hints")
 	if hints == nil {
 		t.Fatal("agent_hints warning not found")
 	}
@@ -244,7 +246,7 @@ engine: codex
 		t.Fatalf("agent_hints status = %v, want Warning", hints.Status)
 	}
 
-	worktrees := findCheck(report, "config", "worktrees/")
+	worktrees := findCheck(report, "orc.yaml", "worktrees/")
 	if worktrees == nil {
 		t.Fatal("worktrees readiness warning not found")
 	}
@@ -290,7 +292,7 @@ engine: codex
 		},
 	})
 
-	command := findCheck(report, "config", "repos.app.worktree_setup.command")
+	command := findCheck(report, "orc.yaml", "repos.app.worktree_setup.command")
 	if command == nil {
 		t.Fatal("worktree_setup command check not found")
 	}
@@ -339,17 +341,17 @@ engine: codex
 		},
 	})
 
-	command := findCheck(report, "config", "repos.app.worktree_setup.command")
+	command := findCheck(report, "orc.yaml", "repos.app.worktree_setup.command")
 	if command == nil {
 		t.Fatal("worktree_setup command check not found")
 	}
 	if command.Status != doctor.OK || command.Detail != "command found: scripts/setup-worktree.sh" {
 		t.Fatalf("command check = %#v, want executable ok", command)
 	}
-	if check := findCheck(report, "config", "repos.app.agent_hints"); check != nil {
+	if check := findCheck(report, "orc.yaml", "repos.app.agent_hints"); check != nil {
 		t.Fatalf("agent_hints warning should not appear when hints exist: %#v", check)
 	}
-	if check := findCheck(report, "config", "worktrees/"); check != nil {
+	if check := findCheck(report, "orc.yaml", "worktrees/"); check != nil {
 		t.Fatalf("config worktrees warning should not appear when directory exists: %#v", check)
 	}
 }
@@ -431,7 +433,7 @@ engine: claude
 		},
 	})
 
-	check := findCheck(report, "config", "workflows.default.stages[0].worker")
+	check := findCheck(report, "orc.yaml", "workflows.default.stages[0].worker")
 	if check == nil {
 		t.Fatal("invalid config check not found")
 	}
@@ -475,7 +477,7 @@ engine: codex
 		},
 	})
 
-	check := findCheck(report, "config", "aliases.stages.develop")
+	check := findCheck(report, "orc.yaml", "aliases.stages.develop")
 	if check == nil {
 		t.Fatal("duplicate alias target check not found")
 	}
@@ -508,7 +510,7 @@ func TestRunWithOptionsReportsStaleStateLock(t *testing.T) {
 		},
 	})
 
-	check := findCheck(report, "state locks", "TICKET-1")
+	check := findCheck(report, "workspace", "TICKET-1")
 	if check == nil {
 		t.Fatal("stale state lock check not found")
 	}
@@ -542,7 +544,7 @@ func TestRunWithOptionsFixRemovesStaleLock(t *testing.T) {
 		Fix: true,
 	})
 
-	check := findCheck(report, "state locks", "TICKET-1")
+	check := findCheck(report, "workspace", "TICKET-1")
 	if check == nil {
 		t.Fatal("state lock check not found")
 	}
@@ -575,7 +577,7 @@ func TestRunWithOptionsFixKeepsLiveLock(t *testing.T) {
 		Fix: true,
 	})
 
-	check := findCheck(report, "state locks", "TICKET-1")
+	check := findCheck(report, "workspace", "TICKET-1")
 	if check == nil {
 		t.Fatal("state lock check not found")
 	}
