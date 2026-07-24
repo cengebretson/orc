@@ -299,18 +299,49 @@ func (m *Model) openSectionItem() {
 		if workflowName == "" {
 			workflowName = f.label
 		}
-		m.navigation.workflowName = workflowName
-		m.navigation.workflowCursor = 0
-		content := renderWorkflowDetail(workflowName, m.data.workflows, m.data.allWorkers, filepath.Join(m.root, "stages"), m.data.features, 0, m.width-4)
-		view := viewport.New(m.width-4, m.height-6)
-		view.SetContent(content)
-		m.viewer = viewerState{viewport: view}
-		m.view = viewWorkflowDetail
+		m.enterWorkflowDetail(workflowName, 0, viewDashboard)
 	case sectionRepositories:
 		m.openRepositoryReport(viewDashboard)
 	default:
 		m.openViewer(fileRenderer(f.path), f.label, sectionLabel(m.navigation.section), viewDashboard)
 	}
+}
+
+// enterWorkflowDetail opens the full-height route chain and stage table for
+// the named workflow at the given stage cursor, scrolling the selected stage
+// into view. returnView is viewDashboard when drilling in from the section
+// list ("back" returns to the list) or the self-referential viewWorkflowDetail
+// when opened directly from the tab bar (marks it as having no drill-in
+// parent, so the shared banner renders the same as the other destinations).
+func (m *Model) enterWorkflowDetail(name string, cursor int, returnView viewState) {
+	m.navigation.workflowName = name
+	m.navigation.workflowCursor = cursor
+	width, height := max(1, m.width-4), max(1, m.height-6)
+	content := renderWorkflowDetail(name, m.data.workflows, m.data.allWorkers, filepath.Join(m.root, "stages"), m.data.features, cursor, width)
+	view := viewport.New(width, height)
+	view.SetContent(content)
+	if line := workflowCursorLine(content); line > 0 {
+		view.SetYOffset(max(0, line-height/2))
+	}
+	m.viewer = viewerState{viewport: view, returnView: returnView}
+	m.view = viewWorkflowDetail
+}
+
+// openDefaultWorkflowDetail opens the workflow detail view directly, as the
+// other Workspace destinations do, instead of requiring a drill-in from the
+// collapsed section list. It defaults to the previously viewed workflow and
+// stage when still valid, otherwise the first available workflow at its top
+// stage, so returning to the tab preserves where the user left off.
+func (m *Model) openDefaultWorkflowDetail() {
+	name := m.navigation.workflowName
+	cursor := m.navigation.workflowCursor
+	if !workflowKnown(name, m.data.workflows) {
+		cursor = 0
+		if len(m.data.workflows) > 0 {
+			name = m.data.workflows[0].name
+		}
+	}
+	m.enterWorkflowDetail(name, cursor, viewWorkflowDetail)
 }
 
 // openViewer switches to the file viewer, rendering content via render at the

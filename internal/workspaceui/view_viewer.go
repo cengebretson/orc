@@ -45,6 +45,9 @@ func (m Model) viewFile() string {
 func (m Model) viewWorkflowDetailPage() string {
 	outerW := max(4, m.width-2)
 	var b strings.Builder
+	if m.isDirectWorkflow() {
+		b.WriteString("\n" + m.operationalBanner(outerW) + "\n")
+	}
 	title := styleDetailTitle.Render(" Workflows") +
 		styleDim.Render(" · ") +
 		styleSubtext.Render(workflowDisplayWithID(m.navigation.workflowName, m.data.workflows)) +
@@ -91,6 +94,18 @@ func wfDetailSelectedStage(name string, idx int, chains []workflowChain) (stageN
 		}
 	}
 	return "", "", 0, 0
+}
+
+func workflowKnown(name string, chains []workflowChain) bool {
+	if name == "" {
+		return false
+	}
+	for _, c := range chains {
+		if c.name == name {
+			return true
+		}
+	}
+	return false
 }
 
 func stageWorkflowCount(chains []workflowChain, stageName string) int {

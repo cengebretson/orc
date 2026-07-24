@@ -8,6 +8,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Workflows now opens directly into its route chain and stage table, filling
+  the terminal height with the shared operational banner pinned above it,
+  matching Health, Workers, and Repositories instead of landing on a sparse
+  collapsed summary. The selected workflow and stage cursor are preserved
+  across tab switches.
+
 - Promoted the merged Live/Features view, Workflows, Workers, Repositories, and
   Health into a unified dashboard tab bar with cyclic and direct-key navigation,
   dedicated Workspace section views, preserved state, an adaptive compact

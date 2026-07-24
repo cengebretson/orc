@@ -365,6 +365,8 @@ func (m Model) SetDestination(destination Destination) Model {
 		m.openRepositoryReport(viewFile)
 	case DestinationWorkers:
 		m.openWorkerReport(viewFile)
+	case DestinationWorkflows:
+		m.openDefaultWorkflowDetail()
 	}
 	return m
 }

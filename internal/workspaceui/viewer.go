@@ -83,6 +83,12 @@ func (m Model) isDirectWorkers() bool {
 	return m.embedded && m.viewer.kind == viewerWorker && m.viewer.returnView == viewFile
 }
 
+// isDirectWorkflow reports whether the workflow detail view was opened
+// straight from the tab bar rather than drilled into from the section list.
+func (m Model) isDirectWorkflow() bool {
+	return m.embedded && m.view == viewWorkflowDetail && m.viewer.returnView == viewWorkflowDetail
+}
+
 func (m Model) directDestinationHeader() string {
 	switch {
 	case m.isDirectHealth():

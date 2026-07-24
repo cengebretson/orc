@@ -86,6 +86,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.refreshStructuredViewer()
 		if m.view == viewWorkflowDetail {
+			if !workflowKnown(m.navigation.workflowName, m.data.workflows) && len(m.data.workflows) > 0 {
+				m.navigation.workflowName = m.data.workflows[0].name
+				m.navigation.workflowCursor = 0
+			}
 			m.reRenderWorkflowDetail()
 		}
 		return m, nil
