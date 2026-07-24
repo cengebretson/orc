@@ -119,6 +119,8 @@ func TestOperationalBannerAppearsOnEveryWorkspaceDestination(t *testing.T) {
 		DestinationFeatures,
 		DestinationWorkflows,
 		DestinationWorkers,
+		DestinationHealth,
+		DestinationRepositories,
 	} {
 		m = m.SetDestination(destination)
 		out := ansi.Strip(m.View())

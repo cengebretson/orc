@@ -108,12 +108,14 @@ func (m Model) directDestinationHeader() string {
 
 func (m Model) directHealthHeader() string {
 	width := max(20, m.viewer.viewport.Width)
-	return "\n" + renderPinnedHealthSummary(m.data.healthItems, width) + "\n"
+	return "\n" + m.operationalBanner(width) + "\n" +
+		renderPinnedHealthSummary(m.data.healthItems, width) + "\n"
 }
 
 func (m Model) directRepositoryHeader() string {
 	width := max(20, m.viewer.viewport.Width)
-	return "\n" + renderRepositoryMapSummary(m.data.repos, m.data.routes, width) + "\n"
+	return "\n" + m.operationalBanner(width) + "\n" +
+		renderRepositoryMapSummary(m.data.repos, m.data.routes, width) + "\n"
 }
 
 func (m Model) directWorkerHeader() string {
