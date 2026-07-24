@@ -197,6 +197,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case tea.MouseMsg:
+		if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft && m.canSwitchSection() {
+			if section, ok := m.navSectionAt(msg.X, msg.Y); ok {
+				return m, m.switchSection(section)
+			}
+		}
 		return m.updateActive(msg)
 	default:
 		return m.updateBoth(msg)
@@ -330,6 +335,58 @@ func (m Model) renderHeader() string {
 	compact := brand + "  " + navStyle.Render("‹") + " " +
 		renderNavigationItem(m.section, m.workspace.HealthIssueCount(), true) + " " + navStyle.Render("›")
 	return terminalui.Fit(compact, m.width)
+}
+
+// navRegion is a clickable column range in the header row, mapping a mouse
+// X position to the tab it landed on.
+type navRegion struct {
+	section    Section
+	start, end int // [start, end)
+}
+
+// navRegions mirrors renderHeader's layout to compute each tab's clickable
+// column range. It returns nil when the header isn't shown, or when it has
+// collapsed to its compact ‹ selected › form for a narrow terminal — that
+// form has no per-tab targets, so clicks there fall through to the active
+// view unchanged.
+func (m Model) navRegions() []navRegion {
+	if !m.shellVisible() || m.help {
+		return nil
+	}
+	brandText := " 👹 ORC"
+	if m.section == SectionOrc {
+		brandText = "[ 👹 ORC ]"
+	}
+	items := make([]string, len(sections))
+	for i, section := range sections {
+		items[i] = renderNavigationItem(section, m.workspace.HealthIssueCount(), section == m.section)
+	}
+	full := brandText + "  " + strings.Join(items, "  ")
+	if lipgloss.Width(full) > m.width {
+		return nil
+	}
+	regions := make([]navRegion, len(sections))
+	col := lipgloss.Width(brandText) + 2
+	for i, section := range sections {
+		w := lipgloss.Width(items[i])
+		regions[i] = navRegion{section: section, start: col, end: col + w}
+		col += w + 2
+	}
+	return regions
+}
+
+// navSectionAt reports which tab, if any, occupies column x on the header
+// row (row 0).
+func (m Model) navSectionAt(x, y int) (Section, bool) {
+	if y != 0 {
+		return SectionLive, false
+	}
+	for _, r := range m.navRegions() {
+		if x >= r.start && x < r.end {
+			return r.section, true
+		}
+	}
+	return SectionLive, false
 }
 
 func initialWideSection(section Section) Section {

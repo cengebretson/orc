@@ -6,6 +6,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Dashboard tabs are clickable — clicking a tab label in the header switches
+  to it, matching the existing `1`-`5` and arrow-key navigation.
+
 ### Changed
 
 - Workflows now opens directly into its route chain and stage table, filling

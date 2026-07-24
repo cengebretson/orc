@@ -7,6 +7,7 @@ import (
 	terminalui "github.com/cengebretson/orc/internal/ui"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 func dashboardModel(t *testing.T, value tea.Model) Model {
@@ -208,6 +209,43 @@ func TestDashboardNumberKeysOpenEveryDestination(t *testing.T) {
 		if m.section != want {
 			t.Fatalf("%c selected %v, want %v", key, m.section, want)
 		}
+	}
+}
+
+func TestClickingATabSwitchesSection(t *testing.T) {
+	m, err := New(t.TempDir(), Options{Start: SectionFeatures})
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	m = dashboardModel(t, updated)
+
+	for _, want := range sections {
+		header := ansi.Strip(strings.Split(m.View(), "\n")[0])
+		col := strings.Index(header, strings.ToUpper(sectionLabel(want)))
+		if col < 0 {
+			t.Fatalf("tab label for %v not found in header: %q", want, header)
+		}
+		updated, _ = m.Update(tea.MouseMsg{X: col, Y: 0, Action: tea.MouseActionPress, Button: tea.MouseButtonLeft})
+		m = dashboardModel(t, updated)
+		if m.section != want {
+			t.Fatalf("clicking %v tab selected %v", want, m.section)
+		}
+	}
+}
+
+func TestClickingOutsideTheHeaderRowDoesNotSwitchSection(t *testing.T) {
+	m, err := New(t.TempDir(), Options{Start: SectionFeatures})
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	m = dashboardModel(t, updated)
+
+	updated, _ = m.Update(tea.MouseMsg{X: 40, Y: 5, Action: tea.MouseActionPress, Button: tea.MouseButtonLeft})
+	m = dashboardModel(t, updated)
+	if m.section != SectionFeatures {
+		t.Fatalf("click below the header row switched section to %v", m.section)
 	}
 }
 
