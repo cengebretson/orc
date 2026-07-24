@@ -316,15 +316,19 @@ func (m *Model) openSectionItem() {
 func (m *Model) enterWorkflowDetail(name string, cursor int, returnView viewState) {
 	m.navigation.workflowName = name
 	m.navigation.workflowCursor = cursor
-	width, height := max(1, m.width-4), max(1, m.height-6)
+	// Set view/returnView before measuring height: viewerHeight consults
+	// isDirectWorkflow, which reads both, to size the viewport around the
+	// pinned banner+title header instead of overflowing past it.
+	m.view = viewWorkflowDetail
+	m.viewer = viewerState{returnView: returnView}
+	width, height := max(1, m.width-4), m.viewerHeight()
 	content := renderWorkflowDetail(name, m.data.workflows, m.data.allWorkers, filepath.Join(m.root, "stages"), m.data.features, cursor, width)
 	view := viewport.New(width, height)
 	view.SetContent(content)
 	if line := workflowCursorLine(content); line > 0 {
 		view.SetYOffset(max(0, line-height/2))
 	}
-	m.viewer = viewerState{viewport: view, returnView: returnView}
-	m.view = viewWorkflowDetail
+	m.viewer.viewport = view
 }
 
 // openDefaultWorkflowDetail opens the workflow detail view directly, as the

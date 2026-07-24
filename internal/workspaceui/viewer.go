@@ -1,6 +1,8 @@
 package workspaceui
 
 import (
+	"fmt"
+
 	"github.com/cengebretson/orc/internal/config"
 	"github.com/cengebretson/orc/internal/doctor"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -97,6 +99,8 @@ func (m Model) directDestinationHeader() string {
 		return m.directRepositoryHeader()
 	case m.isDirectWorkers():
 		return m.directWorkerHeader()
+	case m.isDirectWorkflow():
+		return m.directWorkflowHeader()
 	default:
 		return ""
 	}
@@ -116,6 +120,20 @@ func (m Model) directWorkerHeader() string {
 	width := max(20, m.viewer.viewport.Width)
 	return "\n" + m.operationalBanner(width) + "\n" +
 		renderWorkerSelector(m.data.workerGroups, m.selectedWorkerIndex(), width) + "\n"
+}
+
+// directWorkflowHeader renders the pinned banner and workflow title shown
+// above the route chain when the Workflows tab is opened directly. Building
+// it here (rather than inline in viewWorkflowDetailPage) lets viewerHeight
+// measure its exact line count so the viewport underneath is never over- or
+// under-sized.
+func (m Model) directWorkflowHeader() string {
+	outerW := max(4, m.width-2)
+	title := styleDetailTitle.Render(" Workflows") +
+		styleDim.Render(" · ") +
+		styleSubtext.Render(workflowDisplayWithID(m.navigation.workflowName, m.data.workflows)) +
+		styleDim.Render(fmt.Sprintf("  ·  %.0f%% ", m.viewer.viewport.ScrollPercent()*100))
+	return "\n" + m.operationalBanner(outerW) + "\n" + drawBox(title, nil, outerW) + "\n"
 }
 
 func (m Model) selectedWorkerIndex() int {

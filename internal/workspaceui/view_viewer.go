@@ -43,11 +43,11 @@ func (m Model) viewFile() string {
 // ── Workflow detail view ──────────────────────────────────────────
 
 func (m Model) viewWorkflowDetailPage() string {
+	if header := m.directDestinationHeader(); header != "" {
+		return header + m.viewer.viewport.View()
+	}
 	outerW := max(4, m.width-2)
 	var b strings.Builder
-	if m.isDirectWorkflow() {
-		b.WriteString("\n" + m.operationalBanner(outerW) + "\n")
-	}
 	title := styleDetailTitle.Render(" Workflows") +
 		styleDim.Render(" · ") +
 		styleSubtext.Render(workflowDisplayWithID(m.navigation.workflowName, m.data.workflows)) +
