@@ -101,6 +101,31 @@ func TestRenderTableUsesLiveAttentionStates(t *testing.T) {
 	}
 }
 
+func TestRenderTableMarksAttentionRowsWithABar(t *testing.T) {
+	review := testRow("STORY-1", "active", "code-review")
+	review.attention = "review"
+
+	stopped := testRow("STORY-2", "active", "develop")
+	stopped.s.Runtime.Tmux = &state.TmuxRuntime{Session: "story-2"}
+
+	blocked := testRow("STORY-3", "paused", "develop")
+
+	out := ansi.Strip((Model{}).renderTable([]*featureRow{review, stopped, blocked}, 140, -1))
+	lines := strings.Split(out, "\n")
+	if len(lines) < 5 {
+		t.Fatalf("expected header + divider + 3 rows, got %d lines:\n%s", len(lines), out)
+	}
+	if !strings.HasPrefix(lines[2], attentionMarker) {
+		t.Errorf("review row should start with the attention marker: %q", lines[2])
+	}
+	if strings.HasPrefix(lines[3], attentionMarker) {
+		t.Errorf("stopped row should not show the attention marker: %q", lines[3])
+	}
+	if !strings.HasPrefix(lines[4], attentionMarker) {
+		t.Errorf("blocked row should start with the attention marker: %q", lines[4])
+	}
+}
+
 func TestRenderContextPressureThresholdsAndUnknownLimit(t *testing.T) {
 	thresholds := contextpressure.Thresholds{Green: 40, Yellow: 70, Red: 90}
 	tests := []struct {

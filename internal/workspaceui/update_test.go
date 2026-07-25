@@ -125,6 +125,28 @@ func TestQuoteRotateTickRotatesOnlyWhenFeaturesEmpty(t *testing.T) {
 	}
 }
 
+func TestBreathTickAdvancesPhaseAndWraps(t *testing.T) {
+	m := testModel(t)
+	for i := 1; i <= breathSteps; i++ {
+		updated, cmd := m.Update(breathTickMsg{epoch: m.lifecycle.epoch})
+		m = asModel(t, updated)
+		if cmd == nil {
+			t.Fatal("breathTickMsg should always reschedule while active")
+		}
+		if want := i % breathSteps; m.effects.breathPhase != want {
+			t.Fatalf("breathPhase after %d ticks = %d, want %d", i, m.effects.breathPhase, want)
+		}
+	}
+
+	// A stale epoch is a no-op.
+	stale := m.effects.breathPhase
+	updated, cmd := m.Update(breathTickMsg{epoch: m.lifecycle.epoch + 1})
+	m = asModel(t, updated)
+	if m.effects.breathPhase != stale || cmd != nil {
+		t.Fatalf("stale epoch tick should be a no-op: phase=%d cmd=%v", m.effects.breathPhase, cmd)
+	}
+}
+
 func TestRecordContextHistoryTracksObservedAvailableFeaturesOnly(t *testing.T) {
 	tracked := testRow("STORY-1", "active", "develop")
 	tracked.context = contextpressure.Pressure{Observed: true, Available: true, Percent: 10, Level: contextpressure.LevelGreen}

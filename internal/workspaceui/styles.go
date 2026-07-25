@@ -1,6 +1,7 @@
 package workspaceui
 
 import (
+	"fmt"
 	"hash/fnv"
 	"sort"
 	"time"
@@ -278,6 +279,37 @@ func renderContextSparkline(history []uint64, pressure contextpressure.Pressure)
 		style = styleHealthErr
 	}
 	return style.Render(sparkline(history)) + " " + style.Render(pressure.Label())
+}
+
+// hexBlend linearly interpolates between two "#rrggbb" colors at t in [0,1]
+// (0 returns a, 1 returns b).
+func hexBlend(a, b string, t float64) string {
+	parse := func(hex string) (r, g, bl int) {
+		_, _ = fmt.Sscanf(hex, "#%02x%02x%02x", &r, &g, &bl)
+		return
+	}
+	ar, ag, ab := parse(a)
+	br, bg, bb := parse(b)
+	lerp := func(x, y int) int { return int(float64(x) + t*float64(y-x)) }
+	return fmt.Sprintf("#%02x%02x%02x", lerp(ar, br), lerp(ag, bg), lerp(ab, bb))
+}
+
+// breathStyle returns the "NEEDS YOU" banner style for the given breathPhase,
+// gently blending its foreground between the steady red and a dimmer shade
+// over a slow dim-brighten-dim cycle. The blend is capped well short of full
+// range so it reads as an ambient pulse rather than a flash.
+func breathStyle(phase int) lipgloss.Style {
+	const maxBlend = 0.4
+	half := breathSteps / 2
+	step := phase % breathSteps
+	// Triangle wave: 0 -> half -> 0 across one full cycle.
+	amount := step
+	if step > half {
+		amount = breathSteps - step
+	}
+	t := maxBlend * float64(amount) / float64(half)
+	color := hexBlend(activeTheme.Palette.Red, activeTheme.Palette.Base, t)
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Bold(true)
 }
 
 func helpItem(key, desc string) string {

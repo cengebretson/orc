@@ -26,6 +26,12 @@ func quoteRotateTick(epoch uint64) tea.Cmd {
 	})
 }
 
+func breathTick(epoch uint64) tea.Cmd {
+	return tea.Tick(breathInterval, func(time.Time) tea.Msg {
+		return breathTickMsg{epoch: epoch}
+	})
+}
+
 func attachTmux(session, window string) tea.Cmd {
 	return tea.ExecProcess(
 		newTmuxCmd(session, window),

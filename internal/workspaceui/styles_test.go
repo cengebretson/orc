@@ -75,3 +75,29 @@ func TestRenderContextSparklineNeedsAtLeastTwoSamples(t *testing.T) {
 		t.Fatalf("renderContextSparkline should end with the current percentage: %q", got)
 	}
 }
+
+func TestHexBlendInterpolatesEndpoints(t *testing.T) {
+	if got := hexBlend("#000000", "#ffffff", 0); got != "#000000" {
+		t.Fatalf("hexBlend at t=0 = %q, want the first color", got)
+	}
+	if got := hexBlend("#000000", "#ffffff", 1); got != "#ffffff" {
+		t.Fatalf("hexBlend at t=1 = %q, want the second color", got)
+	}
+	if got := hexBlend("#000000", "#ff0000", 0.5); got != "#7f0000" {
+		t.Fatalf("hexBlend at t=0.5 = %q, want the midpoint", got)
+	}
+}
+
+func TestBreathStyleFormsATriangleWaveAcrossACycle(t *testing.T) {
+	// The steady red endpoint (phase 0) is darkest at the midpoint (a full
+	// half-cycle away) and returns to the steady endpoint one full cycle later.
+	start := breathStyle(0).GetForeground()
+	mid := breathStyle(breathSteps / 2).GetForeground()
+	end := breathStyle(breathSteps).GetForeground()
+	if start != end {
+		t.Fatalf("breathStyle should return to its starting color after a full cycle: start=%v end=%v", start, end)
+	}
+	if start == mid {
+		t.Fatalf("breathStyle midpoint should differ from the steady endpoint")
+	}
+}

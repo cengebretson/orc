@@ -76,6 +76,18 @@ type quoteRotateTickMsg struct {
 // quoteRotateInterval is how often the idle empty-Features quote changes.
 const quoteRotateInterval = 8 * time.Second
 
+type breathTickMsg struct {
+	epoch uint64
+}
+
+// breathInterval is the step rate of the "NEEDS YOU" banner's ambient
+// breathing pulse. breathSteps is the number of steps in one full
+// dim-to-bright-to-dim cycle; keep it even so the midpoint is exact.
+const (
+	breathInterval = 500 * time.Millisecond
+	breathSteps    = 8
+)
+
 type rainbowTickMsg struct{}
 
 const rainbowSteps = terminalui.RainbowSteps // 4 cycles × 12 colors ≈ 3.8s
@@ -302,6 +314,12 @@ type effectsState struct {
 	// Populated on the 2s live refresh rather than the full data reload, so it
 	// survives workspaceData being replaced wholesale on every full refresh.
 	contextHistory map[string][]uint64
+
+	// breathPhase drives the operational banner's "NEEDS YOU" ambient breathing
+	// pulse, advancing every breathInterval regardless of whether anything
+	// currently needs attention (cheap to keep ticking; the banner only uses
+	// it when overview.needs > 0).
+	breathPhase int
 }
 
 // contextHistoryLimit caps how many samples the sparkline keeps per feature —
@@ -418,6 +436,7 @@ func (m Model) Init() tea.Cmd {
 		tickEvery(defaultRefreshInterval, m.lifecycle.epoch),
 		liveTickEvery(defaultLiveRefreshInterval, m.lifecycle.epoch),
 		quoteRotateTick(m.lifecycle.epoch),
+		breathTick(m.lifecycle.epoch),
 	)
 }
 

@@ -60,6 +60,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, quoteRotateTick(m.lifecycle.epoch)
 
+	case breathTickMsg:
+		if m.lifecycle.inactive || msg.epoch != m.lifecycle.epoch {
+			return m, nil
+		}
+		m.effects.breathPhase = (m.effects.breathPhase + 1) % breathSteps
+		return m, breathTick(m.lifecycle.epoch)
+
 	case dataMsg:
 		m.lifecycle.lastRefresh = time.Now()
 		m.lifecycle.lastLiveRefresh = m.lifecycle.lastRefresh

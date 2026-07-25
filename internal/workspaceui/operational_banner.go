@@ -21,6 +21,10 @@ func (m Model) operationalBanner(width int) string {
 		orcLabel = lipgloss.NewStyle().Foreground(c).Bold(true).Render("orc")
 	}
 	headerTitle := orcLabel + styleDim.Render("  workspace orchestrator")
+	needsYouStyle := styleHealthErr.Bold(true)
+	if overview.needs > 0 {
+		needsYouStyle = breathStyle(m.effects.breathPhase)
+	}
 	statsLine := "  " +
 		styleSubtext.Render(fmt.Sprintf("%d FEATURES", overview.features)) +
 		styleDim.Render("  ·  ") +
@@ -28,7 +32,7 @@ func (m Model) operationalBanner(width int) string {
 		styleDim.Render("  ·  ") +
 		styleStatusWaiting.Bold(true).Render(fmt.Sprintf("◐ %d PAUSED", overview.paused)) +
 		styleDim.Render("  ·  ") +
-		styleHealthErr.Bold(true).Render(fmt.Sprintf("! %d NEEDS YOU", overview.needs))
+		needsYouStyle.Render(fmt.Sprintf("! %d NEEDS YOU", overview.needs))
 	if overview.broken > 0 {
 		statsLine += styleDim.Render("  ·  ") +
 			styleHealthErr.Render(fmt.Sprintf("⚠ %d broken", overview.broken))

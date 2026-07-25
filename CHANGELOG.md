@@ -22,6 +22,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The Features table's Context column now shows a small sparkline of each
   live feature's recent context-pressure trend alongside the percentage,
   built from samples collected on the 2s live refresh.
+- Features needing attention (blocked, input, review) now get a colored
+  marker bar in the Features table, matching their status color, instead of
+  relying on scanning the Status column text.
+- The operational banner's "NEEDS YOU" count now breathes gently while it's
+  above zero — a slow, continuous dim/brighten cycle rather than a one-shot
+  flash — so an ongoing attention need reads as ambient rather than urgent
+  noise.
 
 ### Changed
 

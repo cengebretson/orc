@@ -8,6 +8,11 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// attentionMarker replaces a non-selected row's leading space when it needs
+// attention (blocked/input/review), colored to match its status so a long
+// list reads at a glance without needing to scan the Status column text.
+const attentionMarker = "▎"
+
 func (m Model) renderTable(rows []*featureRow, w int, selectedIdx int) string {
 	const (
 		wTicket  = 12
@@ -123,7 +128,11 @@ func (m Model) renderTable(rows []*featureRow, w int, selectedIdx int) string {
 			} else {
 				tmuxCell = styleTmuxNone.Render(plainTmux)
 			}
-			line := " " +
+			marker := " "
+			if featureNeedsAttention(row) {
+				marker = featureStateStyle(row).Render(attentionMarker)
+			}
+			line := marker +
 				ui.PadRight(ticketStyled, wTicket) + "  " +
 				ui.PadRight(nameCell, wName) + "  " +
 				ui.PadRight(statusCell, wStatus) + "  " +
