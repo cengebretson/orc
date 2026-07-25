@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/cengebretson/orc/internal/config"
@@ -274,6 +275,29 @@ func stalenessStyle(age time.Duration) lipgloss.Style {
 	default:
 		return styleDim
 	}
+}
+
+// refreshCountdownWidth is the fill-bar width used by refreshCountdown.
+const refreshCountdownWidth = 6
+
+// refreshCountdown renders a small fill bar plus seconds remaining, showing
+// progress toward the next full data refresh (age/interval) instead of a
+// static "elapsed since last refresh" timestamp. Past the interval (a
+// refresh is overdue) the bar shows full and the countdown clamps to 0s
+// rather than going negative.
+func refreshCountdown(age, interval time.Duration) string {
+	if interval <= 0 {
+		interval = defaultRefreshInterval
+	}
+	frac := float64(age) / float64(interval)
+	frac = max(0, min(frac, 1))
+	filled := int(frac * float64(refreshCountdownWidth))
+	bar := strings.Repeat("▓", filled) + strings.Repeat("░", refreshCountdownWidth-filled)
+	remaining := interval - age
+	if remaining < 0 {
+		remaining = 0
+	}
+	return fmt.Sprintf("%s %ds", bar, int(remaining.Round(time.Second).Seconds()))
 }
 
 func renderContextPressure(pressure contextpressure.Pressure) string {

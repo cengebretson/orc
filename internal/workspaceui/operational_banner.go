@@ -14,7 +14,6 @@ func (m Model) operationalBanner(width int) string {
 		lastLiveRefresh = m.lifecycle.lastRefresh
 	}
 	overview := workspaceOverviewFor(m.data.features, lastLiveRefresh, time.Now())
-	ago := overview.refreshAge.Round(time.Second)
 	orcLabel := styleHeader.Render("orc")
 	if m.effects.rainbowStep > 0 {
 		c := lipgloss.Color(terminalui.RainbowColor(m.effects.rainbowStep, 0))
@@ -37,6 +36,14 @@ func (m Model) operationalBanner(width int) string {
 		statsLine += styleDim.Render("  ·  ") +
 			styleHealthErr.Render(fmt.Sprintf("⚠ %d broken", overview.broken))
 	}
-	statsLine += stalenessStyle(overview.refreshAge).Render(fmt.Sprintf("  ·  ↺ %s ago", ago))
+	interval := m.lifecycle.refreshInterval
+	if interval <= 0 {
+		interval = defaultRefreshInterval
+	}
+	fullAge := time.Since(m.lifecycle.lastRefresh)
+	if m.lifecycle.lastRefresh.IsZero() {
+		fullAge = 0
+	}
+	statsLine += stalenessStyle(overview.refreshAge).Render(fmt.Sprintf("  ·  ↺ %s", refreshCountdown(fullAge, interval)))
 	return drawBoxLabeled(headerTitle, []string{statsLine}, width)
 }

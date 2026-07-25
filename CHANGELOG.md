@@ -34,6 +34,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- The operational banner's staleness indicator is now a small fill bar and
+  countdown toward the next full refresh (`↺ ▓▓▓░░░ 23s`) instead of a
+  static "Ns ago" timestamp, while still turning yellow/red on genuine
+  staleness the same way it always has.
+
 - The ticket detail page and any drilled-into file viewer (a stage file, a
   worker opened from its section list, a ticket's linked document) now pin
   the shared operational banner above their scrollable content too, so it

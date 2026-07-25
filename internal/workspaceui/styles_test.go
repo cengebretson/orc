@@ -3,6 +3,7 @@ package workspaceui
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/cengebretson/orc/internal/config"
 	"github.com/cengebretson/orc/internal/contextpressure"
@@ -127,5 +128,33 @@ func TestBreathStyleFormsATriangleWaveAcrossACycle(t *testing.T) {
 	}
 	if start == mid {
 		t.Fatalf("breathStyle midpoint should differ from the steady endpoint")
+	}
+}
+
+func TestRefreshCountdownFillsAndCountsDownWithinTheInterval(t *testing.T) {
+	interval := 60 * time.Second
+
+	start := refreshCountdown(0, interval)
+	if !strings.HasPrefix(start, "░░░░░░") || !strings.HasSuffix(start, "60s") {
+		t.Fatalf("countdown at age=0 = %q, want an empty bar and the full interval", start)
+	}
+
+	mid := refreshCountdown(30*time.Second, interval)
+	if !strings.HasSuffix(mid, "30s") {
+		t.Fatalf("countdown at age=30s = %q, want 30s remaining", mid)
+	}
+	if strings.Count(mid, "▓") != 3 {
+		t.Fatalf("countdown at age=30s = %q, want a half-filled 6-wide bar", mid)
+	}
+}
+
+func TestRefreshCountdownClampsWhenOverdue(t *testing.T) {
+	interval := 60 * time.Second
+	overdue := refreshCountdown(90*time.Second, interval)
+	if !strings.HasSuffix(overdue, "0s") {
+		t.Fatalf("overdue countdown = %q, want it clamped to 0s rather than negative", overdue)
+	}
+	if strings.Count(overdue, "▓") != refreshCountdownWidth {
+		t.Fatalf("overdue countdown = %q, want a fully-filled bar", overdue)
 	}
 }
