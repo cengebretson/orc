@@ -25,6 +25,19 @@ func pickQuote(custom []string) string {
 	return custom[rand.Intn(len(custom))]
 }
 
+// pickNextQuote picks a quote different from current when possible, so the
+// idle empty-Features rotation doesn't visibly repeat itself back to back.
+func pickNextQuote(custom []string, current string) string {
+	if len(custom) < 2 {
+		return pickQuote(custom)
+	}
+	next := custom[rand.Intn(len(custom)-1)]
+	if next == current {
+		next = custom[len(custom)-1]
+	}
+	return next
+}
+
 // ── view states ──────────────────────────────────────────────────
 
 type viewState int
@@ -56,6 +69,13 @@ type liveTickMsg struct {
 	at    time.Time
 	epoch uint64
 }
+type quoteRotateTickMsg struct {
+	epoch uint64
+}
+
+// quoteRotateInterval is how often the idle empty-Features quote changes.
+const quoteRotateInterval = 8 * time.Second
+
 type rainbowTickMsg struct{}
 
 const rainbowSteps = terminalui.RainbowSteps // 4 cycles × 12 colors ≈ 3.8s
@@ -207,6 +227,7 @@ type workspaceData struct {
 	features       []*featureRow
 	healthItems    []doctor.Check
 	artifactPolicy string
+	quotes         []string
 	workerNames    []string
 	workerGroups   []workerGroup
 	workflowGroups []workflowGroup
@@ -396,6 +417,7 @@ func (m Model) Init() tea.Cmd {
 		loadData(m.root),
 		tickEvery(defaultRefreshInterval, m.lifecycle.epoch),
 		liveTickEvery(defaultLiveRefreshInterval, m.lifecycle.epoch),
+		quoteRotateTick(m.lifecycle.epoch),
 	)
 }
 

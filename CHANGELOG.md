@@ -17,7 +17,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   into its steady highlight, and the Health badge pulses the same way when
   its issue count changes on refresh (not on the very first load).
 - The empty Features view now shows a rotating quote alongside the "no
-  features" message instead of flat text.
+  features" message instead of flat text, and rotates to a new one every 8s
+  while idle and still empty.
 - The Features table's Context column now shows a small sparkline of each
   live feature's recent context-pressure trend alongside the percentage,
   built from samples collected on the 2s live refresh.

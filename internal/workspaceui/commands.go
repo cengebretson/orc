@@ -20,6 +20,12 @@ func liveTickEvery(d time.Duration, epoch uint64) tea.Cmd {
 	})
 }
 
+func quoteRotateTick(epoch uint64) tea.Cmd {
+	return tea.Tick(quoteRotateInterval, func(time.Time) tea.Msg {
+		return quoteRotateTickMsg{epoch: epoch}
+	})
+}
+
 func attachTmux(session, window string) tea.Cmd {
 	return tea.ExecProcess(
 		newTmuxCmd(session, window),

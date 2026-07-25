@@ -93,6 +93,38 @@ func testModel(t *testing.T) Model {
 	return m
 }
 
+func TestQuoteRotateTickRotatesOnlyWhenFeaturesEmpty(t *testing.T) {
+	m := testModel(t)
+	m.data.quotes = []string{"one", "two", "three"}
+	m.effects.quote = "one"
+
+	// Features present: no rotation, but the tick still reschedules.
+	updated, cmd := m.Update(quoteRotateTickMsg{epoch: m.lifecycle.epoch})
+	m = asModel(t, updated)
+	if m.effects.quote != "one" {
+		t.Fatalf("quote rotated while features were present: %q", m.effects.quote)
+	}
+	if cmd == nil {
+		t.Fatal("quoteRotateTickMsg should always reschedule while active")
+	}
+
+	// Empty features: rotates to a different quote.
+	m.data.features = nil
+	updated, _ = m.Update(quoteRotateTickMsg{epoch: m.lifecycle.epoch})
+	m = asModel(t, updated)
+	if m.effects.quote == "one" {
+		t.Fatal("quote should rotate away from the current one when idle and empty")
+	}
+
+	// A stale epoch (from before a deactivate/reactivate cycle) is a no-op.
+	stale := m.effects.quote
+	updated, cmd = m.Update(quoteRotateTickMsg{epoch: m.lifecycle.epoch + 1})
+	m = asModel(t, updated)
+	if m.effects.quote != stale || cmd != nil {
+		t.Fatalf("stale epoch tick should be a no-op: quote=%q cmd=%v", m.effects.quote, cmd)
+	}
+}
+
 func TestRecordContextHistoryTracksObservedAvailableFeaturesOnly(t *testing.T) {
 	tracked := testRow("STORY-1", "active", "develop")
 	tracked.context = contextpressure.Pressure{Observed: true, Available: true, Percent: 10, Level: contextpressure.LevelGreen}

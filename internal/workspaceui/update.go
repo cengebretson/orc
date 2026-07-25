@@ -49,6 +49,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			liveTickEvery(defaultLiveRefreshInterval, m.lifecycle.epoch),
 		)
 
+	case quoteRotateTickMsg:
+		if m.lifecycle.inactive || msg.epoch != m.lifecycle.epoch {
+			return m, nil
+		}
+		// Only worth rotating while the empty state is actually showing it —
+		// otherwise this just quietly primes the next quote for later.
+		if len(m.visibleFeatures()) == 0 {
+			m.effects.quote = pickNextQuote(m.data.quotes, m.effects.quote)
+		}
+		return m, quoteRotateTick(m.lifecycle.epoch)
+
 	case dataMsg:
 		m.lifecycle.lastRefresh = time.Now()
 		m.lifecycle.lastLiveRefresh = m.lifecycle.lastRefresh
@@ -68,6 +79,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			features:       msg.features,
 			healthItems:    msg.healthItems,
 			artifactPolicy: msg.artifactPolicy,
+			quotes:         msg.quotes,
 			workerNames:    msg.workerNames,
 			workerGroups:   msg.workerGroups,
 			workflowGroups: msg.workflowGroups,
