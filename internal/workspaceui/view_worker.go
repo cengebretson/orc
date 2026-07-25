@@ -69,7 +69,11 @@ func renderWorkerFile(path string, features []*featureRow, width int) (string, e
 	var sb strings.Builder
 
 	if hasFM {
-		// Build info rows: label → value pairs.
+		activeFeatureRows := activeWorkerFeatureRows(w.ID, features)
+
+		// Build info rows: label → value pairs. Role and active-feature count
+		// are pulled up here from the markdown body and the Active Features
+		// panel so the card is a complete at-a-glance summary on its own.
 		type row struct{ label, value string }
 		var rows []row
 		add := func(label, value string) {
@@ -80,6 +84,7 @@ func renderWorkerFile(path string, features []*featureRow, width int) (string, e
 		add("id", w.ID)
 		add("engine", w.Engine)
 		add("model", w.Model)
+		add("role", extractMarkdownSection(body, "Role"))
 		argKeys := make([]string, 0, len(w.Args))
 		for k := range w.Args {
 			argKeys = append(argKeys, k)
@@ -88,6 +93,8 @@ func renderWorkerFile(path string, features []*featureRow, width int) (string, e
 		for _, k := range argKeys {
 			add(k, w.Args[k])
 		}
+		add("active", fmt.Sprintf("%d feature(s)", len(activeFeatureRows)))
+
 		// Measure label column width.
 		labelW := 0
 		for _, r := range rows {
@@ -96,14 +103,22 @@ func renderWorkerFile(path string, features []*featureRow, width int) (string, e
 			}
 		}
 
-		// Render rows as styled lines.
+		// Render rows as styled lines, wrapping long values (like role) under
+		// the label column instead of letting them run off the box edge.
 		outerW := width
+		valueW := max(10, outerW-2-labelW-4)
 		var lines []string
 		for _, r := range rows {
 			pad := strings.Repeat(" ", labelW-len(r.label))
 			label := styleDetailLabel.Render(r.label+pad) + styleDim.Render("  ")
-			val := styleDetailValue.Render(r.value)
-			lines = append(lines, "  "+label+val)
+			wrapped := strings.Split(ui.Wrap(r.value, valueW), "\n")
+			for i, wline := range wrapped {
+				if i == 0 {
+					lines = append(lines, "  "+label+styleDetailValue.Render(wline))
+					continue
+				}
+				lines = append(lines, "  "+strings.Repeat(" ", labelW+2)+styleDetailValue.Render(wline))
+			}
 		}
 
 		workerName := w.Name
@@ -112,55 +127,60 @@ func renderWorkerFile(path string, features []*featureRow, width int) (string, e
 		}
 		accent := workerAccentColor(w.ID)
 		accentTitle := lipgloss.NewStyle().Foreground(lipgloss.Color(accent)).Bold(true).Render(workerName)
-		detailsBox := drawBoxLabeledWith(
-			accentTitle,
-			lines,
-			outerW,
-			accent,
-		)
+		detailsBox := drawBoxLabeledWith(accentTitle, lines, outerW, accent)
+		sb.WriteString(detailsBox + "\n")
 
-		activeFeatureRows := activeWorkerFeatureRows(w.ID, features)
-		label := styleSection.Render(fmt.Sprintf("Active Features (%d)", len(activeFeatureRows)))
+		activeLabel := styleSection.Render(fmt.Sprintf("Active Features (%d)", len(activeFeatureRows)))
 		activeRows := padInspectorLines(renderActiveFeatureRows(activeFeatureRows, outerW-6))
-		activeBox := drawBoxLabeled(label, activeRows, outerW)
-		if width >= 100 {
-			const gapW = 2
-			leftW := (outerW - gapW) / 2
-			rightW := outerW - gapW - leftW
-			detailsBox = drawBoxLabeledWith(accentTitle, lines, leftW, accent)
-			activeRows = padInspectorLines(renderActiveFeatureRows(activeFeatureRows, rightW-6))
-			activeBox = drawBoxLabeled(label, activeRows, rightW)
-			detailsBox, activeBox = equalizeBoxHeights(detailsBox, activeBox)
-			sb.WriteString(joinColumns(detailsBox, activeBox, "  ") + "\n")
-		} else {
-			sb.WriteString(detailsBox + "\n")
-			sb.WriteString(activeBox + "\n")
-		}
+		sb.WriteString(drawBoxLabeled(activeLabel, activeRows, outerW) + "\n")
 	}
 
-	// Render markdown body.
+	// Render markdown body, wrapped in a panel to match the boxed layout
+	// above instead of flowing as unboxed text.
 	if body != "" {
+		innerW := max(20, width-4)
 		r, err := glamour.NewTermRenderer(
 			glamour.WithStylesFromJSONBytes(activeTheme.Glamour),
-			glamour.WithWordWrap(width),
+			glamour.WithWordWrap(innerW),
 		)
+		var mdLines []string
 		if err == nil {
 			if out, err := r.Render(body); err == nil {
-				sb.WriteString(out)
+				mdLines = strings.Split(strings.TrimRight(out, "\n"), "\n")
 			} else {
-				sb.WriteString(body)
+				mdLines = strings.Split(body, "\n")
 			}
 		} else {
-			sb.WriteString(body)
+			mdLines = strings.Split(body, "\n")
 		}
+		sb.WriteString(drawBox(styleSection.Render(" Documentation "), mdLines, width))
 	}
 
 	return sb.String(), nil
 }
 
+// extractMarkdownSection returns the trimmed, single-line text of the named
+// "## <heading>" section in a worker markdown body, or "" if the heading
+// isn't present. Used to surface a one-line role summary in the info card
+// without duplicating the full body.
+func extractMarkdownSection(body, heading string) string {
+	marker := "## " + heading
+	idx := strings.Index(body, marker)
+	if idx < 0 {
+		return ""
+	}
+	rest := body[idx+len(marker):]
+	if next := strings.Index(rest, "\n##"); next >= 0 {
+		rest = rest[:next]
+	}
+	return strings.Join(strings.Fields(rest), " ")
+}
+
 type activeFeatureRow struct {
-	ticket string
-	stage  string
+	ticket  string
+	stage   string
+	status  string // pre-styled icon + label, e.g. "◆ review"
+	context string // pre-styled context-pressure label, or a dim "-"
 }
 
 func activeWorkerFeatureRows(workerID string, features []*featureRow) []activeFeatureRow {
@@ -184,33 +204,49 @@ func activeWorkerFeatureRows(workerID string, features []*featureRow) []activeFe
 		if stageLabel == "" {
 			stageLabel = row.s.Stage.Name
 		}
+		icon, label := featureDisplayState(row)
 		rows = append(rows, activeFeatureRow{
-			ticket: row.s.Ticket,
-			stage:  workflowLabel + "/" + stageLabel,
+			ticket:  row.s.Ticket,
+			stage:   workflowLabel + "/" + stageLabel,
+			status:  featureStateStyle(row).Render(icon + " " + label),
+			context: renderContextPressure(row.context),
 		})
 	}
 	return rows
 }
 
 func renderActiveFeatureRows(rows []activeFeatureRow, width int) []string {
-	const maxVisibleActiveFeatures = 5
-	if width < 20 {
-		width = 20
+	if len(rows) == 0 {
+		return []string{styleDim.Render("No active features.")}
 	}
-	ticketW := min(14, max(8, width/3))
-	stageW := width - ticketW - 2
-	if stageW < 1 {
-		stageW = 1
+	const maxVisibleActiveFeatures = 8
+	if width < 30 {
+		width = 30
 	}
+	const (
+		statusW  = 12
+		contextW = 8
+	)
+	ticketW := min(14, max(8, width/5))
+	stageW := width - ticketW - statusW - contextW - 6
+	if stageW < 10 {
+		stageW = 10
+	}
+	header := styleTableHeader.Render(ui.PadRight("Ticket", ticketW)) + "  " +
+		styleTableHeader.Render(ui.PadRight("Stage", stageW)) + "  " +
+		styleTableHeader.Render(ui.PadRight("Status", statusW)) + "  " +
+		styleTableHeader.Render("Context")
 	visibleRows := rows
 	if len(visibleRows) > maxVisibleActiveFeatures {
 		visibleRows = visibleRows[:maxVisibleActiveFeatures]
 	}
-	lines := make([]string, 0, len(visibleRows)+1)
+	lines := make([]string, 0, len(visibleRows)+2)
+	lines = append(lines, header)
 	for _, row := range visibleRows {
 		ticket := styleSubtext.Render(ui.PadRight(ui.Truncate(row.ticket, ticketW), ticketW))
-		stage := styleDim.Render(ui.Truncate(row.stage, stageW))
-		lines = append(lines, ticket+"  "+stage)
+		stage := styleDim.Render(ui.PadRight(ui.Truncate(row.stage, stageW), stageW))
+		status := ui.PadRight(row.status, statusW)
+		lines = append(lines, ticket+"  "+stage+"  "+status+"  "+row.context)
 	}
 	if hidden := len(rows) - len(visibleRows); hidden > 0 {
 		lines = append(lines, styleDim.Render(fmt.Sprintf("+%d more", hidden)))

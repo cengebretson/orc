@@ -159,7 +159,7 @@ func TestRenderWorkerFileNoFrontmatter(t *testing.T) {
 	}
 }
 
-func TestRenderWorkerFileWideLayoutUsesTopColumns(t *testing.T) {
+func TestRenderWorkerFileStacksDetailsAboveActiveFeaturesAtAnyWidth(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "bob-developer.md")
 	content := `---
 id: bob-developer
@@ -167,7 +167,11 @@ name: Bob
 engine: claude
 ---
 
-# Role
+# Bob
+
+## Role
+
+Implementation engineer.
 `
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 		t.Fatal(err)
@@ -180,12 +184,21 @@ engine: claude
 		t.Fatalf("renderWorkerFile: %v", err)
 	}
 	out := ansi.Strip(styled)
-	line := firstLineContaining(out, "╮  ╭")
-	if line == "" {
-		t.Fatalf("wide worker detail should put details and active features on the same row:\n%s", out)
+	// Even at a wide width, the details card and Active Features panel are
+	// full-width and stacked, not side by side.
+	if line := firstLineContaining(out, "╮  ╭"); line != "" {
+		t.Fatalf("worker detail boxes should be stacked, not side by side:\n%s", out)
 	}
-	if bottom := firstLineContaining(out, "╯  ╰"); bottom == "" {
-		t.Fatalf("wide worker detail boxes should have equal height:\n%s", out)
+	detailsIdx := strings.Index(out, "Bob")
+	activeIdx := strings.Index(out, "Active Features")
+	docsIdx := strings.Index(out, "Documentation")
+	if detailsIdx < 0 || activeIdx < 0 || docsIdx < 0 || detailsIdx >= activeIdx || activeIdx >= docsIdx {
+		t.Fatalf("expected details, then Active Features, then a Documentation panel, in order:\n%s", out)
+	}
+	for _, want := range []string{"role", "Implementation engineer.", "active", "1 feature(s)"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("details card missing %q pulled up from the body/Active Features:\n%s", want, out)
+		}
 	}
 }
 
@@ -204,7 +217,7 @@ engine: claude
 	}
 
 	var stories []*featureRow
-	for i := 1; i <= 7; i++ {
+	for i := 1; i <= 10; i++ {
 		story := testRow(fmt.Sprintf("STORY-%d", i), "active", "develop")
 		story.s.Stage.Worker = "bob-developer"
 		stories = append(stories, story)
@@ -215,13 +228,13 @@ engine: claude
 		t.Fatalf("renderWorkerFile: %v", err)
 	}
 	out := ansi.Strip(styled)
-	for _, want := range []string{"STORY-1", "STORY-5", "+2 more"} {
+	for _, want := range []string{"STORY-1", "STORY-8", "+2 more"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("capped active feature list missing %q:\n%s", want, out)
 		}
 	}
-	if strings.Contains(out, "STORY-6") || strings.Contains(out, "STORY-7") {
-		t.Fatalf("capped active feature list should not render rows past the first five:\n%s", out)
+	if strings.Contains(out, "STORY-9") || strings.Contains(out, "STORY-10") {
+		t.Fatalf("capped active feature list should not render rows past the first eight:\n%s", out)
 	}
 }
 
