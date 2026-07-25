@@ -64,7 +64,6 @@ type Model struct {
 	buildDate        string
 	revision         string
 	orcAnimationStep int
-	tabFlashStep     int
 	healthPulseStep  int
 	healthIssuesSeen bool // false until the first HealthIssueCount observation, so startup never pulses
 	lastHealthIssues int
@@ -76,7 +75,6 @@ var (
 	brandStyle        lipgloss.Style
 	navStyle          lipgloss.Style
 	selectedStyle     lipgloss.Style
-	flashStyle        lipgloss.Style
 	warningStyle      lipgloss.Style
 	pulseWarningStyle lipgloss.Style
 	logoStyle         lipgloss.Style
@@ -85,10 +83,9 @@ var (
 	keyStyle          lipgloss.Style
 )
 
-// tabFlashSteps is how many tabFlashTick ticks the newly-selected tab (or a
-// changed Health badge) renders with its pulse style before settling back to
-// its steady one.
-const tabFlashSteps = 3
+// pulseSteps is how many pulseTick ticks a changed Health badge renders with
+// pulseWarningStyle before settling back to the steady warningStyle.
+const pulseSteps = 3
 
 func init() {
 	setTheme(terminalui.DefaultTheme())
@@ -99,7 +96,6 @@ func setTheme(theme terminalui.Theme) {
 	brandStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Text)).Bold(true)
 	navStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Overlay0))
 	selectedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Mauve)).Bold(true)
-	flashStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Base)).Background(lipgloss.Color(p.Mauve)).Bold(true)
 	warningStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Yellow)).Bold(true)
 	pulseWarningStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Base)).Background(lipgloss.Color(p.Yellow)).Bold(true)
 	logoStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Surface1))
@@ -108,10 +104,10 @@ func setTheme(theme terminalui.Theme) {
 	keyStyle = selectedStyle
 }
 
-type tabFlashTickMsg struct{}
+type pulseTickMsg struct{}
 
-func tabFlashTick() tea.Cmd {
-	return tea.Tick(90*time.Millisecond, func(time.Time) tea.Msg { return tabFlashTickMsg{} })
+func pulseTick() tea.Cmd {
+	return tea.Tick(90*time.Millisecond, func(time.Time) tea.Msg { return pulseTickMsg{} })
 }
 
 // New constructs a dashboard without starting the terminal program.
@@ -216,18 +212,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, orcTick()
 		}
 		return m, nil
-	case tabFlashTickMsg:
-		active := false
-		if m.tabFlashStep > 0 {
-			m.tabFlashStep--
-			active = active || m.tabFlashStep > 0
+	case pulseTickMsg:
+		if m.healthPulseStep <= 0 {
+			return m, nil
 		}
+		m.healthPulseStep--
 		if m.healthPulseStep > 0 {
-			m.healthPulseStep--
-			active = active || m.healthPulseStep > 0
-		}
-		if active {
-			return m, tabFlashTick()
+			return m, pulseTick()
 		}
 		return m, nil
 	case tea.MouseMsg:
@@ -248,19 +239,18 @@ func (m *Model) switchSection(section Section) tea.Cmd {
 	}
 	workspaceWasActive := m.workspace.IsActive()
 	m.section = section
-	m.tabFlashStep = tabFlashSteps
 	switch section {
 	case SectionOrc:
 		m.live = m.live.SetActive(false)
 		m.workspace = m.workspace.SetActive(false)
 		m.quote = chooseNextLegacyQuote(m.quotes, m.quote)
 		m.orcAnimationStep = terminalui.RainbowSteps
-		return tea.Batch(orcTick(), tabFlashTick())
+		return orcTick()
 	case SectionLive:
 		m.orcAnimationStep = 0
 		m.workspace = m.workspace.SetActive(false)
 		m.live = m.live.SetActive(true)
-		return tea.Batch(m.live.Init(), tabFlashTick())
+		return m.live.Init()
 	default:
 		m.orcAnimationStep = 0
 		m.wideSection = section
@@ -268,9 +258,9 @@ func (m *Model) switchSection(section Section) tea.Cmd {
 		m.live = m.live.SetActive(false)
 		m.workspace = m.workspace.SetActive(true)
 		if workspaceWasActive {
-			return tabFlashTick()
+			return nil
 		}
-		return tea.Batch(m.workspace.Init(), tabFlashTick())
+		return m.workspace.Init()
 	}
 }
 
@@ -366,16 +356,15 @@ func (m *Model) notePulseIfHealthChanged(count int) tea.Cmd {
 		return nil
 	}
 	m.lastHealthIssues = count
-	m.healthPulseStep = tabFlashSteps
-	return tabFlashTick()
+	m.healthPulseStep = pulseSteps
+	return pulseTick()
 }
 
 func (m Model) renderHeader() string {
 	items := make([]string, 0, len(sections))
 	for _, section := range sections {
-		flashing := section == m.section && m.tabFlashStep > 0
 		healthPulsing := section == SectionHealth && m.healthPulseStep > 0
-		items = append(items, renderNavigationItem(section, m.workspace.HealthIssueCount(), section == m.section, flashing, healthPulsing))
+		items = append(items, renderNavigationItem(section, m.workspace.HealthIssueCount(), section == m.section, healthPulsing))
 	}
 	brand := brandStyle.Render(" 👹 ORC")
 	if m.section == SectionOrc {
@@ -395,7 +384,7 @@ func (m Model) renderHeader() string {
 		return terminalui.Fit(brand, m.width)
 	}
 	compact := brand + "  " + navStyle.Render("‹") + " " +
-		renderNavigationItem(m.section, m.workspace.HealthIssueCount(), true, m.tabFlashStep > 0, m.section == SectionHealth && m.healthPulseStep > 0) + " " + navStyle.Render("›")
+		renderNavigationItem(m.section, m.workspace.HealthIssueCount(), true, m.section == SectionHealth && m.healthPulseStep > 0) + " " + navStyle.Render("›")
 	return terminalui.Fit(compact, m.width)
 }
 
@@ -421,7 +410,7 @@ func (m Model) navRegions() []navRegion {
 	}
 	items := make([]string, len(sections))
 	for i, section := range sections {
-		items[i] = renderNavigationItem(section, m.workspace.HealthIssueCount(), section == m.section, false, false)
+		items[i] = renderNavigationItem(section, m.workspace.HealthIssueCount(), section == m.section, false)
 	}
 	full := brandText + "  " + strings.Join(items, "  ")
 	if lipgloss.Width(full) > m.width {
@@ -466,12 +455,9 @@ func navigationLabel(section Section, healthIssues int) string {
 	return label
 }
 
-func renderNavigationItem(section Section, healthIssues int, selected, flashing, healthPulsing bool) string {
+func renderNavigationItem(section Section, healthIssues int, selected, healthPulsing bool) string {
 	style := navStyle
-	switch {
-	case flashing:
-		style = flashStyle
-	case selected:
+	if selected {
 		style = selectedStyle
 	}
 	label := style.Render(sectionLabel(section))

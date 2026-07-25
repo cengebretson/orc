@@ -103,7 +103,7 @@ func TestHealthNavigationLabelShowsWarningBadge(t *testing.T) {
 	if got := navigationLabel(SectionHealth, 2); got != "HEALTH ⚠ 2" {
 		t.Fatalf("navigationLabel(Health) = %q, want warning badge", got)
 	}
-	badge := renderNavigationItem(SectionHealth, 2, false, false, false)
+	badge := renderNavigationItem(SectionHealth, 2, false, false)
 	if !strings.Contains(badge, warningStyle.Render("⚠ 2")) {
 		t.Fatalf("Health warning badge is not yellow: %q", badge)
 	}
@@ -133,27 +133,27 @@ func TestHealthBadgePulsesOnChangeButNotOnFirstObservation(t *testing.T) {
 	if cmd := m.notePulseIfHealthChanged(3); cmd == nil {
 		t.Fatalf("changed count should return a pulse tick command")
 	}
-	if m.healthPulseStep != tabFlashSteps {
-		t.Fatalf("healthPulseStep = %d, want %d", m.healthPulseStep, tabFlashSteps)
+	if m.healthPulseStep != pulseSteps {
+		t.Fatalf("healthPulseStep = %d, want %d", m.healthPulseStep, pulseSteps)
 	}
 
-	badge := renderNavigationItem(SectionHealth, 3, false, false, true)
+	badge := renderNavigationItem(SectionHealth, 3, false, true)
 	if !strings.Contains(badge, pulseWarningStyle.Render("⚠ 3")) {
 		t.Fatalf("pulsing Health badge missing pulse style: %q", badge)
 	}
 
-	// The shared tick decays it back to steady state.
+	// The pulse tick decays it back to steady state.
 	for m.healthPulseStep > 0 {
-		updated, _ := m.Update(tabFlashTickMsg{})
+		updated, _ := m.Update(pulseTickMsg{})
 		m = dashboardModel(t, updated)
 	}
-	badge = renderNavigationItem(SectionHealth, 3, false, false, false)
+	badge = renderNavigationItem(SectionHealth, 3, false, false)
 	if !strings.Contains(badge, warningStyle.Render("⚠ 3")) {
 		t.Fatalf("settled Health badge missing steady style: %q", badge)
 	}
 }
 
-func TestTabFlashDecaysAfterSwitchingSections(t *testing.T) {
+func TestSwitchSectionUpdatesSelectedTab(t *testing.T) {
 	m, err := New(t.TempDir(), Options{Start: SectionFeatures})
 	if err != nil {
 		t.Fatal(err)
@@ -161,24 +161,13 @@ func TestTabFlashDecaysAfterSwitchingSections(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 40})
 	m = dashboardModel(t, updated)
 
-	cmd := m.switchSection(SectionWorkers)
-	if cmd == nil {
-		t.Fatal("switchSection should return a command batch including the flash tick")
-	}
-	if m.tabFlashStep != tabFlashSteps {
-		t.Fatalf("tabFlashStep = %d after switch, want %d", m.tabFlashStep, tabFlashSteps)
+	m.switchSection(SectionWorkers)
+	if m.section != SectionWorkers {
+		t.Fatalf("section = %v, want SectionWorkers", m.section)
 	}
 	header := ansi.Strip(m.renderHeader())
-	if !strings.Contains(header, "WORKERS") {
+	if !strings.Contains(header, "[ WORKERS ]") {
 		t.Fatalf("header missing selected tab: %q", header)
-	}
-
-	for m.tabFlashStep > 0 {
-		updated, _ = m.Update(tabFlashTickMsg{})
-		m = dashboardModel(t, updated)
-	}
-	if m.tabFlashStep != 0 {
-		t.Fatalf("tabFlashStep = %d after decay, want 0", m.tabFlashStep)
 	}
 }
 

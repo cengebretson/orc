@@ -13,9 +13,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Each worker now gets a stable accent color, assigned so no two workers
   collide, shown consistently everywhere a worker appears — the Features
   table, Workers tab, ticket detail, and the Workflows stage table.
-- Switching tabs briefly flashes the newly-selected tab before it settles
-  into its steady highlight, and the Health badge pulses the same way when
-  its issue count changes on refresh (not on the very first load).
+- The Health badge briefly pulses when its issue count changes on refresh
+  (not on the very first load), so a newly-appeared or newly-resolved issue
+  catches the eye instead of silently updating the number.
 - The empty Features view now shows a rotating quote alongside the "no
   features" message instead of flat text, and rotates to a new one every 8s
   while idle and still empty.
