@@ -222,6 +222,10 @@ func (m Model) viewDashboard() string {
 	var tableLines []string
 	if total == 0 {
 		tableLines = []string{"  " + styleDim.Render("No features found. Run orc work <ticket> to start one.")}
+		if !m.filter.active && m.filter.input.Value() == "" && m.effects.quote != "" {
+			quoteStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(activeTheme.Palette.Overlay0)).Italic(true)
+			tableLines = append(tableLines, "", "  "+quoteStyle.Render("\""+m.effects.quote+"\""))
+		}
 	} else {
 		tableLines = strings.Split(m.renderTable(visibleRows, outerW-2, m.navigation.featureCursor-offset), "\n")
 	}

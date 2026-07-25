@@ -76,6 +76,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			repos:          msg.repos,
 			routes:         msg.routes,
 		}
+		assignWorkerAccentColors(msg.allWorkers)
 		m.navigation.items = msg.sectionItems
 		m.lifecycle.refreshInterval = msg.refreshInterval
 		if m.effects.quote == "" {

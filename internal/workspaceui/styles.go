@@ -1,10 +1,13 @@
 package workspaceui
 
 import (
+	"hash/fnv"
+	"sort"
 	"time"
 
 	"github.com/cengebretson/orc/internal/contextpressure"
 	terminalui "github.com/cengebretson/orc/internal/ui"
+	"github.com/cengebretson/orc/internal/workers"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -114,6 +117,66 @@ func initStyles() {
 	styleTmuxNone = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Overlay0))
 
 	styleDivider = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Surface1))
+}
+
+// workerAccentPalette returns the theme colors set aside for worker identity —
+// deliberately excluding Mauve, Yellow, Green, Red, Sky, and Peach, which are
+// already claimed by selection, status, and health semantics elsewhere in the
+// dashboard, so a worker's color is never mistaken for a status color.
+func workerAccentPalette() []string {
+	p := activeTheme.Palette
+	return []string{p.Blue, p.Sapphire, p.Teal, p.Maroon, p.Pink, p.Flamingo}
+}
+
+// workerColorAssignments maps a worker ID to its assigned palette index,
+// populated by assignWorkerAccentColors whenever the worker list loads. A
+// package-level cache (consistent with activeTheme above) rather than a
+// Model field, since Bubble Tea's single-goroutine update loop already makes
+// package-level UI state safe here.
+var workerColorAssignments = map[string]int{}
+
+// assignWorkerAccentColors gives each known worker a stable palette slot,
+// assigned in sorted-ID order so the same workspace always produces the same
+// assignment and, for typical worker counts, no two workers share a color —
+// something a plain hash can't guarantee (fixed workers can still collide by
+// chance). Unrecognized worker IDs (e.g. stale state.yaml data) fall back to
+// a hash in workerAccentColor below.
+func assignWorkerAccentColors(allWorkers []*workers.Worker) {
+	ids := make([]string, 0, len(allWorkers))
+	for _, w := range allWorkers {
+		if w.ID != "" {
+			ids = append(ids, w.ID)
+		}
+	}
+	sort.Strings(ids)
+	assignments := make(map[string]int, len(ids))
+	for i, id := range ids {
+		assignments[id] = i % len(workerAccentPalette())
+	}
+	workerColorAssignments = assignments
+}
+
+// workerAccentColor returns a stable color for the given worker ID: the
+// assigned palette slot from assignWorkerAccentColors when known, or a hash
+// of the ID as a fallback so an unrecognized worker still gets a consistent
+// (if potentially collision-prone) color rather than falling back to gray.
+func workerAccentColor(workerID string) string {
+	colors := workerAccentPalette()
+	if workerID == "" || len(colors) == 0 {
+		return activeTheme.Palette.Overlay0
+	}
+	if idx, ok := workerColorAssignments[workerID]; ok {
+		return colors[idx]
+	}
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(workerID))
+	return colors[int(h.Sum32())%len(colors)]
+}
+
+// workerAccentStyle is workerAccentColor wrapped as a lipgloss.Style for
+// direct use in Render calls.
+func workerAccentStyle(workerID string) lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(workerAccentColor(workerID)))
 }
 
 func statusStyle(status string) lipgloss.Style {

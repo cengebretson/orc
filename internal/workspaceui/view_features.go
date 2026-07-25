@@ -102,7 +102,7 @@ func (m Model) renderTable(rows []*featureRow, w int, selectedIdx int) string {
 			}
 			statusCell := featureStateStyle(row).Render(icon + " " + displayStatus)
 			nameCell := styleDim.Render(ui.Truncate(name, wName))
-			workerCell := styleDim.Render(ui.Truncate(plainWorker, wWorker))
+			workerCell := workerAccentStyle(row.workerID).Render(ui.Truncate(plainWorker, wWorker))
 			contextCell := renderContextPressure(row.context)
 			var tmuxCell string
 			if s.Runtime.Tmux != nil {

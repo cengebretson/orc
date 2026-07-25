@@ -33,11 +33,11 @@ func renderWorkerGroups(groups []workerGroup, maxW int) []string {
 			continue
 		}
 		lines = append(lines, styleDim.Render(group.name))
-		var names []string
-		for _, item := range group.items {
-			names = append(names, item.label)
+		chips := make([]string, len(group.items))
+		for i, item := range group.items {
+			chips[i] = workerAccentStyle(item.id).Render(item.label)
 		}
-		for _, line := range renderNameList(maxW-2, names) {
+		for _, line := range renderChipList(maxW-2, chips) {
 			lines = append(lines, "  "+line)
 		}
 	}
@@ -100,12 +100,12 @@ func renderGroupedWorkerList(groups []workerGroup, cursor int) []string {
 		}
 		lines = append(lines, styleDim.Render(group.name))
 		for _, item := range group.items {
-			label := labelWithDimID(item.label, item.id)
+			label := coloredWorkerLabel(item.label, item.id)
 			if itemIdx == cursor {
-				lines = append(lines, styleHealthOK.Render("▶")+"  "+styleSubtext.Render(label)+
+				lines = append(lines, styleHealthOK.Render("▶")+"  "+label+
 					styleDim.Render("  enter to view"))
 			} else {
-				lines = append(lines, "   "+styleDim.Render(label))
+				lines = append(lines, "   "+label)
 			}
 			itemIdx++
 		}
@@ -141,16 +141,26 @@ func renderGroupedWorkflowList(groups []workflowGroup, cursor int) []string {
 	return lines
 }
 
-// renderNameList wraps a list of names with · separators to fit maxW.
+// renderNameList wraps a list of plain names with · separators to fit maxW.
 func renderNameList(maxW int, names []string) []string {
+	chips := make([]string, len(names))
+	for i, name := range names {
+		chips[i] = styleSubtext.Render(name)
+	}
+	return renderChipList(maxW, chips)
+}
+
+// renderChipList wraps a list of pre-rendered chips with · separators to fit
+// maxW, letting callers style each chip differently (e.g. per-worker accent
+// colors) while sharing the wrapping logic with renderNameList.
+func renderChipList(maxW int, chips []string) []string {
 	sep := styleDivider.Render("  ·  ")
 	sepW := lipgloss.Width(sep)
 
 	var rows []string
 	row := ""
 	rowW := 0
-	for _, name := range names {
-		chip := styleSubtext.Render(name)
+	for _, chip := range chips {
 		chipW := lipgloss.Width(chip)
 		if rowW > 0 && rowW+sepW+chipW > maxW {
 			rows = append(rows, row)

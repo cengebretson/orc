@@ -27,11 +27,11 @@ func renderWorkerSelector(groups []workerGroup, cursor, width int) string {
 		}
 		lines = append(lines, styleDim.Render(group.name))
 		for _, item := range group.items {
-			label := labelWithDimID(item.label, item.id)
+			label := coloredWorkerLabel(item.label, item.id)
 			if itemIndex == cursor {
-				lines = append(lines, "  "+styleHealthOK.Render("▶")+"  "+styleSubtext.Render(label))
+				lines = append(lines, "  "+styleHealthOK.Render("▶")+"  "+label)
 			} else {
-				lines = append(lines, "     "+styleDim.Render(label))
+				lines = append(lines, "     "+label)
 			}
 			itemIndex++
 		}
@@ -110,11 +110,13 @@ func renderWorkerFile(path string, features []*featureRow, width int) (string, e
 		if workerName == "" {
 			workerName = w.ID
 		}
+		accent := workerAccentColor(w.ID)
+		accentTitle := lipgloss.NewStyle().Foreground(lipgloss.Color(accent)).Bold(true).Render(workerName)
 		detailsBox := drawBoxLabeledWith(
-			styleHeader.Render(workerName),
+			accentTitle,
 			lines,
 			outerW,
-			activeTheme.Palette.Mauve,
+			accent,
 		)
 
 		activeFeatureRows := activeWorkerFeatureRows(w.ID, features)
@@ -125,7 +127,7 @@ func renderWorkerFile(path string, features []*featureRow, width int) (string, e
 			const gapW = 2
 			leftW := (outerW - gapW) / 2
 			rightW := outerW - gapW - leftW
-			detailsBox = drawBoxLabeledWith(styleHeader.Render(workerName), lines, leftW, activeTheme.Palette.Mauve)
+			detailsBox = drawBoxLabeledWith(accentTitle, lines, leftW, accent)
 			activeRows = padInspectorLines(renderActiveFeatureRows(activeFeatureRows, rightW-6))
 			activeBox = drawBoxLabeled(label, activeRows, rightW)
 			detailsBox, activeBox = equalizeBoxHeights(detailsBox, activeBox)

@@ -5,6 +5,7 @@ package dashboard
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/cengebretson/orc/internal/config"
 	terminalui "github.com/cengebretson/orc/internal/ui"
@@ -63,20 +64,31 @@ type Model struct {
 	buildDate        string
 	revision         string
 	orcAnimationStep int
+	tabFlashStep     int
+	healthPulseStep  int
+	healthIssuesSeen bool // false until the first HealthIssueCount observation, so startup never pulses
+	lastHealthIssues int
 	live             watch.Model
 	workspace        workspaceui.Model
 }
 
 var (
-	brandStyle    lipgloss.Style
-	navStyle      lipgloss.Style
-	selectedStyle lipgloss.Style
-	warningStyle  lipgloss.Style
-	logoStyle     lipgloss.Style
-	quoteStyle    lipgloss.Style
-	cardStyle     lipgloss.Style
-	keyStyle      lipgloss.Style
+	brandStyle        lipgloss.Style
+	navStyle          lipgloss.Style
+	selectedStyle     lipgloss.Style
+	flashStyle        lipgloss.Style
+	warningStyle      lipgloss.Style
+	pulseWarningStyle lipgloss.Style
+	logoStyle         lipgloss.Style
+	quoteStyle        lipgloss.Style
+	cardStyle         lipgloss.Style
+	keyStyle          lipgloss.Style
 )
+
+// tabFlashSteps is how many tabFlashTick ticks the newly-selected tab (or a
+// changed Health badge) renders with its pulse style before settling back to
+// its steady one.
+const tabFlashSteps = 3
 
 func init() {
 	setTheme(terminalui.DefaultTheme())
@@ -87,11 +99,19 @@ func setTheme(theme terminalui.Theme) {
 	brandStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Text)).Bold(true)
 	navStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Overlay0))
 	selectedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Mauve)).Bold(true)
+	flashStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Base)).Background(lipgloss.Color(p.Mauve)).Bold(true)
 	warningStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Yellow)).Bold(true)
+	pulseWarningStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Base)).Background(lipgloss.Color(p.Yellow)).Bold(true)
 	logoStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Surface1))
 	quoteStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Overlay0)).Italic(true)
 	cardStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color(p.Mauve)).Padding(0, 1)
 	keyStyle = selectedStyle
+}
+
+type tabFlashTickMsg struct{}
+
+func tabFlashTick() tea.Cmd {
+	return tea.Tick(90*time.Millisecond, func(time.Time) tea.Msg { return tabFlashTickMsg{} })
 }
 
 // New constructs a dashboard without starting the terminal program.
@@ -196,6 +216,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, orcTick()
 		}
 		return m, nil
+	case tabFlashTickMsg:
+		active := false
+		if m.tabFlashStep > 0 {
+			m.tabFlashStep--
+			active = active || m.tabFlashStep > 0
+		}
+		if m.healthPulseStep > 0 {
+			m.healthPulseStep--
+			active = active || m.healthPulseStep > 0
+		}
+		if active {
+			return m, tabFlashTick()
+		}
+		return m, nil
 	case tea.MouseMsg:
 		if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft && m.canSwitchSection() {
 			if section, ok := m.navSectionAt(msg.X, msg.Y); ok {
@@ -214,18 +248,19 @@ func (m *Model) switchSection(section Section) tea.Cmd {
 	}
 	workspaceWasActive := m.workspace.IsActive()
 	m.section = section
+	m.tabFlashStep = tabFlashSteps
 	switch section {
 	case SectionOrc:
 		m.live = m.live.SetActive(false)
 		m.workspace = m.workspace.SetActive(false)
 		m.quote = chooseNextLegacyQuote(m.quotes, m.quote)
 		m.orcAnimationStep = terminalui.RainbowSteps
-		return orcTick()
+		return tea.Batch(orcTick(), tabFlashTick())
 	case SectionLive:
 		m.orcAnimationStep = 0
 		m.workspace = m.workspace.SetActive(false)
 		m.live = m.live.SetActive(true)
-		return m.live.Init()
+		return tea.Batch(m.live.Init(), tabFlashTick())
 	default:
 		m.orcAnimationStep = 0
 		m.wideSection = section
@@ -233,9 +268,9 @@ func (m *Model) switchSection(section Section) tea.Cmd {
 		m.live = m.live.SetActive(false)
 		m.workspace = m.workspace.SetActive(true)
 		if workspaceWasActive {
-			return nil
+			return tabFlashTick()
 		}
-		return m.workspace.Init()
+		return tea.Batch(m.workspace.Init(), tabFlashTick())
 	}
 }
 
@@ -307,13 +342,40 @@ func (m Model) updateBoth(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if next, ok := workspace.(workspaceui.Model); ok {
 		m.workspace = next
 	}
-	return m, tea.Batch(liveCmd, workspaceCmd)
+	cmds := []tea.Cmd{liveCmd, workspaceCmd}
+	if pulseCmd := m.notePulseIfHealthChanged(m.workspace.HealthIssueCount()); pulseCmd != nil {
+		cmds = append(cmds, pulseCmd)
+	}
+	return m, tea.Batch(cmds...)
+}
+
+// notePulseIfHealthChanged compares count against the last observed Health
+// issue count (updated on every call) and starts the badge pulse when it
+// changed, so a newly-appeared or newly-resolved issue catches the eye
+// instead of silently updating the number. The very first observation never
+// pulses -- there's no prior state to have "changed" from. count is passed
+// in rather than read from m.workspace directly so the decision logic is
+// testable without needing to fabricate real health data.
+func (m *Model) notePulseIfHealthChanged(count int) tea.Cmd {
+	if !m.healthIssuesSeen {
+		m.healthIssuesSeen = true
+		m.lastHealthIssues = count
+		return nil
+	}
+	if count == m.lastHealthIssues {
+		return nil
+	}
+	m.lastHealthIssues = count
+	m.healthPulseStep = tabFlashSteps
+	return tabFlashTick()
 }
 
 func (m Model) renderHeader() string {
 	items := make([]string, 0, len(sections))
 	for _, section := range sections {
-		items = append(items, renderNavigationItem(section, m.workspace.HealthIssueCount(), section == m.section))
+		flashing := section == m.section && m.tabFlashStep > 0
+		healthPulsing := section == SectionHealth && m.healthPulseStep > 0
+		items = append(items, renderNavigationItem(section, m.workspace.HealthIssueCount(), section == m.section, flashing, healthPulsing))
 	}
 	brand := brandStyle.Render(" 👹 ORC")
 	if m.section == SectionOrc {
@@ -333,7 +395,7 @@ func (m Model) renderHeader() string {
 		return terminalui.Fit(brand, m.width)
 	}
 	compact := brand + "  " + navStyle.Render("‹") + " " +
-		renderNavigationItem(m.section, m.workspace.HealthIssueCount(), true) + " " + navStyle.Render("›")
+		renderNavigationItem(m.section, m.workspace.HealthIssueCount(), true, m.tabFlashStep > 0, m.section == SectionHealth && m.healthPulseStep > 0) + " " + navStyle.Render("›")
 	return terminalui.Fit(compact, m.width)
 }
 
@@ -359,7 +421,7 @@ func (m Model) navRegions() []navRegion {
 	}
 	items := make([]string, len(sections))
 	for i, section := range sections {
-		items[i] = renderNavigationItem(section, m.workspace.HealthIssueCount(), section == m.section)
+		items[i] = renderNavigationItem(section, m.workspace.HealthIssueCount(), section == m.section, false, false)
 	}
 	full := brandText + "  " + strings.Join(items, "  ")
 	if lipgloss.Width(full) > m.width {
@@ -404,14 +466,21 @@ func navigationLabel(section Section, healthIssues int) string {
 	return label
 }
 
-func renderNavigationItem(section Section, healthIssues int, selected bool) string {
+func renderNavigationItem(section Section, healthIssues int, selected, flashing, healthPulsing bool) string {
 	style := navStyle
-	if selected {
+	switch {
+	case flashing:
+		style = flashStyle
+	case selected:
 		style = selectedStyle
 	}
 	label := style.Render(sectionLabel(section))
 	if section == SectionHealth && healthIssues > 0 {
-		label += " " + warningStyle.Render(fmt.Sprintf("⚠ %d", healthIssues))
+		badgeStyle := warningStyle
+		if healthPulsing {
+			badgeStyle = pulseWarningStyle
+		}
+		label += " " + badgeStyle.Render(fmt.Sprintf("⚠ %d", healthIssues))
 	}
 	if selected {
 		return style.Render("[ ") + label + style.Render(" ]")

@@ -78,7 +78,7 @@ func (m Model) renderDetailBody() string {
 		stageLabel = summary.Stage
 	}
 	stageValue := labelWithDimID(stageLabel+summary.StageLoopLabel, summary.Stage)
-	workerValue := labelWithDimID(workerLabel, summary.WorkerID)
+	workerValue := coloredWorkerLabel(workerLabel, summary.WorkerID)
 	fields := []struct{ label, value string }{
 		{" Ticket  ", s.Ticket},
 		{" Status  ", statusStyle(s.Status).Render(statusIcon(s.Status) + " " + s.Status)},
@@ -322,6 +322,17 @@ func labelWithDimID(label, id string) string {
 		return label
 	}
 	return label + styleDim.Render(" ("+id+")")
+}
+
+// coloredWorkerLabel is labelWithDimID with the name rendered in the
+// worker's stable accent color instead of plain text, so the same worker
+// reads consistently across every list in the dashboard.
+func coloredWorkerLabel(label, id string) string {
+	styled := workerAccentStyle(id).Render(label)
+	if id == "" || id == label {
+		return styled
+	}
+	return styled + styleDim.Render(" ("+id+")")
 }
 
 func joinColumns(left, right, gap string) string {

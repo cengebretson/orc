@@ -44,10 +44,11 @@ func renderWorkflowDetail(name string, chains []workflowChain, allWorkers []*wor
 			return styleDim.Render("—")
 		}
 		if w := workers.FindByID(allWorkers, id); w != nil {
-			label := w.Name
-			if label == "" {
-				label = w.ID
+			name := w.Name
+			if name == "" {
+				name = w.ID
 			}
+			label := workerAccentStyle(w.ID).Render(name)
 			if w.Engine != "" {
 				label += styleDim.Render("  " + w.Engine)
 			}

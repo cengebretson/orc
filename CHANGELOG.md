@@ -10,6 +10,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Dashboard tabs are clickable — clicking a tab label in the header switches
   to it, matching the existing `1`-`5` and arrow-key navigation.
+- Each worker now gets a stable accent color, assigned so no two workers
+  collide, shown consistently everywhere a worker appears — the Features
+  table, Workers tab, ticket detail, and the Workflows stage table.
+- Switching tabs briefly flashes the newly-selected tab before it settles
+  into its steady highlight, and the Health badge pulses the same way when
+  its issue count changes on refresh (not on the very first load).
+- The empty Features view now shows a rotating quote alongside the "no
+  features" message instead of flat text.
 
 ### Changed
 
