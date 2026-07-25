@@ -29,6 +29,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   above zero — a slow, continuous dim/brighten cycle rather than a one-shot
   flash — so an ongoing attention need reads as ambient rather than urgent
   noise.
+- Repositories now get the same stable-accent-color treatment as workers,
+  shown in the Repositories view's list and inspector cards.
 
 ### Changed
 

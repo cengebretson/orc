@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cengebretson/orc/internal/config"
 	"github.com/cengebretson/orc/internal/contextpressure"
 	"github.com/cengebretson/orc/internal/workers"
 	"github.com/charmbracelet/x/ansi"
@@ -48,6 +49,33 @@ func TestWorkerAccentColorFallsBackForUnknownWorker(t *testing.T) {
 	}
 	if got := workerAccentColor("ghost-worker"); got == "" {
 		t.Fatal("unknown worker ID should still get a non-empty fallback color")
+	}
+}
+
+func TestAssignRepoAccentColorsGivesEachRepoADistinctColor(t *testing.T) {
+	repos := []config.Repo{{Name: "api"}, {Name: "web"}, {Name: "infra"}}
+	assignRepoAccentColors(repos)
+
+	seen := map[string]string{}
+	for _, r := range repos {
+		color := repoAccentColor(r.Name)
+		if other, ok := seen[color]; ok {
+			t.Fatalf("repo colors collide: %s and %s both got %s", r.Name, other, color)
+		}
+		seen[color] = r.Name
+	}
+}
+
+func TestRepoAndWorkerColorsAssignIndependently(t *testing.T) {
+	// A repo and a worker sharing a name is a coincidence, not a conflict --
+	// each palette is assigned from its own sorted set.
+	assignWorkerAccentColors([]*workers.Worker{{ID: "shared"}})
+	assignRepoAccentColors([]config.Repo{{Name: "shared"}})
+	if got := workerAccentColor("shared"); got == "" {
+		t.Fatal("worker color should still resolve")
+	}
+	if got := repoAccentColor("shared"); got == "" {
+		t.Fatal("repo color should still resolve")
 	}
 }
 

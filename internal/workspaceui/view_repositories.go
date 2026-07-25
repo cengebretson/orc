@@ -55,7 +55,7 @@ func renderRepoList(repos []config.Repo, maxW int) []string {
 	}
 	var lines []string
 	for _, r := range repos {
-		name := styleSubtext.Render(r.Name)
+		name := repoAccentStyle(r.Name).Render(r.Name)
 		sep := styleDivider.Render("  —  ")
 		purpose := styleDim.Render(r.Purpose)
 		var badges []string
@@ -324,7 +324,9 @@ func renderRepositoryInspectorCard(repo config.Repo, work repoWorkSummary, width
 	if len(repo.AgentHints) > 0 {
 		lines = append(lines, labeledInspectorLines("hints", fmt.Sprintf("%d configured", len(repo.AgentHints)), contentW, styleStatusWaiting)...)
 	}
-	return drawBoxLabeledWith(styleHeader.Render(repo.Name), padInspectorLines(lines), width, activeTheme.Palette.Blue)
+	accent := repoAccentColor(repo.Name)
+	title := lipgloss.NewStyle().Foreground(lipgloss.Color(accent)).Bold(true).Render(repo.Name)
+	return drawBoxLabeledWith(title, padInspectorLines(lines), width, accent)
 }
 
 func labeledInspectorLines(label, value string, width int, valueStyle lipgloss.Style) []string {

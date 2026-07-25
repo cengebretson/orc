@@ -6,6 +6,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/cengebretson/orc/internal/config"
 	"github.com/cengebretson/orc/internal/contextpressure"
 	terminalui "github.com/cengebretson/orc/internal/ui"
 	"github.com/cengebretson/orc/internal/workers"
@@ -178,6 +179,51 @@ func workerAccentColor(workerID string) string {
 // direct use in Render calls.
 func workerAccentStyle(workerID string) lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color(workerAccentColor(workerID)))
+}
+
+// repoColorAssignments mirrors workerColorAssignments for repository names.
+var repoColorAssignments = map[string]int{}
+
+// assignRepoAccentColors gives each configured repo a stable palette slot in
+// sorted-name order, the same collision-avoidance approach used for workers.
+// Repos and workers share the same palette but assign independently — they
+// never appear in the same cell, so a coincidental color match between a
+// repo and a worker isn't visually confusing.
+func assignRepoAccentColors(repos []config.Repo) {
+	names := make([]string, 0, len(repos))
+	for _, r := range repos {
+		if r.Name != "" {
+			names = append(names, r.Name)
+		}
+	}
+	sort.Strings(names)
+	assignments := make(map[string]int, len(names))
+	for i, name := range names {
+		assignments[name] = i % len(workerAccentPalette())
+	}
+	repoColorAssignments = assignments
+}
+
+// repoAccentColor returns a stable color for the given repo name: the
+// assigned palette slot from assignRepoAccentColors when known, or a hash of
+// the name as a fallback.
+func repoAccentColor(name string) string {
+	colors := workerAccentPalette()
+	if name == "" || len(colors) == 0 {
+		return activeTheme.Palette.Overlay0
+	}
+	if idx, ok := repoColorAssignments[name]; ok {
+		return colors[idx]
+	}
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(name))
+	return colors[int(h.Sum32())%len(colors)]
+}
+
+// repoAccentStyle is repoAccentColor wrapped as a lipgloss.Style for direct
+// use in Render calls.
+func repoAccentStyle(name string) lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(repoAccentColor(name)))
 }
 
 func statusStyle(status string) lipgloss.Style {
