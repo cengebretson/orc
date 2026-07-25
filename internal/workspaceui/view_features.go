@@ -12,7 +12,7 @@ func (m Model) renderTable(rows []*featureRow, w int, selectedIdx int) string {
 	const (
 		wTicket  = 12
 		wStatus  = 12
-		wContext = 8
+		wContext = 14 // room for an up-to-8-sample sparkline plus the percentage
 		wTmux    = 6
 	)
 	// fixed overhead: leading space + static columns + separators (6 × "  ")
@@ -84,15 +84,21 @@ func (m Model) renderTable(rows []*featureRow, w int, selectedIdx int) string {
 			ticketCell = ui.Truncate("! "+s.Ticket, wTicket)
 		}
 
+		history := m.effects.contextHistory[row.ticketID()]
+
 		if selected {
 			// Plain unstyled text so styleRowSelected background covers the full row
+			contextText := row.context.Label()
+			if len(history) >= 2 {
+				contextText = sparkline(history) + " " + row.context.Label()
+			}
 			line := " " +
 				ui.PadRight(ticketCell, wTicket) + "  " +
 				ui.PadRight(ui.Truncate(name, wName), wName) + "  " +
 				ui.PadRight(ui.Truncate(icon+" "+displayStatus, wStatus), wStatus) + "  " +
 				ui.PadRight(ui.Truncate(stageCell, wWorkflow), wWorkflow) + "  " +
 				ui.PadRight(ui.Truncate(plainWorker, wWorker), wWorker) + "  " +
-				ui.PadRight(row.context.Label(), wContext) + "  " +
+				ui.PadRight(contextText, wContext) + "  " +
 				ui.PadRight(plainTmux, wTmux)
 			lines = append(lines, styleRowSelected.Width(w).Render(line))
 		} else {
@@ -104,6 +110,9 @@ func (m Model) renderTable(rows []*featureRow, w int, selectedIdx int) string {
 			nameCell := styleDim.Render(ui.Truncate(name, wName))
 			workerCell := workerAccentStyle(row.workerID).Render(ui.Truncate(plainWorker, wWorker))
 			contextCell := renderContextPressure(row.context)
+			if spark := renderContextSparkline(history, row.context); spark != "" {
+				contextCell = spark
+			}
 			var tmuxCell string
 			if s.Runtime.Tmux != nil {
 				if row.tmuxLive {

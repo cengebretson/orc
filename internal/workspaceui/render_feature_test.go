@@ -71,7 +71,7 @@ func TestRenderTable(t *testing.T) {
 	if !strings.Contains(out, "default › develop") {
 		t.Error("stage cell should render workflow and stage with a separator")
 	}
-	if !strings.Contains(out, "this-is-a-very-long-feature-name-that-should-tru…") {
+	if !strings.Contains(out, "this-is-a-very-long-feature-name-that-should-…") {
 		t.Errorf("long feature name should truncate with an ellipsis:\n%s", ansi.Strip(out))
 	}
 	if strings.Contains(out, "this-is-a-very-long-feature-name-that-should-truncate  ") {

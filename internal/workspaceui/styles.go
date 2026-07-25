@@ -242,6 +242,44 @@ func renderContextPressure(pressure contextpressure.Pressure) string {
 	return style.Render(pressure.Label())
 }
 
+var sparkBlocks = [...]rune{'▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'}
+
+// sparkline renders a sequence of 0-100 percentages as block characters, one
+// per sample, scaled so 0% is the shortest block and 100% the tallest.
+func sparkline(samples []uint64) string {
+	if len(samples) == 0 {
+		return ""
+	}
+	runes := make([]rune, len(samples))
+	for i, v := range samples {
+		idx := int(v) * (len(sparkBlocks) - 1) / 100
+		idx = max(0, min(idx, len(sparkBlocks)-1))
+		runes[i] = sparkBlocks[idx]
+	}
+	return string(runes)
+}
+
+// renderContextSparkline renders the trend line for a feature's recent
+// context-pressure samples, colored the same as its current level, followed
+// by the current percentage. Returns "" when there's no history yet (a
+// feature just picked up telemetry, or has none) so callers can fall back to
+// the plain percentage.
+func renderContextSparkline(history []uint64, pressure contextpressure.Pressure) string {
+	if len(history) < 2 {
+		return ""
+	}
+	style := styleDim
+	switch pressure.Level {
+	case contextpressure.LevelGreen:
+		style = styleHealthOK
+	case contextpressure.LevelYellow:
+		style = styleHealthWarn
+	case contextpressure.LevelRed:
+		style = styleHealthErr
+	}
+	return style.Render(sparkline(history)) + " " + style.Render(pressure.Label())
+}
+
 func helpItem(key, desc string) string {
 	return styleHelpKey.Render(key) + styleDim.Render(" "+desc)
 }

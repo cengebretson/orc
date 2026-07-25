@@ -275,7 +275,17 @@ type effectsState struct {
 	// easter egg: press "!" on a focused worker to open Bard's Tale character sheet
 	charSheetWorker *workers.Worker
 	charSheetReturn viewState
+
+	// contextHistory holds each feature's recent context-pressure percentages
+	// (most recent last), keyed by ticket, for the Features table sparkline.
+	// Populated on the 2s live refresh rather than the full data reload, so it
+	// survives workspaceData being replaced wholesale on every full refresh.
+	contextHistory map[string][]uint64
 }
+
+// contextHistoryLimit caps how many samples the sparkline keeps per feature —
+// enough to show a short trend without the history growing unbounded.
+const contextHistoryLimit = 8
 
 type detailFile struct {
 	label string

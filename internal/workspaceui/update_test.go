@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/cengebretson/orc/internal/config"
+	"github.com/cengebretson/orc/internal/contextpressure"
 	"github.com/cengebretson/orc/internal/doctor"
 	"github.com/cengebretson/orc/internal/workers"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -90,6 +91,44 @@ func testModel(t *testing.T) Model {
 		sectionWorkers:   {{label: "Bob", id: "bob", path: "bob.md"}},
 	}
 	return m
+}
+
+func TestRecordContextHistoryTracksObservedAvailableFeaturesOnly(t *testing.T) {
+	tracked := testRow("STORY-1", "active", "develop")
+	tracked.context = contextpressure.Pressure{Observed: true, Available: true, Percent: 10, Level: contextpressure.LevelGreen}
+
+	unavailable := testRow("STORY-2", "active", "develop")
+	unavailable.context = contextpressure.Pressure{Observed: true, Available: false}
+
+	notObserved := testRow("STORY-3", "active", "develop")
+
+	m := testModel(t)
+	m.data.features = []*featureRow{tracked, unavailable, notObserved}
+
+	m.recordContextHistory()
+	if got := m.effects.contextHistory["STORY-1"]; len(got) != 1 || got[0] != 10 {
+		t.Fatalf("STORY-1 history = %v, want [10]", got)
+	}
+	if _, ok := m.effects.contextHistory["STORY-2"]; ok {
+		t.Fatal("unavailable telemetry should not be recorded")
+	}
+	if _, ok := m.effects.contextHistory["STORY-3"]; ok {
+		t.Fatal("unobserved telemetry should not be recorded")
+	}
+
+	// Accumulates across refreshes and caps at contextHistoryLimit, keeping
+	// the most recent samples.
+	for i := range contextHistoryLimit + 3 {
+		tracked.context.Percent = uint64(20 + i)
+		m.recordContextHistory()
+	}
+	got := m.effects.contextHistory["STORY-1"]
+	if len(got) != contextHistoryLimit {
+		t.Fatalf("history length = %d, want capped at %d", len(got), contextHistoryLimit)
+	}
+	if want := uint64(20 + contextHistoryLimit + 2); got[len(got)-1] != want {
+		t.Fatalf("most recent sample = %d, want %d", got[len(got)-1], want)
+	}
 }
 
 func TestHandleKeyQuit(t *testing.T) {

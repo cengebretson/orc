@@ -101,6 +101,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.lifecycle.lastLiveRefresh = time.Now()
 		m.data.features = mergeLiveFeatures(m.data.features, msg.features)
+		m.recordContextHistory()
 		if rows := m.visibleFeatures(); m.navigation.featureCursor >= len(rows) && len(rows) > 0 {
 			m.navigation.featureCursor = len(rows) - 1
 		}
@@ -125,6 +126,27 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	return m, nil
+}
+
+// recordContextHistory appends each live feature's current context-pressure
+// percentage to its rolling history, trimmed to contextHistoryLimit samples,
+// for the Features table sparkline. Features without observed, available
+// telemetry are skipped rather than recording a misleading flat sample.
+func (m *Model) recordContextHistory() {
+	if m.effects.contextHistory == nil {
+		m.effects.contextHistory = map[string][]uint64{}
+	}
+	for _, row := range m.data.features {
+		if !row.context.Observed || !row.context.Available {
+			continue
+		}
+		ticket := row.ticketID()
+		history := append(m.effects.contextHistory[ticket], row.context.Percent)
+		if len(history) > contextHistoryLimit {
+			history = history[len(history)-contextHistoryLimit:]
+		}
+		m.effects.contextHistory[ticket] = history
+	}
 }
 
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
