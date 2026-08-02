@@ -6,6 +6,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Updated the GoReleaser build-date template for GoReleaser 2.17 so release
+  archives can be built after `.Date` changed from a time value to an RFC 3339
+  string.
+
 ## [0.16.0] - 2026-08-02
 
 ### Added
