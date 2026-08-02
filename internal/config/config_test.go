@@ -50,6 +50,9 @@ settings:
     green: 10
     yellow: 65
     red: 85
+  notify:
+    on: [blocked, complete]
+    command: "notify-send orc '{{ticket}} {{event}}'"
 repos: []
 `)
 
@@ -74,6 +77,9 @@ repos: []
 	}
 	if got := cfg.ContextPressureThresholds(); got.Green != 10 || got.Yellow != 65 || got.Red != 85 {
 		t.Errorf("ContextPressureThresholds() = %+v, want 10/65/85", got)
+	}
+	if strings.Join(cfg.Settings.Notify.On, ",") != "blocked,complete" || cfg.Settings.Notify.Command != "notify-send orc '{{ticket}} {{event}}'" {
+		t.Errorf("notify settings = %#v", cfg.Settings.Notify)
 	}
 }
 

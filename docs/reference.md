@@ -135,6 +135,9 @@ settings:
     green: 0
     yellow: 70
     red: 90
+  notify:                # optional transition notification command
+    on: [blocked, complete]
+    command: "notify-send 'orc' '{{ticket}} {{event}}'"
 
 repos:
   - name: my-app

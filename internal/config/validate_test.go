@@ -71,6 +71,11 @@ func TestValidate_WorkspaceRefreshCannotBeNegative(t *testing.T) {
 	assertValidationError(t, config.Validate(cfg, nil), "settings.workspace_refresh", "workspace_refresh must be zero or greater")
 }
 
+func TestValidate_NotifyEvents(t *testing.T) {
+	cfg := &config.Config{Settings: config.Settings{Notify: config.NotifySettings{On: []string{"blocked", "bogus"}}}}
+	assertValidationError(t, config.Validate(cfg, nil), "settings.notify.on[1]", `event must be "blocked", "complete", "error", or "all"`)
+}
+
 func TestValidate_RepoIdentity(t *testing.T) {
 	cfg := &config.Config{Repos: []config.Repo{
 		{},

@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cengebretson/orc/internal/config"
+	orcnotify "github.com/cengebretson/orc/internal/notify"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/workspace"
 )
@@ -536,6 +538,65 @@ func TestRunMarkPauseUpdatesCopiedFixture(t *testing.T) {
 	}
 	if got := s.History[len(s.History)-1].Result; got != "paused — waiting for ops" {
 		t.Fatalf("last history result = %q", got)
+	}
+}
+
+func TestRunMarkSendsNotificationsAfterSuccessfulTransitions(t *testing.T) {
+	tests := []struct {
+		name      string
+		args      []string
+		wantEvent string
+		wantStage string
+	}{
+		{name: "pause", args: []string{"HOT-42", "pause", "waiting"}, wantEvent: "blocked", wantStage: "hotfix:patch"},
+		{name: "done", args: []string{"HOT-42", "done"}, wantEvent: "complete", wantStage: "hotfix:patch"},
+		{name: "next", args: []string{"HOT-42", "next"}, wantEvent: "complete", wantStage: "hotfix:patch"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resetCommandGlobals(t)
+			globalWorkspace = mutableFixtureWorkspace(t)
+			if tt.name == "next" {
+				featureDir := filepath.Join(globalWorkspace, "features", "HOT-42-login-500-error")
+				if err := state.Update(featureDir, func(s *state.State) error {
+					s.Stage.Name = "hotfix:intake"
+					s.Stage.Worker = "default:fred"
+					return nil
+				}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			var events []orcnotify.Event
+			sendTransitionNotification = func(_ config.NotifySettings, event orcnotify.Event) error {
+				events = append(events, event)
+				return nil
+			}
+			if _, err := captureStdout(func() error { return runMark(nil, tt.args) }); err != nil {
+				t.Fatalf("runMark: %v", err)
+			}
+			if len(events) != 1 {
+				t.Fatalf("notifications = %#v, want one", events)
+			}
+			got := events[0]
+			if got.Name != tt.wantEvent || got.Ticket != "HOT-42" || got.Slug != "HOT-42-login-500-error" || got.Stage != tt.wantStage || got.Workflow != "hotfix:standard" || got.WorkDir != globalWorkspace {
+				t.Fatalf("notification = %#v", got)
+			}
+		})
+	}
+}
+
+func TestRunMarkNotificationFailureDoesNotRollBackTransition(t *testing.T) {
+	resetCommandGlobals(t)
+	globalWorkspace = mutableFixtureWorkspace(t)
+	sendTransitionNotification = func(config.NotifySettings, orcnotify.Event) error {
+		return errors.New("desktop notifier unavailable")
+	}
+
+	if _, err := captureStdout(func() error { return runMark(nil, []string{"HOT-42", "done"}) }); err != nil {
+		t.Fatalf("runMark done: %v", err)
+	}
+	if got := loadTicketState(t, globalWorkspace, "HOT-42").Status; got != "done" {
+		t.Fatalf("status = %q, want done", got)
 	}
 }
 
@@ -1155,6 +1216,7 @@ func resetCommandGlobals(t *testing.T) {
 	oldArtifactsAll := artifactsAll
 	oldArtifactsJSON := artifactsJSON
 	oldPackInspectJSON := packInspectJSON
+	oldSendTransitionNotification := sendTransitionNotification
 	t.Cleanup(func() {
 		globalWorkspace = oldWorkspace
 		version = oldVersion
@@ -1176,6 +1238,7 @@ func resetCommandGlobals(t *testing.T) {
 		artifactsAll = oldArtifactsAll
 		artifactsJSON = oldArtifactsJSON
 		packInspectJSON = oldPackInspectJSON
+		sendTransitionNotification = oldSendTransitionNotification
 	})
 
 	globalWorkspace = "."

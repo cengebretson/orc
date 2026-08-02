@@ -8,6 +8,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Workspace-configurable transition notifications can run a short command after
+  tickets block or complete a stage. Commands receive template placeholders and
+  `ORC_*` environment variables; failures warn without rolling back durable
+  state.
 - A native Herdr multiplexer backend is available with `--mux herdr`. Orc can
   create ticket workspaces and stage tabs, launch Claude or Codex through
   Herdr's agent API, persist exact workspace/tab/pane IDs, inventory lifecycle

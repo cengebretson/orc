@@ -38,6 +38,11 @@ agent dispatches another, and how a session surface is driven.
 
 ### Agent completion notification
 
+Status: Implemented. `settings.notify` supports filtered `blocked`, `complete`,
+`error`, and `all` events; current transitions emit blocked and complete after
+their state writes, with templates, `ORC_*` environment, timeout, and
+best-effort warning behavior.
+
 Add a small notification hook so unattended agent runs can get the user's
 attention when they block or complete.
 

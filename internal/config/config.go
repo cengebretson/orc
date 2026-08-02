@@ -40,6 +40,14 @@ type Settings struct {
 	Quotes           []string                 `yaml:"quotes"`
 	Theme            string                   `yaml:"theme"` // e.g. "catppuccin-mocha"; defaults to catppuccin-mocha
 	ContextPressure  *ContextPressureSettings `yaml:"context_pressure,omitempty"`
+	Notify           NotifySettings           `yaml:"notify,omitempty"`
+}
+
+// NotifySettings configures an optional best-effort command after selected
+// workflow events.
+type NotifySettings struct {
+	On      []string `yaml:"on,omitempty"`
+	Command string   `yaml:"command,omitempty"`
 }
 
 type ContextPressureSettings struct {

@@ -22,6 +22,9 @@ settings:
     green: 0
     yellow: 70
     red: 90
+  notify:
+    on: [blocked, complete]
+    command: "notify-send 'orc' '{{ticket}} {{event}}'"
 
 repos:
   - name: my-app
@@ -84,6 +87,24 @@ a repository.
 | `theme` | No | Dashboard color theme. Defaults to `catppuccin-mocha`. |
 | `quotes` | No | Optional dashboard status quotes. |
 | `context_pressure` | No | Green, yellow, and red percentage boundaries for live provider context usage in `orc watch` and `orc dashboard`. Defaults to `0`, `70`, and `90`; values must satisfy `0 <= green < yellow < red <= 100`. |
+| `notify` | No | Best-effort command run after selected `blocked` or `complete` transitions. See below. |
+
+### Transition notifications
+
+`settings.notify.on` accepts `blocked`, `complete`, `error`, or `all`. Orc fires
+`blocked` after a successful `orc mark <ticket> pause` and `complete` after a
+successful stage advance or explicit `done`. `error` is reserved for a future
+explicit failure transition.
+
+The command runs through `/bin/sh` from the workspace root with a five-second
+timeout. The placeholders `{{ticket}}`, `{{slug}}`, `{{event}}`, `{{stage}}`,
+and `{{workflow}}` expand from the updated `STATE.yaml`. The same values are
+available as `ORC_TICKET`, `ORC_SLUG`, `ORC_EVENT`, `ORC_STAGE`, and
+`ORC_WORKFLOW`. Prefer the environment variables when values need shell-safe
+handling.
+
+Notification failures print a warning but do not roll back or fail the state
+transition. An empty command or an event absent from `on` is a no-op.
 
 ## Repos
 

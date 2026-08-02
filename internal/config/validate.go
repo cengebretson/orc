@@ -72,6 +72,16 @@ func Validate(cfg *Config, workerIDs []string) ValidationErrors {
 			Message: "thresholds must satisfy 0 <= green < yellow < red <= 100",
 		})
 	}
+	for i, event := range cfg.Settings.Notify.On {
+		switch strings.ToLower(strings.TrimSpace(event)) {
+		case "blocked", "complete", "error", "all":
+		default:
+			errs = append(errs, ValidationError{
+				Path:    fmt.Sprintf("settings.notify.on[%d]", i),
+				Message: `event must be "blocked", "complete", "error", or "all"`,
+			})
+		}
+	}
 
 	if len(cfg.Workflows) > 0 {
 		defaultWorkflow := cfg.ResolveWorkflow(cfg.DefaultWorkflow())

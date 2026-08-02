@@ -2,14 +2,19 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
+	"github.com/cengebretson/orc/internal/config"
+	orcnotify "github.com/cengebretson/orc/internal/notify"
 	"github.com/cengebretson/orc/internal/orchestrator"
 	"github.com/cengebretson/orc/internal/runner"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/ticket"
 	"github.com/spf13/cobra"
 )
+
+var sendTransitionNotification = orcnotify.Send
 
 func runMark(cmd *cobra.Command, args []string) error {
 	root, err := resolveRoot(globalWorkspace)
@@ -75,6 +80,7 @@ func runMark(cmd *cobra.Command, args []string) error {
 		if err := state.Pause(featureDir, reason); err != nil {
 			return err
 		}
+		notifyTransition(root, featureDir, "blocked")
 		printPauseResult(s.Ticket, reason)
 		return nil
 
@@ -92,6 +98,7 @@ func runMark(cmd *cobra.Command, args []string) error {
 		if err := state.Done(featureDir, result); err != nil {
 			return err
 		}
+		notifyTransition(root, featureDir, "complete")
 		printTicketStatus(s.Ticket, "done")
 		return nil
 
@@ -155,6 +162,7 @@ func runMarkNext(root, featureDir string) error {
 		fmt.Printf("Loop limit reached %s. Pausing for human review.\n", strings.TrimPrefix(result.Reason, "loop limit reached "))
 		return nil
 	}
+	notifyTransition(root, featureDir, "complete")
 
 	printAdvanceResult(result)
 
@@ -179,6 +187,25 @@ func runMarkNext(root, featureDir string) error {
 	}
 	printDryRun(plan, result.Ticket)
 	return nil
+}
+
+func notifyTransition(root, featureDir, eventName string) {
+	cfg, err := config.Load(root)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: could not load notification settings: %v\n", err)
+		return
+	}
+	s, err := state.Load(featureDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: could not load notification context: %v\n", err)
+		return
+	}
+	if err := sendTransitionNotification(cfg.Settings.Notify, orcnotify.Event{
+		Ticket: s.Ticket, Slug: s.Slug, Name: eventName, Stage: s.Stage.Name,
+		Workflow: s.Workflow, WorkDir: root,
+	}); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: %v\n", err)
+	}
 }
 
 func printAdvanceResult(result *orchestrator.AdvanceResult) {
