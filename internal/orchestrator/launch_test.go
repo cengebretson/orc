@@ -5,9 +5,10 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/cengebretson/orc/internal/mux"
+	"github.com/cengebretson/orc/internal/mux/muxtest"
 	"github.com/cengebretson/orc/internal/runner"
 	"github.com/cengebretson/orc/internal/state"
-	"github.com/cengebretson/orc/internal/tmux"
 	"github.com/cengebretson/orc/internal/workers"
 )
 
@@ -29,27 +30,29 @@ func TestLauncherLaunchesInTmux(t *testing.T) {
 	var sent []string
 	var sendEvent []string
 	var history []string
-	var metadata tmux.WindowMetadata
+	var metadata mux.Metadata
 
 	launcher := Launcher{
-		TmuxAvailable: func() bool { return true },
-		SessionExists: func(string) bool { return false },
-		CreateSession: func(slug, featureDir string, workflows []string) error {
-			createdSession = slug
-			return nil
+		Mux: &muxtest.Fake{
+			AvailableFunc:     func() bool { return true },
+			SessionExistsFunc: func(string) bool { return false },
+			CreateSessionFunc: func(name, dir string, windows []string) error {
+				createdSession = name
+				return nil
+			},
+			SendCommandFunc: func(session, window, pane, dir, runDir string, argv []string) (string, error) {
+				sent = []string{session, window, runDir}
+				return "%1", nil
+			},
+			SetWindowMetadataFunc: func(session, window string, got mux.Metadata) error {
+				if session != "TICKET-1" || window != "develop" {
+					t.Fatalf("SetWindowMetadata target = %s:%s", session, window)
+				}
+				metadata = got
+				return nil
+			},
 		},
 		SetRuntime: func(featureDir, tmuxSession string) error { return nil },
-		SendCommand: func(session, window, pane, featureDir, runDir string, argv []string) (string, error) {
-			sent = []string{session, window, runDir}
-			return "%1", nil
-		},
-		SetWindowMetadata: func(session, window string, got tmux.WindowMetadata) error {
-			if session != "TICKET-1" || window != "develop" {
-				t.Fatalf("SetWindowMetadata target = %s:%s", session, window)
-			}
-			metadata = got
-			return nil
-		},
 		AppendHistory: func(featureDir, stage, workerID, result string) error {
 			history = []string{stage, workerID, result}
 			return nil
@@ -58,7 +61,6 @@ func TestLauncherLaunchesInTmux(t *testing.T) {
 			t.Fatal("foreground should not run")
 			return nil
 		},
-		AttachHint: func(session, window string) string { return session + ":" + window },
 	}
 
 	result, err := launcher.Launch(LaunchOptions{
@@ -116,26 +118,27 @@ func TestLauncherAdoptsExistingSessionWhenRuntimeUnset(t *testing.T) {
 	var setRuntime []string
 	var sent []string
 	launcher := Launcher{
-		TmuxAvailable: func() bool { return true },
-		SessionExists: func(session string) bool { return session == "TICKET-1" },
-		CreateSession: func(slug, featureDir string, workflows []string) error {
-			t.Fatal("should adopt existing session, not create a new one")
-			return nil
+		Mux: &muxtest.Fake{
+			AvailableFunc:     func() bool { return true },
+			SessionExistsFunc: func(session string) bool { return session == "TICKET-1" },
+			CreateSessionFunc: func(name, dir string, windows []string) error {
+				t.Fatal("should adopt existing session, not create a new one")
+				return nil
+			},
+			SendCommandFunc: func(session, window, pane, dir, runDir string, argv []string) (string, error) {
+				sent = []string{session, window, runDir}
+				return "%1", nil
+			},
 		},
 		SetRuntime: func(featureDir, tmuxSession string) error {
 			setRuntime = []string{featureDir, tmuxSession}
 			return nil
-		},
-		SendCommand: func(session, window, pane, featureDir, runDir string, argv []string) (string, error) {
-			sent = []string{session, window, runDir}
-			return "%1", nil
 		},
 		AppendHistory: func(featureDir, stage, workerID, result string) error { return nil },
 		RunForeground: func(opts LaunchOptions) error {
 			t.Fatal("foreground should not run")
 			return nil
 		},
-		AttachHint: func(session, window string) string { return session + ":" + window },
 	}
 
 	result, err := launcher.Launch(LaunchOptions{
@@ -174,13 +177,15 @@ func TestLauncherFallsBackToForegroundWhenTmuxCreateFails(t *testing.T) {
 	createErr := errors.New("no tmux")
 
 	launcher := Launcher{
-		TmuxAvailable: func() bool { return true },
-		CreateSession: func(slug, featureDir string, workflows []string) error {
-			return createErr
-		},
-		SendCommand: func(session, window, pane, featureDir, runDir string, argv []string) (string, error) {
-			t.Fatal("send should not run after create failure")
-			return "", nil
+		Mux: &muxtest.Fake{
+			AvailableFunc: func() bool { return true },
+			CreateSessionFunc: func(name, dir string, windows []string) error {
+				return createErr
+			},
+			SendCommandFunc: func(session, window, pane, dir, runDir string, argv []string) (string, error) {
+				t.Fatal("send should not run after create failure")
+				return "", nil
+			},
 		},
 		RunForeground: func(opts LaunchOptions) error {
 			foregroundRan = true
@@ -236,15 +241,17 @@ func TestLauncherUsesExistingTmuxWindowOverride(t *testing.T) {
 	var sent []string
 	var history []string
 	launcher := Launcher{
-		TmuxAvailable: func() bool { return true },
-		SessionExists: func(session string) bool { return session == "existing" },
-		CreateSession: func(slug, featureDir string, workflows []string) error {
-			t.Fatal("existing-session launch should not create a session")
-			return nil
-		},
-		SendCommand: func(session, window, pane, featureDir, runDir string, argv []string) (string, error) {
-			sent = []string{session, window, runDir}
-			return "%2", nil
+		Mux: &muxtest.Fake{
+			AvailableFunc:     func() bool { return true },
+			SessionExistsFunc: func(session string) bool { return session == "existing" },
+			CreateSessionFunc: func(name, dir string, windows []string) error {
+				t.Fatal("existing-session launch should not create a session")
+				return nil
+			},
+			SendCommandFunc: func(session, window, pane, dir, runDir string, argv []string) (string, error) {
+				sent = []string{session, window, runDir}
+				return "%2", nil
+			},
 		},
 		AppendHistory: func(featureDir, stage, workerID, result string) error {
 			history = []string{stage, workerID, result}
@@ -254,7 +261,6 @@ func TestLauncherUsesExistingTmuxWindowOverride(t *testing.T) {
 			t.Fatal("foreground should not run")
 			return nil
 		},
-		AttachHint: func(session, window string) string { return session + ":" + window },
 	}
 
 	result, err := launcher.Launch(LaunchOptions{
@@ -289,9 +295,11 @@ func TestLauncherSkipsTmuxWhenDisabled(t *testing.T) {
 	var foregroundRan bool
 	var history []string
 	launcher := Launcher{
-		TmuxAvailable: func() bool {
-			t.Fatal("tmux availability should not be checked")
-			return true
+		Mux: &muxtest.Fake{
+			AvailableFunc: func() bool {
+				t.Fatal("tmux availability should not be checked")
+				return true
+			},
 		},
 		RunForeground: func(opts LaunchOptions) error {
 			foregroundRan = true
@@ -334,7 +342,7 @@ func TestLauncherRecordsForegroundFailure(t *testing.T) {
 	runErr := errors.New("agent failed")
 	var history []string
 	launcher := Launcher{
-		TmuxAvailable: func() bool { return false },
+		Mux: &muxtest.Fake{},
 		RunForeground: func(opts LaunchOptions) error {
 			return runErr
 		},

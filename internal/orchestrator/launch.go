@@ -7,6 +7,7 @@ import (
 	"os/exec"
 
 	"github.com/cengebretson/orc/internal/config"
+	"github.com/cengebretson/orc/internal/mux"
 	"github.com/cengebretson/orc/internal/runner"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/tmux"
@@ -49,32 +50,26 @@ type LaunchOptions struct {
 }
 
 type Launcher struct {
-	TmuxAvailable     func() bool
-	SessionExists     func(string) bool
-	CreateSession     func(slug, featureDir string, workflows []string) error
-	SendCommand       func(session, window, pane, featureDir, runDir string, argv []string) (string, error)
-	SetWindowMetadata func(session, window string, metadata tmux.WindowMetadata) error
-	SetPaneMetadata   func(pane string, metadata tmux.WindowMetadata) error
-	SetRuntime        func(featureDir, tmuxSession string) error
-	SetRuntimeTarget  func(featureDir, tmuxSession, pane string) error
-	AppendHistory     func(featureDir, stage, workerID, result string) error
-	RunForeground     func(opts LaunchOptions) error
-	AttachHint        func(session, window string) string
+	// Mux is the multiplexer the launcher drives. It replaces the seven
+	// separate tmux function fields this struct used to carry — session
+	// existence, creation, send, both metadata stamps, availability, and the
+	// attach hint were always the same backend, and splitting them let a caller
+	// assemble a launcher from mismatched halves.
+	Mux mux.Backend
+
+	SetRuntime       func(featureDir, tmuxSession string) error
+	SetRuntimeTarget func(featureDir, tmuxSession, pane string) error
+	AppendHistory    func(featureDir, stage, workerID, result string) error
+	RunForeground    func(opts LaunchOptions) error
 }
 
 func NewLauncher() Launcher {
 	return Launcher{
-		TmuxAvailable:     tmux.Available,
-		SessionExists:     tmux.SessionExists,
-		CreateSession:     tmux.CreateSession,
-		SendCommand:       tmux.SendCommandTarget,
-		SetWindowMetadata: tmux.SetWindowMetadata,
-		SetPaneMetadata:   tmux.SetPaneMetadata,
-		SetRuntime:        state.SetRuntime,
-		SetRuntimeTarget:  state.SetRuntimeTarget,
-		AppendHistory:     state.AppendHistory,
-		RunForeground:     runForeground,
-		AttachHint:        tmux.AttachHint,
+		Mux:              tmux.New(),
+		SetRuntime:       state.SetRuntime,
+		SetRuntimeTarget: state.SetRuntimeTarget,
+		AppendHistory:    state.AppendHistory,
+		RunForeground:    runForeground,
 	}
 }
 
@@ -91,17 +86,8 @@ func (l Launcher) Launch(opts LaunchOptions) (*LaunchResult, error) {
 		return nil, fmt.Errorf("plan is required")
 	}
 
-	if l.TmuxAvailable == nil {
-		l.TmuxAvailable = tmux.Available
-	}
-	if l.SessionExists == nil {
-		l.SessionExists = tmux.SessionExists
-	}
-	if l.CreateSession == nil {
-		l.CreateSession = tmux.CreateSession
-	}
-	if l.SendCommand == nil {
-		l.SendCommand = tmux.SendCommandTarget
+	if l.Mux == nil {
+		l.Mux = tmux.New()
 	}
 	if l.SetRuntime == nil {
 		l.SetRuntime = state.SetRuntime
@@ -112,9 +98,6 @@ func (l Launcher) Launch(opts LaunchOptions) (*LaunchResult, error) {
 	if l.RunForeground == nil {
 		l.RunForeground = runForeground
 	}
-	if l.AttachHint == nil {
-		l.AttachHint = tmux.AttachHint
-	}
 
 	result := &LaunchResult{
 		Mode:   LaunchModeForeground,
@@ -124,7 +107,7 @@ func (l Launcher) Launch(opts LaunchOptions) (*LaunchResult, error) {
 		result.Window = opts.Window
 	}
 
-	if !opts.DisableTmux && l.TmuxAvailable() {
+	if !opts.DisableTmux && l.Mux.Available() {
 		session := opts.State.Slug
 		if opts.State.Runtime.Tmux != nil {
 			session = opts.State.Runtime.Tmux.Session
@@ -133,7 +116,7 @@ func (l Launcher) Launch(opts LaunchOptions) (*LaunchResult, error) {
 		tmuxReady := false
 
 		if opts.RequireExistingTmux {
-			if opts.State.Runtime.Tmux != nil && l.SessionExists(session) {
+			if opts.State.Runtime.Tmux != nil && l.Mux.SessionExists(session) {
 				tmuxReady = true
 			}
 		} else if opts.State.Runtime.Tmux == nil {
@@ -141,12 +124,12 @@ func (l Launcher) Launch(opts LaunchOptions) (*LaunchResult, error) {
 			// e.g. a prior launch created it but could not persist runtime. Adopt
 			// it rather than re-creating (which would fail as a duplicate and
 			// needlessly drop to foreground).
-			if l.SessionExists(session) {
+			if l.Mux.SessionExists(session) {
 				if err := l.SetRuntime(opts.FeatureDir, session); err != nil {
 					result.addFallback(opts, fmt.Sprintf("warning: could not write runtime to STATE.yaml: %v", err))
 				}
 				tmuxReady = true
-			} else if err := l.CreateSession(session, opts.FeatureDir, stageNamesForTicket(opts.Root, opts.State)); err != nil {
+			} else if err := l.Mux.CreateSession(session, opts.FeatureDir, stageNamesForTicket(opts.Root, opts.State)); err != nil {
 				result.addFallback(opts, fmt.Sprintf("tmux session create failed (%v)", err))
 			} else if err := l.SetRuntime(opts.FeatureDir, session); err != nil {
 				result.addFallback(opts, fmt.Sprintf("warning: could not write runtime to STATE.yaml: %v", err))
@@ -154,8 +137,8 @@ func (l Launcher) Launch(opts LaunchOptions) (*LaunchResult, error) {
 			} else {
 				tmuxReady = true
 			}
-		} else if !l.SessionExists(session) {
-			if err := l.CreateSession(session, opts.FeatureDir, stageNamesForTicket(opts.Root, opts.State)); err != nil {
+		} else if !l.Mux.SessionExists(session) {
+			if err := l.Mux.CreateSession(session, opts.FeatureDir, stageNamesForTicket(opts.Root, opts.State)); err != nil {
 				result.addFallback(opts, fmt.Sprintf("tmux session recreate failed (%v)", err))
 			} else {
 				tmuxReady = true
@@ -172,7 +155,7 @@ func (l Launcher) Launch(opts LaunchOptions) (*LaunchResult, error) {
 			if opts.State.Runtime.Tmux != nil {
 				pane = opts.State.Runtime.Tmux.Pane
 			}
-			sentPane, err := l.SendCommand(session, result.Window, pane, opts.FeatureDir, opts.Plan.CWD, opts.Plan.LaunchArgv)
+			sentPane, err := l.Mux.SendCommand(session, result.Window, pane, opts.FeatureDir, opts.Plan.CWD, opts.Plan.LaunchArgv)
 			if err != nil {
 				result.addFallback(opts, fmt.Sprintf("tmux send failed (%v)", err))
 			} else {
@@ -180,15 +163,11 @@ func (l Launcher) Launch(opts LaunchOptions) (*LaunchResult, error) {
 				// SendCommand creates missing windows (notably the JIT window), so
 				// stamp metadata only after the exact target is guaranteed to exist.
 				metadata := windowMetadata(opts, result.Window)
-				if l.SetWindowMetadata != nil {
-					if err := l.SetWindowMetadata(session, result.Window, metadata); err != nil {
-						result.addFallback(opts, fmt.Sprintf("warning: could not set tmux metadata: %v", err))
-					}
+				if err := l.Mux.SetWindowMetadata(session, result.Window, metadata); err != nil {
+					result.addFallback(opts, fmt.Sprintf("warning: could not set tmux metadata: %v", err))
 				}
-				if l.SetPaneMetadata != nil {
-					if err := l.SetPaneMetadata(sentPane, metadata); err != nil {
-						result.addFallback(opts, fmt.Sprintf("warning: could not set tmux pane metadata: %v", err))
-					}
+				if err := l.Mux.SetPaneMetadata(sentPane, metadata); err != nil {
+					result.addFallback(opts, fmt.Sprintf("warning: could not set tmux pane metadata: %v", err))
 				}
 				if l.SetRuntimeTarget != nil {
 					if err := l.SetRuntimeTarget(opts.FeatureDir, session, sentPane); err != nil {
@@ -196,7 +175,7 @@ func (l Launcher) Launch(opts LaunchOptions) (*LaunchResult, error) {
 					}
 				}
 				result.Mode = LaunchModeTmux
-				result.AttachHint = l.AttachHint(session, result.Window)
+				result.AttachHint = l.Mux.AttachHint(session, result.Window)
 				l.recordLaunch(opts, result, fmt.Sprintf("launched in tmux session %s:%s", session, result.Window))
 				return result, nil
 			}
@@ -214,8 +193,8 @@ func (l Launcher) Launch(opts LaunchOptions) (*LaunchResult, error) {
 	return result, nil
 }
 
-func windowMetadata(opts LaunchOptions, window string) tmux.WindowMetadata {
-	metadata := tmux.WindowMetadata{
+func windowMetadata(opts LaunchOptions, window string) mux.Metadata {
+	metadata := mux.Metadata{
 		Ticket:     opts.State.Ticket,
 		Stage:      window,
 		FeatureDir: opts.FeatureDir,

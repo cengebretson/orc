@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cengebretson/orc/internal/mux"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/tmux"
 )
@@ -43,9 +44,7 @@ type Archiver struct {
 	MkdirAll       func(path string, perm os.FileMode) error
 	Stat           func(path string) (os.FileInfo, error)
 	Rename         func(oldpath, newpath string) error
-	TmuxAvailable  func() bool
-	SessionExists  func(string) bool
-	KillSession    func(string) error
+	Mux            mux.Backend
 	ClearRuntime   func(featureDir string) error
 }
 
@@ -56,9 +55,7 @@ func NewArchiver() Archiver {
 		MkdirAll:       os.MkdirAll,
 		Stat:           os.Stat,
 		Rename:         os.Rename,
-		TmuxAvailable:  tmux.Available,
-		SessionExists:  tmux.SessionExists,
-		KillSession:    tmux.KillSession,
+		Mux:            tmux.New(),
 		ClearRuntime:   state.ClearRuntime,
 	}
 }
@@ -90,14 +87,8 @@ func (a Archiver) Archive(opts ArchiveOptions) (*ArchiveResult, error) {
 	if a.Rename == nil {
 		a.Rename = os.Rename
 	}
-	if a.TmuxAvailable == nil {
-		a.TmuxAvailable = tmux.Available
-	}
-	if a.SessionExists == nil {
-		a.SessionExists = tmux.SessionExists
-	}
-	if a.KillSession == nil {
-		a.KillSession = tmux.KillSession
+	if a.Mux == nil {
+		a.Mux = tmux.New()
 	}
 	if a.ClearRuntime == nil {
 		a.ClearRuntime = state.ClearRuntime
@@ -148,8 +139,8 @@ func (a Archiver) Archive(opts ArchiveOptions) (*ArchiveResult, error) {
 	result.Destination = dest
 
 	session := tmuxSessionName(opts.State)
-	if a.TmuxAvailable() && a.SessionExists(session) {
-		if err := a.KillSession(session); err != nil {
+	if a.Mux.Available() && a.Mux.SessionExists(session) {
+		if err := a.Mux.KillSession(session); err != nil {
 			result.TmuxKillWarn = fmt.Sprintf("could not kill tmux session %s: %v", session, err)
 		} else {
 			result.KilledTmux = true

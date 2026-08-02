@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/cengebretson/orc/internal/mux/muxtest"
 	"github.com/cengebretson/orc/internal/state"
 )
 
@@ -52,11 +53,13 @@ func TestArchiverArchivesFeatureAndCleansRuntime(t *testing.T) {
 			renamed = []string{oldpath, newpath}
 			return nil
 		},
-		TmuxAvailable: func() bool { return true },
-		SessionExists: func(session string) bool { return session == "custom-session" },
-		KillSession: func(session string) error {
-			killedSession = session
-			return nil
+		Mux: &muxtest.Fake{
+			AvailableFunc:     func() bool { return true },
+			SessionExistsFunc: func(session string) bool { return session == "custom-session" },
+			KillSessionFunc: func(session string) error {
+				killedSession = session
+				return nil
+			},
 		},
 		ClearRuntime: func(featureDir string) error { return nil },
 	}
@@ -109,13 +112,15 @@ func TestArchiverKeepsGoingAfterCleanupWarnings(t *testing.T) {
 		RemoveWorktree: func(repoMain, worktreePath string) error {
 			return errors.New("worktree busy")
 		},
-		SetStatus:     func(featureDir, status string) error { return nil },
-		MkdirAll:      func(path string, perm os.FileMode) error { return nil },
-		Rename:        func(oldpath, newpath string) error { return nil },
-		TmuxAvailable: func() bool { return true },
-		SessionExists: func(session string) bool { return true },
-		KillSession: func(session string) error {
-			return errors.New("tmux busy")
+		SetStatus: func(featureDir, status string) error { return nil },
+		MkdirAll:  func(path string, perm os.FileMode) error { return nil },
+		Rename:    func(oldpath, newpath string) error { return nil },
+		Mux: &muxtest.Fake{
+			AvailableFunc:     func() bool { return true },
+			SessionExistsFunc: func(session string) bool { return true },
+			KillSessionFunc: func(session string) error {
+				return errors.New("tmux busy")
+			},
 		},
 		ClearRuntime: func(featureDir string) error {
 			return errors.New("state busy")
