@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/cengebretson/orc/internal/featurelist"
+	"github.com/cengebretson/orc/internal/mux/muxtest"
 )
 
 func TestCollectResolvesWorkerAndTmuxState(t *testing.T) {
@@ -48,13 +49,15 @@ runtime:
 `)
 
 	features, err := featurelist.Collect(root, featurelist.Options{
-		TmuxAvailable: func() bool { return true },
-		ListSessions:  func() []string { return []string{"TICKET-1"} },
-		WindowAttention: func(session, window string) string {
-			if session != "TICKET-1" || window != "default:code-review" {
-				t.Fatalf("WindowAttention target = %s:%s", session, window)
-			}
-			return "review"
+		Mux: &muxtest.Fake{
+			AvailableFunc:    func() bool { return true },
+			ListSessionsFunc: func() []string { return []string{"TICKET-1"} },
+			AttentionFunc: func(session, window string) string {
+				if session != "TICKET-1" || window != "default:code-review" {
+					t.Fatalf("Attention target = %s:%s", session, window)
+				}
+				return "review"
+			},
 		},
 	})
 	if err != nil {

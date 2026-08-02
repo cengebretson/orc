@@ -9,6 +9,7 @@ import (
 	"github.com/cengebretson/orc/internal/artifactcheck"
 	"github.com/cengebretson/orc/internal/report"
 	"github.com/cengebretson/orc/internal/ticketview"
+	"github.com/cengebretson/orc/internal/tmux"
 	"github.com/cengebretson/orc/internal/ui"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -43,18 +44,33 @@ func (m Model) viewDetail() string {
 	return b.String()
 }
 
+// cachedLiveness answers session liveness from the dashboard's own refresh
+// snapshot rather than querying the multiplexer. renderDetailBody runs on every
+// frame, so asking tmux directly would put a subprocess in the render path.
+// Everything else — notably the attach hint — falls through to the real
+// backend, which is why this embeds it instead of reimplementing the interface.
+type cachedLiveness struct {
+	tmux.Backend
+	session string
+	live    bool
+}
+
+func (c cachedLiveness) Available() bool { return true }
+
+func (c cachedLiveness) SessionExists(session string) bool {
+	return c.live && c.session != "" && session == c.session
+}
+
 // renderDetailBody renders the scrollable body of the detail view — the State,
 // Repos, Timing, History, and Files boxes — for the viewport.
 func (m Model) renderDetailBody() string {
 	s := m.detail.feature.s
+	liveness := cachedLiveness{live: m.detail.feature.tmuxLive}
+	if s.Runtime.Tmux != nil {
+		liveness.session = s.Runtime.Tmux.Session
+	}
 	summary := ticketview.Build(m.root, m.detail.feature.featureDir, s, ticketview.Options{
-		TmuxAvailable: func() bool { return true },
-		SessionExists: func(session string) bool {
-			return s.Runtime.Tmux != nil && session == s.Runtime.Tmux.Session && m.detail.feature.tmuxLive
-		},
-		AttachHint: func(session, window string) string {
-			return "tmux attach -t " + session + ":" + window
-		},
+		Mux: liveness,
 	})
 	// The body renders inside the viewport (width m.width-4), so build the boxes
 	// to that width — the title bar in viewDetail keeps the full m.width-2.

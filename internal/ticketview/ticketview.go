@@ -5,15 +5,16 @@ import (
 	"path/filepath"
 
 	"github.com/cengebretson/orc/internal/config"
+	"github.com/cengebretson/orc/internal/mux"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/tmux"
 	"github.com/cengebretson/orc/internal/workers"
 )
 
 type Options struct {
-	TmuxAvailable func() bool
-	SessionExists func(string) bool
-	AttachHint    func(string, string) string
+	// Mux reports whether the ticket's session is live and how to attach to
+	// it. Defaults to tmux.
+	Mux mux.Backend
 }
 
 type Summary struct {
@@ -44,14 +45,8 @@ type Summary struct {
 }
 
 func Build(root, featureDir string, s *state.State, opts Options) Summary {
-	if opts.TmuxAvailable == nil {
-		opts.TmuxAvailable = tmux.Available
-	}
-	if opts.SessionExists == nil {
-		opts.SessionExists = tmux.SessionExists
-	}
-	if opts.AttachHint == nil {
-		opts.AttachHint = tmux.AttachHint
+	if opts.Mux == nil {
+		opts.Mux = tmux.New()
 	}
 
 	cfg, _ := config.Load(root)
@@ -112,11 +107,11 @@ func Build(root, featureDir string, s *state.State, opts Options) Summary {
 		session := s.Runtime.Tmux.Session
 		summary.TmuxConfigured = true
 		summary.TmuxSession = session
-		summary.TmuxAvailable = opts.TmuxAvailable()
+		summary.TmuxAvailable = opts.Mux.Available()
 		summary.TmuxRestart = fmt.Sprintf("run `orc next %s` to restart", s.Ticket)
-		if summary.TmuxAvailable && opts.SessionExists(session) {
+		if summary.TmuxAvailable && opts.Mux.SessionExists(session) {
 			summary.TmuxLive = true
-			summary.TmuxAttachHint = opts.AttachHint(session, s.Stage.Name)
+			summary.TmuxAttachHint = opts.Mux.AttachHint(session, s.Stage.Name)
 		}
 	}
 

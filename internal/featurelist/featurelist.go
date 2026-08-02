@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/cengebretson/orc/internal/config"
+	"github.com/cengebretson/orc/internal/mux"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/tmux"
 	"github.com/cengebretson/orc/internal/workers"
@@ -35,22 +36,15 @@ type Options struct {
 	IncludeArchived bool
 	// Config and Workers let callers reuse one immutable workspace snapshot
 	// instead of loading the same workspace context for each projection.
-	Config          *config.Config
-	Workers         []*workers.Worker
-	TmuxAvailable   func() bool
-	ListSessions    func() []string
-	WindowAttention func(session, window string) string
+	Config  *config.Config
+	Workers []*workers.Worker
+	// Mux supplies live session and attention state. Defaults to tmux.
+	Mux mux.Backend
 }
 
 func Collect(root string, opts Options) ([]*Feature, error) {
-	if opts.TmuxAvailable == nil {
-		opts.TmuxAvailable = tmux.Available
-	}
-	if opts.ListSessions == nil {
-		opts.ListSessions = tmux.ListSessions
-	}
-	if opts.WindowAttention == nil {
-		opts.WindowAttention = tmux.WindowAttention
+	if opts.Mux == nil {
+		opts.Mux = tmux.New()
 	}
 
 	cfg := opts.Config
@@ -64,19 +58,19 @@ func Collect(root string, opts Options) ([]*Feature, error) {
 		allWorkers = ctx.Workers
 	}
 	activeSessions := map[string]bool{}
-	if opts.TmuxAvailable() {
-		for _, name := range opts.ListSessions() {
+	if opts.Mux.Available() {
+		for _, name := range opts.Mux.ListSessions() {
 			activeSessions[name] = true
 		}
 	}
 
 	featuresDir := filepath.Join(root, "features")
 	var out []*Feature
-	if err := collectDir(root, featuresDir, false, cfg, allWorkers, activeSessions, opts.WindowAttention, &out); err != nil {
+	if err := collectDir(root, featuresDir, false, cfg, allWorkers, activeSessions, opts.Mux.Attention, &out); err != nil {
 		return nil, err
 	}
 	if opts.IncludeArchived {
-		if err := collectDir(root, filepath.Join(featuresDir, "_archive"), true, cfg, allWorkers, activeSessions, opts.WindowAttention, &out); err != nil {
+		if err := collectDir(root, filepath.Join(featuresDir, "_archive"), true, cfg, allWorkers, activeSessions, opts.Mux.Attention, &out); err != nil {
 			return nil, err
 		}
 	}

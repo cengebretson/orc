@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/cengebretson/orc/internal/mux/muxtest"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/ticketview"
 )
@@ -52,9 +53,10 @@ model: gpt-5
 	}
 
 	summary := ticketview.Build(root, filepath.Join(root, "features", "TICKET-1"), s, ticketview.Options{
-		TmuxAvailable: func() bool { return true },
-		SessionExists: func(session string) bool { return session == "TICKET-1" },
-		AttachHint:    func(session, window string) string { return session + ":" + window },
+		Mux: &muxtest.Fake{
+			AvailableFunc:     func() bool { return true },
+			SessionExistsFunc: func(session string) bool { return session == "TICKET-1" },
+		},
 	})
 
 	if summary.Workflow != "default:standard" {
@@ -91,7 +93,7 @@ func TestBuildSummarizesPausedAndDeadTmux(t *testing.T) {
 	}
 
 	summary := ticketview.Build(root, filepath.Join(root, "features", "TICKET-1"), s, ticketview.Options{
-		TmuxAvailable: func() bool { return false },
+		Mux: &muxtest.Fake{},
 	})
 
 	if summary.PausedReason != "paused for review" {

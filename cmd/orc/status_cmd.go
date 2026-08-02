@@ -63,20 +63,12 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	// Collect does its own availability and session lookup; this one is for
+	// deciding whether the printed table carries a tmux column.
 	showTmux := tmux.Available()
-	sessionNames := []string{}
-	if showTmux {
-		sessionNames = tmux.ListSessions()
-	}
 
 	features, err := featurelist.Collect(root, featurelist.Options{
 		IncludeArchived: true,
-		TmuxAvailable: func() bool {
-			return showTmux
-		},
-		ListSessions: func() []string {
-			return sessionNames
-		},
 	})
 	if err != nil {
 		return err
