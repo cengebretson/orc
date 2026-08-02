@@ -86,6 +86,15 @@ type TaskCellSpec struct {
 	Metadata     Metadata
 }
 
+// Notification is a backend-native attention message. Sound is semantic:
+// "request" asks for human input, "done" announces completion, and "none"
+// suppresses an audible cue when the backend supports those distinctions.
+type Notification struct {
+	Title string
+	Body  string
+	Sound string
+}
+
 // AttentionRank orders attention states by how much they need a human, most
 // urgent first. An unrecognized or empty state ranks last.
 //
@@ -267,4 +276,13 @@ type TaskCellBackend interface {
 	TargetBackend
 
 	ConfigureTaskCell(target Target, spec TaskCellSpec) error
+}
+
+// NotificationBackend is an optional capability for multiplexers that own a
+// native notification surface. Transition callers use it best-effort; durable
+// workflow state must never depend on delivery succeeding.
+type NotificationBackend interface {
+	Backend
+
+	ShowNotification(notification Notification) error
 }

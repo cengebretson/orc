@@ -8,6 +8,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Tickets running through Herdr now publish native session notifications when
+  they block or complete, using distinct request and completion sounds without
+  replacing the existing user-configured notification command.
 - Herdr launches can optionally build an Orc-owned task cell beside each stage
   agent: a configured test command runs in a right-side pane, `orc watch` can
   run below it, and metadata-backed ownership makes repeated launches reuse the

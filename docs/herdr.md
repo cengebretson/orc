@@ -104,3 +104,22 @@ Orc marks these panes with `source=orc`, `task_cell=tests` or
 directory. Later launches reuse exact matching panes and never adopt a user
 pane merely because it has a `tests` or `watch` label. Layout failures are
 reported as warnings without preventing the stage agent from launching.
+
+## Native transition notifications
+
+When a ticket whose selected runtime is Herdr blocks or completes, Orc also
+publishes a Herdr session notification. Blocked transitions use Herdr's
+`request` sound and completed transitions use `done`. Delivery is best-effort:
+a missing Herdr server warns without rolling back the durable state change.
+
+This native notification is independent of `settings.notify`. A configured
+notification command still runs, so it can continue delivering events to a
+desktop service, chat integration, or other user-owned destination.
+
+Herdr's notification delivery defaults to off. Choose the destination in the
+user-owned Herdr config before expecting the alert to appear:
+
+```toml
+[ui.toast]
+delivery = "herdr" # or "terminal" / "system"
+```

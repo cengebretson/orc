@@ -13,8 +13,10 @@ import (
 	"time"
 
 	"github.com/cengebretson/orc/internal/config"
+	"github.com/cengebretson/orc/internal/mux"
 	orcnotify "github.com/cengebretson/orc/internal/notify"
 	"github.com/cengebretson/orc/internal/state"
+	"github.com/cengebretson/orc/internal/tmux"
 	"github.com/cengebretson/orc/internal/workspace"
 )
 
@@ -594,6 +596,62 @@ func TestRunMarkNotificationFailureDoesNotRollBackTransition(t *testing.T) {
 
 	if _, err := captureStdout(func() error { return runMark(nil, []string{"HOT-42", "done"}) }); err != nil {
 		t.Fatalf("runMark done: %v", err)
+	}
+	if got := loadTicketState(t, globalWorkspace, "HOT-42").Status; got != "done" {
+		t.Fatalf("status = %q, want done", got)
+	}
+}
+
+func TestRunMarkSendsNativeNotificationForRecordedHerdrRuntime(t *testing.T) {
+	resetCommandGlobals(t)
+	globalWorkspace = mutableFixtureWorkspace(t)
+	featureDir := filepath.Join(globalWorkspace, "features", "HOT-42-login-500-error")
+	if err := state.Update(featureDir, func(s *state.State) error {
+		s.Runtime.Mux = &state.MuxRuntime{Backend: "herdr", Workspace: "w9", Tab: "w9:t1", Pane: "w9:p1"}
+		s.Runtime.Tmux = nil
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	var backendName string
+	var got orcnotify.Event
+	sendNativeTransitionNotification = func(backend mux.Backend, event orcnotify.Event) error {
+		backendName = backend.Name()
+		got = event
+		return nil
+	}
+	sendTransitionNotification = func(config.NotifySettings, orcnotify.Event) error { return nil }
+
+	if _, err := captureStdout(func() error {
+		return runMark(nil, []string{"HOT-42", "pause", "waiting"})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if backendName != "herdr" || got.Name != "blocked" || got.Ticket != "HOT-42" {
+		t.Fatalf("native notification backend=%q event=%#v", backendName, got)
+	}
+}
+
+func TestRunMarkNativeNotificationFailureDoesNotSkipConfiguredNotification(t *testing.T) {
+	resetCommandGlobals(t)
+	globalWorkspace = mutableFixtureWorkspace(t)
+	sendNativeTransitionNotification = func(mux.Backend, orcnotify.Event) error {
+		return errors.New("herdr notification unavailable")
+	}
+	customCalls := 0
+	sendTransitionNotification = func(config.NotifySettings, orcnotify.Event) error {
+		customCalls++
+		return nil
+	}
+
+	if _, err := captureStdout(func() error {
+		return runMark(nil, []string{"HOT-42", "done"})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if customCalls != 1 {
+		t.Fatalf("configured notification calls = %d, want 1", customCalls)
 	}
 	if got := loadTicketState(t, globalWorkspace, "HOT-42").Status; got != "done" {
 		t.Fatalf("status = %q, want done", got)
@@ -1197,6 +1255,8 @@ func resetCommandGlobals(t *testing.T) {
 	t.Helper()
 
 	oldWorkspace := globalWorkspace
+	oldMux := globalMux
+	oldMuxBackend := muxBackend
 	oldVersion := version
 	oldDoctorFix := doctorFix
 	oldDoctorSystem := doctorSystem
@@ -1217,8 +1277,11 @@ func resetCommandGlobals(t *testing.T) {
 	oldArtifactsJSON := artifactsJSON
 	oldPackInspectJSON := packInspectJSON
 	oldSendTransitionNotification := sendTransitionNotification
+	oldSendNativeTransitionNotification := sendNativeTransitionNotification
 	t.Cleanup(func() {
 		globalWorkspace = oldWorkspace
+		globalMux = oldMux
+		muxBackend = oldMuxBackend
 		version = oldVersion
 		doctorFix = oldDoctorFix
 		doctorSystem = oldDoctorSystem
@@ -1239,9 +1302,12 @@ func resetCommandGlobals(t *testing.T) {
 		artifactsJSON = oldArtifactsJSON
 		packInspectJSON = oldPackInspectJSON
 		sendTransitionNotification = oldSendTransitionNotification
+		sendNativeTransitionNotification = oldSendNativeTransitionNotification
 	})
 
 	globalWorkspace = "."
+	globalMux = ""
+	muxBackend = tmux.New()
 	version = "dev"
 	doctorFix = false
 	doctorSystem = false

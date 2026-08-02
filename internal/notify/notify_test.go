@@ -8,7 +8,19 @@ import (
 	"time"
 
 	"github.com/cengebretson/orc/internal/config"
+	"github.com/cengebretson/orc/internal/mux"
+	"github.com/cengebretson/orc/internal/mux/muxtest"
 )
+
+type nativeBackend struct {
+	*muxtest.Fake
+	notification mux.Notification
+}
+
+func (b *nativeBackend) ShowNotification(notification mux.Notification) error {
+	b.notification = notification
+	return nil
+}
 
 func TestSendExpandsTemplatesAndExportsEnvironment(t *testing.T) {
 	dir := t.TempDir()
@@ -45,6 +57,45 @@ func TestSendDisabledAndEmptyCommandsAreNoOps(t *testing.T) {
 func TestSendAllEnablesEvent(t *testing.T) {
 	if err := Send(config.NotifySettings{On: []string{"ALL"}, Command: "exit 0"}, Event{Name: "blocked"}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestSendNativeMapsTransitionToBackendNotification(t *testing.T) {
+	tests := []struct {
+		event Event
+		sound string
+	}{
+		{event: Event{Ticket: "ORC-9", Name: "blocked", Stage: "review", Workflow: "default"}, sound: "request"},
+		{event: Event{Ticket: "ORC-9", Name: "complete", Stage: "review", Workflow: "default"}, sound: "done"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.event.Name, func(t *testing.T) {
+			backend := &nativeBackend{Fake: &muxtest.Fake{}}
+			if err := SendNative(backend, tt.event); err != nil {
+				t.Fatal(err)
+			}
+			want := mux.Notification{
+				Title: "Orc · ORC-9 " + tt.event.Name,
+				Body:  "Stage: review · Workflow: default",
+				Sound: tt.sound,
+			}
+			if backend.notification != want {
+				t.Fatalf("notification = %#v, want %#v", backend.notification, want)
+			}
+		})
+	}
+}
+
+func TestSendNativeIgnoresUnsupportedBackendAndEvent(t *testing.T) {
+	if err := SendNative(&muxtest.Fake{}, Event{Name: "blocked"}); err != nil {
+		t.Fatal(err)
+	}
+	backend := &nativeBackend{Fake: &muxtest.Fake{}}
+	if err := SendNative(backend, Event{Name: "error"}); err != nil {
+		t.Fatal(err)
+	}
+	if backend.notification != (mux.Notification{}) {
+		t.Fatalf("unexpected notification: %#v", backend.notification)
 	}
 }
 

@@ -15,6 +15,7 @@ import (
 )
 
 var sendTransitionNotification = orcnotify.Send
+var sendNativeTransitionNotification = orcnotify.SendNative
 
 func runMark(cmd *cobra.Command, args []string) error {
 	root, err := resolveRoot(globalWorkspace)
@@ -190,20 +191,27 @@ func runMarkNext(root, featureDir string) error {
 }
 
 func notifyTransition(root, featureDir, eventName string) {
-	cfg, err := config.Load(root)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "warning: could not load notification settings: %v\n", err)
-		return
-	}
 	s, err := state.Load(featureDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "warning: could not load notification context: %v\n", err)
 		return
 	}
-	if err := sendTransitionNotification(cfg.Settings.Notify, orcnotify.Event{
+	event := orcnotify.Event{
 		Ticket: s.Ticket, Slug: s.Slug, Name: eventName, Stage: s.Stage.Name,
 		Workflow: s.Workflow, WorkDir: root,
-	}); err != nil {
+	}
+	if err := selectMuxForState(s); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: could not select notification backend: %v\n", err)
+	} else if err := sendNativeTransitionNotification(muxBackend, event); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: %v\n", err)
+	}
+
+	cfg, err := config.Load(root)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: could not load notification settings: %v\n", err)
+		return
+	}
+	if err := sendTransitionNotification(cfg.Settings.Notify, event); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: %v\n", err)
 	}
 }

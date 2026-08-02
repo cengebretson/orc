@@ -27,8 +27,28 @@ var _ mux.Backend = Backend{}
 var _ mux.TargetBackend = Backend{}
 var _ mux.WorktreeTargetBackend = Backend{}
 var _ mux.TaskCellBackend = Backend{}
+var _ mux.NotificationBackend = Backend{}
 
 func (Backend) Name() string { return "herdr" }
+
+// ShowNotification publishes an Orc transition through Herdr's session-native
+// notification surface.
+func (b Backend) ShowNotification(notification mux.Notification) error {
+	if strings.TrimSpace(notification.Title) == "" {
+		return fmt.Errorf("herdr notification requires a title")
+	}
+	args := []string{"notification", "show", notification.Title}
+	if notification.Body != "" {
+		args = append(args, "--body", notification.Body)
+	}
+	if notification.Sound != "" {
+		args = append(args, "--sound", notification.Sound)
+	}
+	if _, err := b.command(args...); err != nil {
+		return fmt.Errorf("show herdr notification: %w", err)
+	}
+	return nil
+}
 
 func (b Backend) Available() bool {
 	if _, err := exec.LookPath("herdr"); err != nil {

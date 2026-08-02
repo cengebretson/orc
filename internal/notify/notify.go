@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/cengebretson/orc/internal/config"
+	"github.com/cengebretson/orc/internal/mux"
 )
 
 const defaultTimeout = 5 * time.Second
@@ -39,6 +40,39 @@ type Event struct {
 // disabled events are successful no-ops.
 func Send(settings config.NotifySettings, event Event) error {
 	return send(settings, event, defaultTimeout)
+}
+
+// SendNative publishes blocked and complete transitions through a
+// multiplexer-owned notification surface when the selected backend supports
+// one. Other backends and event names are successful no-ops.
+func SendNative(backend mux.Backend, event Event) error {
+	notifier, ok := backend.(mux.NotificationBackend)
+	if !ok {
+		return nil
+	}
+
+	sound := ""
+	switch strings.ToLower(strings.TrimSpace(event.Name)) {
+	case "blocked":
+		sound = "request"
+	case "complete":
+		sound = "done"
+	default:
+		return nil
+	}
+
+	body := make([]string, 0, 2)
+	if event.Stage != "" {
+		body = append(body, "Stage: "+event.Stage)
+	}
+	if event.Workflow != "" {
+		body = append(body, "Workflow: "+event.Workflow)
+	}
+	return notifier.ShowNotification(mux.Notification{
+		Title: "Orc · " + event.Ticket + " " + event.Name,
+		Body:  strings.Join(body, " · "),
+		Sound: sound,
+	})
 }
 
 func send(settings config.NotifySettings, event Event, timeout time.Duration) error {

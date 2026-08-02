@@ -51,6 +51,37 @@ func TestCreateWorktreeTargetCreatesMissingCheckout(t *testing.T) {
 	}
 }
 
+func TestShowNotificationUsesNativeHerdrSurface(t *testing.T) {
+	var call string
+	b := Backend{run: func(args ...string) ([]byte, error) {
+		call = strings.Join(args, " ")
+		return []byte("ok"), nil
+	}}
+
+	err := b.ShowNotification(mux.Notification{
+		Title: "Orc · ORC-9 blocked",
+		Body:  "Stage: review · Workflow: default",
+		Sound: "request",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "notification show Orc · ORC-9 blocked --body Stage: review · Workflow: default --sound request"
+	if call != want {
+		t.Fatalf("call = %q, want %q", call, want)
+	}
+}
+
+func TestShowNotificationRequiresTitle(t *testing.T) {
+	b := Backend{run: func(args ...string) ([]byte, error) {
+		t.Fatalf("unexpected command: %v", args)
+		return nil, nil
+	}}
+	if err := b.ShowNotification(mux.Notification{}); err == nil {
+		t.Fatal("expected empty-title error")
+	}
+}
+
 func TestCreateWorktreeTargetOpensExistingCheckout(t *testing.T) {
 	root := t.TempDir()
 	source := filepath.Join(root, "source")

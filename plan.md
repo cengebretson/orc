@@ -106,11 +106,12 @@ Effort: Small.
 
 ### Add a native herdr multiplexer backend
 
-Status: First vertical slice, native worktree create/open, and task-cell
-layouts implemented. Launch, exact identity, agent lifecycle inventory,
-attach/focus, dashboard/watch selection, archive cleanup, sidebar metadata,
-worktree-backed workspace creation, and optional test/watch panes are wired
-through `--mux herdr`. The remaining extension ideas stay future work. Live
+Status: First vertical slice, native worktree create/open, task-cell layouts,
+and native transition notifications implemented. Launch, exact identity, agent
+lifecycle inventory, attach/focus, dashboard/watch selection, archive cleanup,
+sidebar metadata, worktree-backed workspace creation, optional test/watch
+panes, and blocked/completed alerts are wired through `--mux herdr`. The
+remaining extension ideas stay future work. Live
 disposable-workspace smoke tests verified Codex launch, exact target
 persistence, lifecycle inventory, sidebar tokens, attach targeting, owned
 archive cleanup, Herdr's native worktree create/open response shapes, and the
@@ -235,7 +236,8 @@ After the vertical slice is stable:
 - Implemented: offer a metadata-owned task-cell layout with the agent pane plus
   optional test and watch panes. Repeated launches reuse exact Orc-owned panes
   and leave user-created panes alone.
-- Send herdr notifications when background work blocks or completes.
+- Implemented: send Herdr-native notifications when work blocks or completes,
+  with request/done sounds and best-effort failure behavior.
 - Reuse herdr's blocking prompt/wait and stall detection underneath `orc ctl`
   rather than rebuilding those semantics for this backend.
 - Defer named-session, remote attach, and event-stream optimization until the
