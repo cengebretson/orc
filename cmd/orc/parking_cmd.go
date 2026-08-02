@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cengebretson/orc/internal/mux"
 	"github.com/cengebretson/orc/internal/parking"
 	"github.com/cengebretson/orc/internal/sessionlist"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/telemetry"
-	"github.com/cengebretson/orc/internal/tmux"
 	"github.com/spf13/cobra"
 )
 
@@ -22,7 +22,7 @@ func runSessionsPark(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	if !tmux.Available() {
+	if !muxBackend.Available() {
 		return fmt.Errorf("tmux is not installed or not in PATH")
 	}
 	sessions, err := sessionlist.Collect(root, sessionlist.Options{})
@@ -54,7 +54,7 @@ func runSessionsPark(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("save parking snapshot: %w", err)
 	}
 	for _, entry := range entries {
-		if err := tmux.KillSession(entry.TmuxSession); err != nil {
+		if err := muxBackend.KillSession(entry.TmuxSession); err != nil {
 			return fmt.Errorf("parking snapshot saved at %s, but %w", path, err)
 		}
 	}
@@ -123,7 +123,7 @@ func runSessionsUnpark(cmd *cobra.Command, args []string) error {
 	if !sessionsUnparkYes {
 		return fmt.Errorf("refusing to create tmux sessions without --yes; use --dry to preview")
 	}
-	if !tmux.Available() {
+	if !muxBackend.Available() {
 		return fmt.Errorf("tmux is not installed or not in PATH")
 	}
 
@@ -156,8 +156,8 @@ func runSessionsUnpark(cmd *cobra.Command, args []string) error {
 }
 
 func unparkEntry(entry parking.Entry) error {
-	if tmux.SessionExists(entry.TmuxSession) {
-		panes, err := tmux.ListPanesDetailed()
+	if muxBackend.SessionExists(entry.TmuxSession) {
+		panes, err := muxBackend.ListPanes()
 		if err != nil {
 			return fmt.Errorf("inspect existing tmux session %s: %w", entry.TmuxSession, err)
 		}
@@ -180,32 +180,32 @@ func unparkEntry(entry parking.Entry) error {
 	if _, err := os.Stat(entry.CWD); err != nil {
 		return fmt.Errorf("cwd %s is unavailable", entry.CWD)
 	}
-	if err := tmux.CreateSession(entry.TmuxSession, entry.FeatureDir, []string{entry.TmuxWindow}); err != nil {
+	if err := muxBackend.CreateSession(entry.TmuxSession, entry.FeatureDir, []string{entry.TmuxWindow}); err != nil {
 		return err
 	}
 	created := true
 	defer func() {
 		if created {
-			_ = tmux.KillSession(entry.TmuxSession)
+			_ = muxBackend.KillSession(entry.TmuxSession)
 		}
 	}()
-	if err := tmux.SetSessionEnvironment(entry.TmuxSession, tmux.EnvResumedFrom, entry.ProviderSessionID); err != nil {
+	if err := muxBackend.SetSessionEnvironment(entry.TmuxSession, mux.EnvResumedFrom, entry.ProviderSessionID); err != nil {
 		return err
 	}
 	launchArgv := resumedLaunchArgv(binary, argv, entry.ProviderSessionID)
-	pane, err := tmux.SendCommandTarget(entry.TmuxSession, entry.TmuxWindow, "", entry.FeatureDir, entry.CWD, launchArgv)
+	pane, err := muxBackend.SendCommand(entry.TmuxSession, entry.TmuxWindow, "", entry.FeatureDir, entry.CWD, launchArgv)
 	if err != nil {
 		return err
 	}
-	metadata := tmux.WindowMetadata{
+	metadata := mux.Metadata{
 		Ticket: entry.Ticket, Stage: entry.Stage, Worker: entry.Worker,
 		Engine: entry.Engine, ProviderSessionID: entry.ProviderSessionID,
 		FeatureDir: entry.FeatureDir,
 	}
-	if err := tmux.SetWindowMetadata(entry.TmuxSession, entry.TmuxWindow, metadata); err != nil {
+	if err := muxBackend.SetWindowMetadata(entry.TmuxSession, entry.TmuxWindow, metadata); err != nil {
 		return err
 	}
-	if err := tmux.SetPaneMetadata(pane, metadata); err != nil {
+	if err := muxBackend.SetPaneMetadata(pane, metadata); err != nil {
 		return err
 	}
 	if err := state.SetRuntimeTarget(entry.FeatureDir, entry.TmuxSession, pane); err != nil {
@@ -215,7 +215,7 @@ func unparkEntry(entry parking.Entry) error {
 	return nil
 }
 
-func restoredPane(entry parking.Entry, panes []tmux.Pane) (string, bool) {
+func restoredPane(entry parking.Entry, panes []mux.Pane) (string, bool) {
 	for _, pane := range panes {
 		engine := pane.ProviderEngine
 		if engine == "" {
@@ -232,7 +232,7 @@ func restoredPane(entry parking.Entry, panes []tmux.Pane) (string, bool) {
 }
 
 func resumedLaunchArgv(binary string, argv []string, providerSessionID string) []string {
-	launch := []string{"env", tmux.EnvResumedFrom + "=" + providerSessionID, binary}
+	launch := []string{"env", mux.EnvResumedFrom + "=" + providerSessionID, binary}
 	return append(launch, argv...)
 }
 

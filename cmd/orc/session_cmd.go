@@ -5,7 +5,7 @@ import (
 
 	"github.com/cengebretson/orc/internal/dashboard"
 	"github.com/cengebretson/orc/internal/ticket"
-	"github.com/cengebretson/orc/internal/tmux"
+
 	"github.com/cengebretson/orc/internal/watch"
 	"github.com/spf13/cobra"
 )
@@ -28,7 +28,7 @@ func runAttach(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	if !tmux.Available() {
+	if !muxBackend.Available() {
 		return fmt.Errorf("tmux is not installed or not in PATH")
 	}
 
@@ -43,7 +43,7 @@ func runAttach(cmd *cobra.Command, args []string) error {
 		session = s.Runtime.Tmux.Session
 	}
 
-	if !tmux.SessionExists(session) {
+	if !muxBackend.SessionExists(session) {
 		return fmt.Errorf("no tmux session for %s — run `orc next %s` to start one", s.Ticket, s.Ticket)
 	}
 
@@ -51,7 +51,7 @@ func runAttach(cmd *cobra.Command, args []string) error {
 	if s.Runtime.Tmux != nil {
 		pane = s.Runtime.Tmux.Pane
 	}
-	return tmux.AttachTarget(session, s.Stage.Name, pane)
+	return muxBackend.AttachPane(session, s.Stage.Name, pane)
 }
 
 func runFocus(cmd *cobra.Command, args []string) error {
@@ -59,7 +59,7 @@ func runFocus(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	if !tmux.Available() {
+	if !muxBackend.Available() {
 		return fmt.Errorf("tmux is not installed or not in PATH")
 	}
 	return watch.Focus(root)

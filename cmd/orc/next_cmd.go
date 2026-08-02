@@ -10,7 +10,7 @@ import (
 	"github.com/cengebretson/orc/internal/runner"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/ticket"
-	"github.com/cengebretson/orc/internal/tmux"
+
 	"github.com/spf13/cobra"
 )
 
@@ -67,7 +67,7 @@ func runNext(cmd *cobra.Command, args []string) error {
 		}
 
 	case "active":
-		sessionActive := s.Runtime.Tmux != nil && tmux.Available() && tmux.SessionExists(s.Runtime.Tmux.Session)
+		sessionActive := s.Runtime.Tmux != nil && muxBackend.Available() && muxBackend.SessionExists(s.Runtime.Tmux.Session)
 		if sessionActive {
 			fmt.Println()
 			fmt.Printf("⚠ tmux session %q is already running.\n", s.Runtime.Tmux.Session)
@@ -75,12 +75,12 @@ func runNext(cmd *cobra.Command, args []string) error {
 				ans := promptLine("  Attach to existing session? [Y/n]: ")
 				ans = strings.ToLower(strings.TrimSpace(ans))
 				if ans == "" || ans == "y" || ans == "yes" {
-					return tmux.Attach(s.Runtime.Tmux.Session)
+					return muxBackend.AttachSession(s.Runtime.Tmux.Session)
 				}
 				fmt.Println("Cancelled.")
 				return nil
 			}
-			return tmux.Attach(s.Runtime.Tmux.Session)
+			return muxBackend.AttachSession(s.Runtime.Tmux.Session)
 		} else {
 			fmt.Println()
 			fmt.Println("⚠ Ticket is active but no session found — likely interrupted.")

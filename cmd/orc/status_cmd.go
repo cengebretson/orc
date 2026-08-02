@@ -12,7 +12,7 @@ import (
 	"github.com/cengebretson/orc/internal/telemetry"
 	"github.com/cengebretson/orc/internal/ticket"
 	"github.com/cengebretson/orc/internal/ticketview"
-	"github.com/cengebretson/orc/internal/tmux"
+
 	"github.com/cengebretson/orc/internal/validate"
 	"github.com/spf13/cobra"
 )
@@ -65,7 +65,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 
 	// Collect does its own availability and session lookup; this one is for
 	// deciding whether the printed table carries a tmux column.
-	showTmux := tmux.Available()
+	showTmux := muxBackend.Available()
 
 	features, err := featurelist.Collect(root, featurelist.Options{
 		IncludeArchived: true,

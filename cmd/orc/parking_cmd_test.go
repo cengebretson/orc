@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cengebretson/orc/internal/mux"
 	"github.com/cengebretson/orc/internal/parking"
 	"github.com/cengebretson/orc/internal/sessionlist"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/telemetry"
-	"github.com/cengebretson/orc/internal/tmux"
 )
 
 func TestParkableEntriesRequireRunningManagedResumeMetadata(t *testing.T) {
@@ -47,7 +47,7 @@ func TestRestoredPaneRequiresExactParkedIdentity(t *testing.T) {
 		Ticket: "ORC-1", Stage: "develop", Engine: "codex", ProviderSessionID: "provider-1",
 		TmuxSession: "orc-1", TmuxWindow: "develop",
 	}
-	panes := []tmux.Pane{
+	panes := []mux.Pane{
 		{ID: "%1", Agent: true, Session: "orc-1", Window: "develop", Ticket: "ORC-1", Stage: "develop", ProviderEngine: "codex", ProviderSessionID: "other"},
 		{ID: "%2", Agent: true, Session: "orc-1", Window: "develop", Ticket: "ORC-1", Stage: "develop", ProviderEngine: "CODEX", ProviderSessionID: "provider-1"},
 	}
@@ -63,7 +63,7 @@ func TestRestoredPaneRejectsUnrelatedSessionCollision(t *testing.T) {
 		Ticket: "ORC-1", Stage: "develop", Engine: "codex", ProviderSessionID: "provider-1",
 		TmuxSession: "orc-1", TmuxWindow: "develop",
 	}
-	panes := []tmux.Pane{
+	panes := []mux.Pane{
 		{ID: "%1", Agent: true, Session: "orc-1", Window: "develop", Ticket: "ORC-OTHER", Stage: "develop", ProviderEngine: "codex", ProviderSessionID: "provider-1"},
 		{ID: "%2", Agent: false, Session: "orc-1", Window: "develop", Ticket: "ORC-1", Stage: "develop", ProviderEngine: "codex", ProviderSessionID: "provider-1"},
 	}
@@ -74,7 +74,7 @@ func TestRestoredPaneRejectsUnrelatedSessionCollision(t *testing.T) {
 }
 
 func TestUnparkEntryReconcilesMatchingExistingSession(t *testing.T) {
-	if !tmux.Available() {
+	if !muxBackend.Available() {
 		t.Skip("tmux is not installed")
 	}
 	socketDir, err := os.MkdirTemp("/tmp", "orc-unpark-test-")
@@ -101,27 +101,27 @@ func TestUnparkEntryReconcilesMatchingExistingSession(t *testing.T) {
 		t.Fatalf("create test session: %v", err)
 	}
 	deadline := time.Now().Add(time.Second)
-	for !tmux.SessionExists(entry.TmuxSession) && time.Now().Before(deadline) {
+	for !muxBackend.SessionExists(entry.TmuxSession) && time.Now().Before(deadline) {
 		time.Sleep(10 * time.Millisecond)
 	}
-	if !tmux.SessionExists(entry.TmuxSession) {
+	if !muxBackend.SessionExists(entry.TmuxSession) {
 		t.Fatal("test tmux session did not become available")
 	}
-	metadata := tmux.WindowMetadata{
+	metadata := mux.Metadata{
 		Ticket: entry.Ticket, Stage: entry.Stage, Worker: entry.Worker, Engine: entry.Engine,
 		ProviderSessionID: entry.ProviderSessionID, FeatureDir: entry.FeatureDir,
 	}
-	if err := tmux.SetWindowMetadata(entry.TmuxSession, entry.TmuxWindow, metadata); err != nil {
+	if err := muxBackend.SetWindowMetadata(entry.TmuxSession, entry.TmuxWindow, metadata); err != nil {
 		t.Fatal(err)
 	}
-	pane, err := tmux.ResolvePaneTarget(entry.TmuxSession, entry.TmuxWindow)
+	pane, err := muxBackend.ResolvePane(entry.TmuxSession, entry.TmuxWindow)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := tmux.SetPaneMetadata(pane, metadata); err != nil {
+	if err := muxBackend.SetPaneMetadata(pane, metadata); err != nil {
 		t.Fatal(err)
 	}
-	panes, err := tmux.ListPanesDetailed()
+	panes, err := muxBackend.ListPanes()
 	if err != nil {
 		t.Fatal(err)
 	}
