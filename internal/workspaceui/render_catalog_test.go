@@ -122,11 +122,6 @@ Build features end to end.
 	}
 	// glamour styles individual word spans, so assert on ANSI-stripped text
 	out := ansi.Strip(styled)
-	for _, want := range []string{"Bob", "bob-developer", "claude", "opus"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("worker info missing %q", want)
-		}
-	}
 	if !strings.Contains(out, "Active Features (1)") {
 		t.Error("missing active features count")
 	}
@@ -138,6 +133,52 @@ Build features end to end.
 	}
 	if !strings.Contains(out, "Build features end to end.") {
 		t.Error("missing rendered markdown body")
+	}
+}
+
+func TestRenderWorkerSelectorIncludesSelectedWorkerDetails(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "bob-developer.md")
+	content := `---
+id: bob-developer
+name: Bob
+engine: claude
+model: opus
+args:
+  permission-mode: plan
+---
+
+# Bob
+
+## Role
+
+Implementation engineer.
+`
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+	story := testRow("STORY-7", "active", "develop")
+	story.s.Stage.Worker = "bob-developer"
+	groups := []workerGroup{{name: "default", items: []sectionItem{{
+		label: "Bob", id: "bob-developer", path: path,
+	}}}}
+
+	out := ansi.Strip(renderWorkerSelector(groups, 0, []*featureRow{story}, 120))
+	for _, want := range []string{
+		"Workers", "▶  Bob", "bob-developer", "claude", "opus",
+		"Implementation engineer.", "permission-mode", "plan", "active=1",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("combined Workers panel missing %q:\n%s", want, out)
+		}
+	}
+	selectedLine := firstLineContaining(out, "▶  Bob")
+	for _, want := range []string{"id=bob-developer", "engine=claude", "model=opus", "permission-mode=plan", "active=1"} {
+		if !strings.Contains(selectedLine, want) {
+			t.Errorf("selected worker row missing %q: %q", want, selectedLine)
+		}
+	}
+	if strings.Contains(selectedLine, "Implementation engineer.") {
+		t.Errorf("role should render on its own row: %q", selectedLine)
 	}
 }
 
@@ -159,7 +200,7 @@ func TestRenderWorkerFileNoFrontmatter(t *testing.T) {
 	}
 }
 
-func TestRenderWorkerFileStacksDetailsAboveActiveFeaturesAtAnyWidth(t *testing.T) {
+func TestRenderWorkerFileStartsWithActiveFeaturesAtAnyWidth(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "bob-developer.md")
 	content := `---
 id: bob-developer
@@ -184,21 +225,18 @@ Implementation engineer.
 		t.Fatalf("renderWorkerFile: %v", err)
 	}
 	out := ansi.Strip(styled)
-	// Even at a wide width, the details card and Active Features panel are
-	// full-width and stacked, not side by side.
+	// Worker metadata lives in the pinned Workers panel, so the scrollable
+	// body begins directly with full-width Active Features and Documentation.
 	if line := firstLineContaining(out, "╮  ╭"); line != "" {
-		t.Fatalf("worker detail boxes should be stacked, not side by side:\n%s", out)
+		t.Fatalf("worker content boxes should be stacked, not side by side:\n%s", out)
 	}
-	detailsIdx := strings.Index(out, "Bob")
 	activeIdx := strings.Index(out, "Active Features")
 	docsIdx := strings.Index(out, "Documentation")
-	if detailsIdx < 0 || activeIdx < 0 || docsIdx < 0 || detailsIdx >= activeIdx || activeIdx >= docsIdx {
-		t.Fatalf("expected details, then Active Features, then a Documentation panel, in order:\n%s", out)
+	if activeIdx < 0 || docsIdx < 0 || activeIdx >= docsIdx {
+		t.Fatalf("expected Active Features then Documentation, in order:\n%s", out)
 	}
-	for _, want := range []string{"role", "Implementation engineer.", "active", "1 feature(s)"} {
-		if !strings.Contains(out, want) {
-			t.Fatalf("details card missing %q pulled up from the body/Active Features:\n%s", want, out)
-		}
+	if strings.Contains(firstLineContaining(out, "engine"), "claude") {
+		t.Fatalf("worker metadata should not render in the scrollable body:\n%s", out)
 	}
 }
 

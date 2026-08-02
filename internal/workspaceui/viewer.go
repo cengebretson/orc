@@ -125,7 +125,7 @@ func (m Model) directRepositoryHeader() string {
 func (m Model) directWorkerHeader() string {
 	width := max(20, m.viewer.viewport.Width)
 	return "\n" + m.operationalBanner(width) + "\n" +
-		renderWorkerSelector(m.data.workerGroups, m.selectedWorkerIndex(), width) + "\n"
+		renderWorkerSelector(m.data.workerGroups, m.selectedWorkerIndex(), m.data.features, width) + "\n"
 }
 
 // directWorkflowHeader renders the pinned banner and workflow title shown

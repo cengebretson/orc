@@ -39,11 +39,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   static "Ns ago" timestamp, while still turning yellow/red on genuine
   staleness the same way it always has.
 - The Workers detail view is more consistent and complete: the worker card
-  now pulls in a one-line role summary and the active-feature count instead
-  of requiring a scroll to find them, Active Features always spans the full
-  width (previously half-width side by side on wide terminals) with new
-  Status and Context columns, and the markdown body below is now wrapped in
-  a panel like the rest of the dashboard instead of flowing unboxed.
+  is now merged into the pinned Workers panel, which includes the selected
+  worker's configuration, one-line role summary, and active-feature count.
+  Active Features always spans the full width (previously half-width side by
+  side on wide terminals) with new Status and Context columns, and the
+  markdown body below is now wrapped in a panel like the rest of the dashboard
+  instead of flowing unboxed.
 
 - The ticket detail page and any drilled-into file viewer (a stage file, a
   worker opened from its section list, a ticket's linked document) now pin

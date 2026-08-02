@@ -465,7 +465,7 @@ func TestWorkersDestinationSelectsInlineDetailsAndKeepsCharacterSheet(t *testing
 		t.Fatalf("Workers destination = view %v kind %v, want direct worker inspector", m.view, m.viewer.kind)
 	}
 	body := ansi.Strip(m.View())
-	for _, want := range []string{"Workers", "▶  Bob", "Bob builds things"} {
+	for _, want := range []string{"Workers", "▶  Bob", "engine", "claude", "Bob builds things"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("direct worker inspector missing %q:\n%s", want, body)
 		}
@@ -474,7 +474,7 @@ func TestWorkersDestinationSelectsInlineDetailsAndKeepsCharacterSheet(t *testing
 		t.Fatalf("Workers destination should not require drill-in:\n%s", body)
 	}
 	if strings.Contains(body, "configured") || strings.Contains(body, "scroll details") {
-		t.Fatalf("Workers selector should contain only worker choices:\n%s", body)
+		t.Fatalf("Workers panel should not contain navigation help:\n%s", body)
 	}
 	if got := lipgloss.Height(m.View()); got != m.height {
 		t.Fatalf("Workers view height = %d, want terminal height %d", got, m.height)
