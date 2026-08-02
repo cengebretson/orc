@@ -49,6 +49,61 @@ type Metadata struct {
 	FeatureDir        string
 }
 
+// AttentionRank orders attention states by how much they need a human, most
+// urgent first. An unrecognized or empty state ranks last.
+//
+// The order is deliberate: blocked work has stopped and cannot continue,
+// input is stopped but answerable, review is finished work waiting on a
+// decision, and done needs nothing. Anything a caller does not recognize is
+// treated as no signal rather than guessed at.
+func AttentionRank(state string) int {
+	switch state {
+	case AttentionBlocked:
+		return 0
+	case AttentionInput:
+		return 1
+	case AttentionReview:
+		return 2
+	case AttentionDone:
+		return 3
+	default:
+		return 4
+	}
+}
+
+// RollUpAttention reduces the panes of one window to the single attention
+// state that window should display, and the time that state began.
+//
+// A window can host more than one agent — a stage agent beside a jit task, or
+// a split the user made themselves — and they report independently. The most
+// urgent state wins, so a window is never shown as done while something in it
+// is blocked. Ties go to the *earliest* timestamp, so the elapsed time tracks
+// the agent that has been waiting longest rather than whichever most recently
+// changed.
+//
+// Returns the empty string when no pane reports a recognized state.
+func RollUpAttention(panes []Pane) (state string, since int64) {
+	for _, pane := range panes {
+		rank := AttentionRank(pane.Attention)
+		if rank == AttentionRank("") {
+			continue
+		}
+		if state == "" || rank < AttentionRank(state) {
+			state, since = pane.Attention, pane.AttentionSince
+			continue
+		}
+		// Same urgency: prefer the one that has been in it longest. A zero
+		// timestamp means the reporter did not say, which must not win a tie
+		// against a real one by looking like the distant past.
+		if rank == AttentionRank(state) && pane.AttentionSince != 0 {
+			if since == 0 || pane.AttentionSince < since {
+				since = pane.AttentionSince
+			}
+		}
+	}
+	return state, since
+}
+
 // Pane describes one terminal pane: the process running in it, and whatever
 // Orc metadata the backend has stamped on it.
 type Pane struct {
@@ -67,6 +122,10 @@ type Pane struct {
 	ProviderSessionID string `json:"provider_session_id,omitempty"`
 	FeatureDir        string `json:"feature_dir,omitempty"`
 	Attention         string `json:"attention,omitempty"`
+	// AttentionSince is when the pane entered its current attention state, in
+	// epoch seconds. Zero means the reporter did not say — treat it as unknown
+	// rather than as the epoch.
+	AttentionSince int64 `json:"attention_since,omitempty"`
 }
 
 // Backend is a terminal multiplexer Orc can drive.

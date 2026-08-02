@@ -21,10 +21,13 @@ func TestWriteScriptCleansUpAfterCommandFailure(t *testing.T) {
 	}
 }
 
+// A pane reporting no attention still emits its trailing fields as empty
+// strings. Trimming them would leave the row short and drop an otherwise valid
+// pane from the inventory.
 func TestParseDetailedPanesPreservesEmptyAttention(t *testing.T) {
 	row := strings.Join([]string{
 		"%1", "orc-1", "develop", "/work", "codex", "4242", "1",
-		"ORC-1", "develop", "default:bob", "codex", "codex", "provider-1", "/feature", "",
+		"ORC-1", "develop", "default:bob", "codex", "codex", "provider-1", "/feature", "", "",
 	}, "\t") + "\n"
 
 	got := parseDetailedPanes([]byte(row))
@@ -33,6 +36,36 @@ func TestParseDetailedPanesPreservesEmptyAttention(t *testing.T) {
 	}
 	if got[0].ID != "%1" || got[0].ProviderSessionID != "provider-1" || got[0].Attention != "" {
 		t.Fatalf("pane = %#v", got[0])
+	}
+	if got[0].AttentionSince != 0 {
+		t.Fatalf("AttentionSince = %d, want 0 when unreported", got[0].AttentionSince)
+	}
+}
+
+// An unrecognized marker is not passed through to the display. Orc defines the
+// attention vocabulary; anything else is no signal rather than a fifth state
+// every renderer would have to know about.
+func TestParseDetailedPanesNormalizesAttention(t *testing.T) {
+	rows := func(attention string) string {
+		return strings.Join([]string{
+			"%1", "orc-1", "develop", "/work", "codex", "4242", "1",
+			"ORC-1", "develop", "default:bob", "codex", "codex", "p1", "/feature", attention, "1700000000",
+		}, "\t") + "\n"
+	}
+
+	for _, test := range []struct{ raw, want string }{
+		{"blocked", "blocked"},
+		{"BLOCKED", "blocked"},
+		{"clear", ""},
+		{"nonsense", ""},
+	} {
+		got := parseDetailedPanes([]byte(rows(test.raw)))
+		if len(got) != 1 {
+			t.Fatalf("%q: panes = %#v", test.raw, got)
+		}
+		if got[0].Attention != test.want {
+			t.Errorf("%q: Attention = %q, want %q", test.raw, got[0].Attention, test.want)
+		}
 	}
 }
 

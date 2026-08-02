@@ -36,9 +36,12 @@ func TestBackendDelegatesToTmuxCommands(t *testing.T) {
 			wantArgs: []string{"set-option", "-p", "-t", "%1", "@orc_agent", "1"},
 		},
 		{
+			// Attention reads per pane, not per window — a window can host more
+			// than one agent and a window-scoped read reports whichever wrote
+			// last.
 			name:     "Attention",
 			call:     func() { backend.Attention("orc", "develop") },
-			wantArgs: []string{"show-options", "-w", "-qv", "-t", "orc:develop", "@agent_attention"},
+			wantArgs: []string{"list-panes", "-t", "orc:develop", "-F"},
 		},
 	}
 

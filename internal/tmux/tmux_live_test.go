@@ -119,6 +119,28 @@ func TestLiveTmuxWindowMetadataAttentionAndExactSend(t *testing.T) {
 	if resolved, err := ValidatePaneTarget(session, "review", "%999999"); err != nil || resolved != pane {
 		t.Fatalf("ValidatePaneTarget stale pane = %q, %v; want %q", resolved, err, pane)
 	}
+
+	// Two agents now share this window, which is what a jit task sent into a
+	// stage's session looks like. The window option still says input; the second
+	// pane says blocked. A window-scoped read would report whichever was written
+	// last and could hide the blocked one.
+	if err := exec.Command("tmux", "set-option", "-p", "-t", secondPane, "@agent_attention", mux.AttentionBlocked).Run(); err != nil {
+		t.Fatalf("set pane attention: %v", err)
+	}
+	if err := exec.Command("tmux", "set-option", "-p", "-t", secondPane, "@agent_attention_since", "1700000000").Run(); err != nil {
+		t.Fatalf("set pane attention time: %v", err)
+	}
+	if got, since := WindowAttentionSince(session, "review"); got != mux.AttentionBlocked || since != 1700000000 {
+		t.Fatalf("WindowAttentionSince = %q/%d, want %q/1700000000", got, since, mux.AttentionBlocked)
+	}
+	// Clearing the pane's own value falls back to the window's, which is how
+	// setups that only ever set the window option keep working.
+	if err := exec.Command("tmux", "set-option", "-p", "-u", "-t", secondPane, "@agent_attention").Run(); err != nil {
+		t.Fatalf("clear pane attention: %v", err)
+	}
+	if got := WindowAttention(session, "review"); got != mux.AttentionInput {
+		t.Fatalf("WindowAttention after clearing pane = %q, want inherited %q", got, mux.AttentionInput)
+	}
 	output := filepath.Join(root, "review-ready")
 	pidFile := filepath.Join(root, "provider-pid")
 	gotPane, err := SendCommandTarget(session, "review", pane, root, root, []string{"sh", "-c", `printf '%s' "$$" > "$1"; printf ready > "$2"; sleep 30`, "sh", pidFile, output})

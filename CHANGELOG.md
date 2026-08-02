@@ -91,6 +91,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Attention markers are now read per pane and rolled up per window, so a window
+  running more than one agent — a `orc jit --tmux` task sent into a stage's
+  session, or a split you made yourself — no longer reports whichever agent
+  wrote its marker last. The most urgent state wins (`blocked`, then `input`,
+  then `review`, then `done`), so a blocked agent can't be hidden behind a
+  finished one, and when two agents share a state the elapsed time tracks
+  whichever has been waiting longest. Markers set only on the window keep
+  working unchanged.
+- Unrecognized attention markers are treated as no signal instead of being
+  passed through to the display.
 - Included the generated `.gitignore` in the shared atomic workspace mutation
   plan so initialization counts it, reports write failures, and rolls it back
   consistently with every other scaffold file.

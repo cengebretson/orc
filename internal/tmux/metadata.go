@@ -126,17 +126,35 @@ func WindowOption(session, window, option string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-// WindowAttention returns the supported tmux-attention state for a window.
-// Unknown, cleared, and unreadable values are treated as no live overlay.
-func WindowAttention(session, window string) string {
-	value, err := WindowOption(session, window, "@agent_attention")
-	if err != nil {
-		return ""
-	}
-	switch strings.ToLower(value) {
+// normalizeAttention maps a raw option value to a supported attention state.
+// Unknown and cleared values are treated as no live overlay rather than being
+// passed through, so a display never has to recognize a state Orc does not
+// define.
+func normalizeAttention(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
 	case mux.AttentionInput, mux.AttentionBlocked, mux.AttentionReview, mux.AttentionDone:
-		return strings.ToLower(value)
+		return strings.ToLower(strings.TrimSpace(value))
 	default:
 		return ""
 	}
+}
+
+// WindowAttention returns the attention state for a window, rolled up across
+// its panes.
+//
+// The marker is read per pane rather than per window because a window can host
+// more than one agent — a jit task sent into a stage's session, or a split the
+// user made — and a window-scoped read reports whichever wrote last, so a
+// blocked agent could be hidden behind a done one. Panes inherit the window's
+// value when they have none of their own, so setups that only ever set the
+// window option keep working unchanged.
+func WindowAttention(session, window string) string {
+	state, _ := WindowAttentionSince(session, window)
+	return state
+}
+
+// WindowAttentionSince returns the rolled-up attention state for a window and
+// when it began, in epoch seconds. A zero time means no pane reported one.
+func WindowAttentionSince(session, window string) (string, int64) {
+	return mux.RollUpAttention(windowPanes(session, window))
 }
