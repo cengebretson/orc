@@ -77,42 +77,20 @@ Implementation notes:
 
 Effort: Medium.
 
-### Abstract the multiplexer behind an interface
+### Record which multiplexer produced a session
 
-`internal/tmux` is called directly from the orchestrator, watch, dashboard, and
-session packages. Every tmux assumption — user options as the metadata store,
-`session:window` targeting, `send-keys` as the input path — is spread across
-call sites rather than sitting behind a boundary.
+Leftover from the `mux.Backend` seam, which shipped without it.
+`runtime.tmux.session` in `STATE.yaml` still names its backend in the field
+itself, so a workspace cannot say a session came from anything but tmux.
 
-This is worth doing on its own merits, independent of ever supporting a second
-multiplexer. Orc already gates agent-specific behavior behind the worker's
-`engine` field because the hard requirement is product-agnosticism; the same
-discipline applied one layer down is the missing half. Right now Orc is
-agent-agnostic and multiplexer-coupled.
+- Keep `runtime.tmux.session` readable forever; old state must not need
+  migrating.
+- New writes should record the backend name alongside the handle —
+  `mux.Backend.Name()` already supplies it.
+- Only worth doing when a second backend actually exists. Until then it is a
+  field nothing varies, and guessing its shape now risks getting it wrong.
 
-Implementation notes:
-
-- Introduce `internal/session` (name TBD) with a narrow interface: launch,
-  attach, focus, set/read identity metadata, read attention state, send input,
-  list live sessions. Keep it to what Orc actually calls today — resist
-  designing for a backend that does not exist yet.
-- `internal/tmux` becomes the first implementation and moves behind it. No
-  behavior change; this is a refactor with existing tests as the gate.
-- Where tmux user options are the metadata store, the interface should expose
-  *metadata*, not *options*. A backend with no user-option concept must still be
-  implementable.
-- `STATE.yaml` keeps `runtime.tmux.session` for compatibility, but new writes
-  should record the backend alongside the handle so a workspace can say which
-  multiplexer produced a session.
-- Explicit non-goal: do not add a second backend in this change. The value is
-  the seam. A herdr or Zellij backend becomes an additive change afterwards
-  instead of a rewrite.
-
-Prior art: none — this is a response to having read two of them. herdr replaces
-tmux rather than wrapping it, which is exactly the swap this seam would have to
-absorb, and it is currently unabsorbable.
-
-Effort: Medium.
+Effort: Small.
 
 ### Ship the agent hook installer
 
@@ -179,34 +157,25 @@ Prior art: jmux (`jmux --install-agent-hooks`, `bun run verify:agents`).
 
 Effort: Medium.
 
-### Pane-scope the attention marker
+### Derive attention for agents that do not report it
 
-`@agent_attention` is read at window scope (`internal/tmux/metadata.go`,
-`WindowAttention`). `docs/watch.md` already concedes the flaw: "If multiple agent
-panes share one tmux window, the most recent marker wins for that window." That
-becomes wrong the moment `orc jit --tmux` sends a task into a ticket's existing
-session, which is already shipped.
+Pane-scoped reading and the window rollup have shipped. What remains is the
+tier that *derives* a state by reading the screen, for agents whose hooks report
+nothing, plus the two display uses of the timestamp the rollup now returns.
 
-The pane infrastructure exists — `SetPaneMetadata` already stamps `@orc_agent`
-and the full identity set onto the exact agent pane. Only attention is stuck at
-window scope.
-
-Implementation notes:
-
-- Add a pane-scoped reader alongside `WindowOption` in `internal/tmux/metadata.go`
-  and prefer it; the window value stays a fallback.
-- Roll a window's panes up for display: `blocked` beats `input` beats `review`
-  beats `done`. On a tie, take the **earliest** timestamp, so the elapsed timer
-  tracks the agent that has been stuck longest rather than the one that most
-  recently changed.
-- Back-compat is free: a pane with no value of its own inherits the window's, and
-  the rollup collapses a single-pane window to exactly today's behavior.
-- Record `@agent_attention_since` (epoch seconds) so the rail can age a marker
-  and flag an implausibly long `blocked`.
+- Surface `@agent_attention_since` in the rail: age a marker, and flag an
+  implausibly long `blocked` as likely stuck rather than merely waiting.
+  `mux.RollUpAttention` already returns the time; nothing displays it yet, and
+  `mux.Backend.Attention` does not expose it — grow the interface when the rail
+  actually needs it, not before.
 - Mark derived state as derived. Anything inferred from reading a pane rather
   than reported by a hook gets `@agent_attention_source screen`, and the derived
   tier may never overwrite a state the agent reports for itself. A guess must
   stay distinguishable from a fact.
+- Consider whether `internal/sessionlist` should roll up too. It reports the
+  matched pane's own state, which is right for a pane-level listing, but it can
+  disagree with the window rollup the rail shows for the same ticket. Decide
+  deliberately rather than letting the two drift.
 
 If a derived tier is built at all, it belongs in a **data file, not Go code**.
 Screen signatures rot — an agent ships a UI change and the detector silently
@@ -241,7 +210,7 @@ project whose whole job is agent detection, and a bad one for Orc — it puts a
 network service in the middle of local state reads. Ship the files in the
 binary and let a workspace override them on disk.
 
-Effort: Small (pane scope) / Medium (with the derived tier).
+Effort: Small (timestamp display) / Medium (the derived tier).
 
 ### `orc ctl` — agent-facing control surface
 
