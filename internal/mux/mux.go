@@ -17,7 +17,11 @@
 // portability layer, and it should grow only when a caller needs it to.
 package mux
 
-import "os/exec"
+import (
+	"fmt"
+	"os/exec"
+	"time"
+)
 
 // Attention states an agent (or an external tool) can report for a window.
 // STATE.yaml remains authoritative for workflow status; these are live urgency
@@ -93,6 +97,43 @@ type Notification struct {
 	Title string
 	Body  string
 	Sound string
+}
+
+// AgentControlOptions configures a backend-native lifecycle wait. Until is a
+// list of exact backend lifecycle states. An empty list means the backend's
+// documented settled states.
+type AgentControlOptions struct {
+	Until   []string
+	Timeout time.Duration
+}
+
+// AgentControlResult is the structured live state returned after a prompt or
+// wait. Target remains the exact opaque location recorded by Orc.
+type AgentControlResult struct {
+	Backend        string `json:"backend"`
+	Target         Target `json:"target"`
+	Agent          string `json:"agent,omitempty"`
+	Name           string `json:"name,omitempty"`
+	Lifecycle      string `json:"lifecycle"`
+	StateChangeSeq uint64 `json:"state_change_seq,omitempty"`
+}
+
+// AgentControlError preserves a backend's stable automation error code, such
+// as Herdr's agent_prompt_stalled or timeout.
+type AgentControlError struct {
+	Backend string
+	Code    string
+	Message string
+}
+
+func (e *AgentControlError) Error() string {
+	if e == nil {
+		return ""
+	}
+	if e.Message == "" {
+		return fmt.Sprintf("%s agent control: %s", e.Backend, e.Code)
+	}
+	return fmt.Sprintf("%s agent control: %s: %s", e.Backend, e.Code, e.Message)
 }
 
 // AttentionRank orders attention states by how much they need a human, most
@@ -285,4 +326,15 @@ type NotificationBackend interface {
 	Backend
 
 	ShowNotification(notification Notification) error
+}
+
+// AgentControlBackend is an optional capability for multiplexers that can
+// submit prompts atomically and wait on recognized agent lifecycle state.
+// Backends without reliable lifecycle detection must not emulate it by
+// scraping screen text.
+type AgentControlBackend interface {
+	Backend
+
+	PromptAgent(target Target, text string, wait bool, options AgentControlOptions) (AgentControlResult, error)
+	WaitAgent(target Target, options AgentControlOptions) (AgentControlResult, error)
 }

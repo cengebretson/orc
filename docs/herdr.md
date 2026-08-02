@@ -123,3 +123,23 @@ user-owned Herdr config before expecting the alert to appear:
 [ui.toast]
 delivery = "herdr" # or "terminal" / "system"
 ```
+
+## Structured agent control
+
+`orc ctl` delegates prompting, lifecycle waiting, timeout handling, and stall
+detection to Herdr while continuing to use Orc's exact recorded pane identity:
+
+```bash
+orc ctl agent prompt --ticket ORC-9 "Review this diff" --wait --timeout 120s
+orc ctl agent wait --ticket ORC-9 --until blocked --timeout 120s
+```
+
+Results are JSON on stdout and failures are JSON on stderr. A prompt submitted
+from a non-working state that produces no observed lifecycle change preserves
+Herdr's `agent_prompt_stalled` error code. Waits observe lifecycle state rather
+than pretending to track an individual agent turn; if the agent is already
+working, the active turn settling may satisfy the wait.
+
+Accepted `--until` values are `idle`, `working`, `blocked`, `done`, and
+`unknown`. Repeat the flag to accept multiple states. Omitting it uses Herdr's
+settled defaults: `idle`, `done`, or `blocked`.

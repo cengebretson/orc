@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -28,6 +29,7 @@ var _ mux.TargetBackend = Backend{}
 var _ mux.WorktreeTargetBackend = Backend{}
 var _ mux.TaskCellBackend = Backend{}
 var _ mux.NotificationBackend = Backend{}
+var _ mux.AgentControlBackend = Backend{}
 
 func (Backend) Name() string { return "herdr" }
 
@@ -48,6 +50,131 @@ func (b Backend) ShowNotification(notification mux.Notification) error {
 		return fmt.Errorf("show herdr notification: %w", err)
 	}
 	return nil
+}
+
+// PromptAgent atomically submits text to the exact recorded Herdr agent pane
+// and optionally delegates lifecycle waiting and stall detection to Herdr.
+func (b Backend) PromptAgent(target mux.Target, text string, wait bool, options mux.AgentControlOptions) (mux.AgentControlResult, error) {
+	if strings.TrimSpace(text) == "" {
+		return mux.AgentControlResult{}, fmt.Errorf("herdr agent prompt requires text")
+	}
+	if !wait && (len(options.Until) > 0 || options.Timeout > 0) {
+		return mux.AgentControlResult{}, fmt.Errorf("herdr agent prompt wait options require wait=true")
+	}
+	target, err := b.resolveExactAgentTarget(target)
+	if err != nil {
+		return mux.AgentControlResult{}, err
+	}
+	args := []string{"agent", "prompt", target.Pane, text}
+	if wait {
+		args = append(args, "--wait")
+		args, err = appendAgentWaitOptions(args, options)
+		if err != nil {
+			return mux.AgentControlResult{}, err
+		}
+	}
+	return b.agentControl(target, args...)
+}
+
+// WaitAgent blocks on Herdr's recognized lifecycle state for the exact
+// recorded pane. An empty Until list uses Herdr's settled-state defaults.
+func (b Backend) WaitAgent(target mux.Target, options mux.AgentControlOptions) (mux.AgentControlResult, error) {
+	target, err := b.resolveExactAgentTarget(target)
+	if err != nil {
+		return mux.AgentControlResult{}, err
+	}
+	args, err := appendAgentWaitOptions([]string{"agent", "wait", target.Pane}, options)
+	if err != nil {
+		return mux.AgentControlResult{}, err
+	}
+	return b.agentControl(target, args...)
+}
+
+func appendAgentWaitOptions(args []string, options mux.AgentControlOptions) ([]string, error) {
+	for _, status := range options.Until {
+		status = strings.TrimSpace(status)
+		if status == "" {
+			return nil, fmt.Errorf("herdr agent wait status is empty")
+		}
+		args = append(args, "--until", status)
+	}
+	if options.Timeout > 0 {
+		milliseconds := options.Timeout.Milliseconds()
+		if milliseconds == 0 {
+			return nil, fmt.Errorf("herdr agent timeout must be at least 1ms")
+		}
+		args = append(args, "--timeout", strconv.FormatInt(milliseconds, 10))
+	}
+	return args, nil
+}
+
+func (b Backend) resolveExactAgentTarget(target mux.Target) (mux.Target, error) {
+	if target.Backend != "" && target.Backend != "herdr" {
+		return mux.Target{}, fmt.Errorf("herdr cannot control %s target", target.Backend)
+	}
+	if target.Workspace == "" || target.Tab == "" || target.Pane == "" {
+		return mux.Target{}, fmt.Errorf("herdr agent control requires exact workspace, tab, and pane ids")
+	}
+	var workspace struct {
+		Workspace workspaceInfo `json:"workspace"`
+	}
+	if err := b.decode(&workspace, "workspace", "get", target.Workspace); err != nil {
+		return mux.Target{}, err
+	}
+	if workspace.Workspace.WorkspaceID != target.Workspace {
+		return mux.Target{}, fmt.Errorf("herdr workspace target %s did not resolve exactly", target.Workspace)
+	}
+	var tab struct {
+		Tab tabInfo `json:"tab"`
+	}
+	if err := b.decode(&tab, "tab", "get", target.Tab); err != nil {
+		return mux.Target{}, err
+	}
+	if tab.Tab.TabID != target.Tab || tab.Tab.WorkspaceID != target.Workspace {
+		return mux.Target{}, fmt.Errorf("herdr tab target %s is not in workspace %s", target.Tab, target.Workspace)
+	}
+	pane, err := b.getPane(target.Pane)
+	if err != nil {
+		return mux.Target{}, err
+	}
+	if pane.PaneID != target.Pane || pane.WorkspaceID != target.Workspace || pane.TabID != target.Tab {
+		return mux.Target{}, fmt.Errorf("herdr pane target %s is not in recorded tab %s", target.Pane, target.Tab)
+	}
+	return mux.Target{Backend: "herdr", Workspace: target.Workspace, Tab: target.Tab, Pane: target.Pane}, nil
+}
+
+func (b Backend) agentControl(target mux.Target, args ...string) (mux.AgentControlResult, error) {
+	out, commandErr := b.command(args...)
+	envelope, decodeErr := decodeResponseEnvelope(out)
+	if decodeErr == nil && envelope.Error != nil {
+		return mux.AgentControlResult{}, &mux.AgentControlError{
+			Backend: "herdr", Code: envelope.Error.Code, Message: envelope.Error.Message,
+		}
+	}
+	if commandErr != nil {
+		return mux.AgentControlResult{}, commandErr
+	}
+	if decodeErr != nil {
+		return mux.AgentControlResult{}, decodeErr
+	}
+	var result struct {
+		Agent struct {
+			Name           string `json:"name"`
+			Agent          string `json:"agent"`
+			AgentStatus    string `json:"agent_status"`
+			StateChangeSeq uint64 `json:"state_change_seq"`
+		} `json:"agent"`
+	}
+	if err := json.Unmarshal(envelope.Result, &result); err != nil {
+		return mux.AgentControlResult{}, fmt.Errorf("decode herdr agent result: %w", err)
+	}
+	if result.Agent.AgentStatus == "" {
+		return mux.AgentControlResult{}, fmt.Errorf("herdr agent response has no lifecycle state")
+	}
+	return mux.AgentControlResult{
+		Backend: "herdr", Target: target, Agent: result.Agent.Agent, Name: result.Agent.Name,
+		Lifecycle: result.Agent.AgentStatus, StateChangeSeq: result.Agent.StateChangeSeq,
+	}, nil
 }
 
 func (b Backend) Available() bool {
@@ -638,20 +765,30 @@ func appendTokens(args []string, meta mux.Metadata) []string {
 	return args
 }
 
+type responseEnvelope struct {
+	Result json.RawMessage `json:"result"`
+	Error  *struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	} `json:"error"`
+}
+
+func decodeResponseEnvelope(out []byte) (responseEnvelope, error) {
+	var envelope responseEnvelope
+	if err := json.Unmarshal(out, &envelope); err != nil {
+		return responseEnvelope{}, fmt.Errorf("decode herdr response: %w", err)
+	}
+	return envelope, nil
+}
+
 func (b Backend) decode(dst any, args ...string) error {
 	out, err := b.command(args...)
 	if err != nil {
 		return err
 	}
-	var envelope struct {
-		Result json.RawMessage `json:"result"`
-		Error  *struct {
-			Code    string `json:"code"`
-			Message string `json:"message"`
-		} `json:"error"`
-	}
-	if err := json.Unmarshal(out, &envelope); err != nil {
-		return fmt.Errorf("decode herdr response: %w", err)
+	envelope, err := decodeResponseEnvelope(out)
+	if err != nil {
+		return err
 	}
 	if envelope.Error != nil {
 		return fmt.Errorf("herdr %s: %s", envelope.Error.Code, envelope.Error.Message)
@@ -677,7 +814,7 @@ func runCLI(args ...string) ([]byte, error) {
 	cmd := exec.Command("herdr", args...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("herdr %s: %s: %w", strings.Join(args, " "), strings.TrimSpace(string(out)), err)
+		return out, fmt.Errorf("herdr %s: %s: %w", strings.Join(args, " "), strings.TrimSpace(string(out)), err)
 	}
 	return out, nil
 }

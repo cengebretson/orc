@@ -107,11 +107,12 @@ Effort: Small.
 ### Add a native herdr multiplexer backend
 
 Status: First vertical slice, native worktree create/open, task-cell layouts,
-and native transition notifications implemented. Launch, exact identity, agent
-lifecycle inventory, attach/focus, dashboard/watch selection, archive cleanup,
-sidebar metadata, worktree-backed workspace creation, optional test/watch
-panes, and blocked/completed alerts are wired through `--mux herdr`. The
-remaining extension ideas stay future work. Live
+native transition notifications, and structured prompt/wait control
+implemented. Launch, exact identity, agent lifecycle inventory, attach/focus,
+dashboard/watch selection, archive cleanup, sidebar metadata, worktree-backed
+workspace creation, optional test/watch panes, blocked/completed alerts, and
+native wait/stall semantics are wired through `--mux herdr`. The remaining
+extension ideas stay future work. Live
 disposable-workspace smoke tests verified Codex launch, exact target
 persistence, lifecycle inventory, sidebar tokens, attach targeting, owned
 archive cleanup, Herdr's native worktree create/open response shapes, and the
@@ -238,8 +239,8 @@ After the vertical slice is stable:
   and leave user-created panes alone.
 - Implemented: send Herdr-native notifications when work blocks or completes,
   with request/done sounds and best-effort failure behavior.
-- Reuse herdr's blocking prompt/wait and stall detection underneath `orc ctl`
-  rather than rebuilding those semantics for this backend.
+- Implemented: `orc ctl agent prompt` and `orc ctl agent wait` reuse Herdr's
+  atomic submission, blocking lifecycle wait, timeout, and stall detection.
 - Defer named-session, remote attach, and event-stream optimization until the
   local lifecycle is correct.
 
@@ -381,6 +382,11 @@ binary and let a workspace override them on disk.
 Effort: Small (timestamp display) / Medium (the derived tier).
 
 ### `orc ctl` — agent-facing control surface
+
+Status: First vertical slice implemented for Herdr: exact-ticket `agent
+prompt` and `agent wait`, structured results/errors, repeatable lifecycle
+targets, timeouts, and native stall detection. Status/state/watch/capture and a
+tmux lifecycle provider remain future work.
 
 Orc has `orc mark` (an agent writes its own durable state) and `orc status
 --json` (a human or script reads it). It has nothing that lets an agent

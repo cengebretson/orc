@@ -14,11 +14,26 @@ import (
 
 	"github.com/cengebretson/orc/internal/config"
 	"github.com/cengebretson/orc/internal/mux"
+	"github.com/cengebretson/orc/internal/mux/muxtest"
 	orcnotify "github.com/cengebretson/orc/internal/notify"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/tmux"
 	"github.com/cengebretson/orc/internal/workspace"
 )
+
+type ctlTestBackend struct {
+	*muxtest.Fake
+	promptFunc func(mux.Target, string, bool, mux.AgentControlOptions) (mux.AgentControlResult, error)
+	waitFunc   func(mux.Target, mux.AgentControlOptions) (mux.AgentControlResult, error)
+}
+
+func (b *ctlTestBackend) PromptAgent(target mux.Target, text string, wait bool, options mux.AgentControlOptions) (mux.AgentControlResult, error) {
+	return b.promptFunc(target, text, wait, options)
+}
+
+func (b *ctlTestBackend) WaitAgent(target mux.Target, options mux.AgentControlOptions) (mux.AgentControlResult, error) {
+	return b.waitFunc(target, options)
+}
 
 func TestRunStatusTicketPrintsDetail(t *testing.T) {
 	resetCommandGlobals(t)
@@ -41,6 +56,117 @@ func TestRunStatusTicketPrintsDetail(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Fatalf("status output missing %q:\n%s", want, out)
 		}
+	}
+}
+
+func TestRunCtlAgentPromptTargetsRecordedHerdrPane(t *testing.T) {
+	resetCommandGlobals(t)
+	globalWorkspace = mutableFixtureWorkspace(t)
+	featureDir := filepath.Join(globalWorkspace, "features", "HOT-42-login-500-error")
+	if err := state.Update(featureDir, func(s *state.State) error {
+		s.Runtime.Mux = &state.MuxRuntime{Backend: "herdr", Workspace: "w9", Tab: "w9:t1", Pane: "w9:p1"}
+		s.Runtime.Tmux = nil
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	var gotTarget mux.Target
+	var gotText string
+	var gotOptions mux.AgentControlOptions
+	muxBackend = &ctlTestBackend{
+		Fake: &muxtest.Fake{NameFunc: func() string { return "herdr" }},
+		promptFunc: func(target mux.Target, text string, wait bool, options mux.AgentControlOptions) (mux.AgentControlResult, error) {
+			if !wait {
+				t.Fatal("prompt wait = false")
+			}
+			gotTarget, gotText, gotOptions = target, text, options
+			return mux.AgentControlResult{Backend: "herdr", Target: target, Agent: "codex", Lifecycle: "blocked"}, nil
+		},
+		waitFunc: func(mux.Target, mux.AgentControlOptions) (mux.AgentControlResult, error) {
+			t.Fatal("unexpected wait")
+			return mux.AgentControlResult{}, nil
+		},
+	}
+	ctlPromptTicket = "HOT-42"
+	ctlPromptWait = true
+	ctlPromptUntil = []string{"blocked"}
+	ctlPromptTimeout = 2 * time.Minute
+
+	out, err := captureStdout(func() error { return runCtlAgentPrompt(nil, []string{"review this"}) })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotTarget.Pane != "w9:p1" || gotText != "review this" || gotOptions.Timeout != 2*time.Minute || len(gotOptions.Until) != 1 || gotOptions.Until[0] != "blocked" {
+		t.Fatalf("target=%#v text=%q options=%#v", gotTarget, gotText, gotOptions)
+	}
+	if !strings.Contains(out, `"agent_prompted"`) || !strings.Contains(out, `"blocked"`) {
+		t.Fatalf("output = %s", out)
+	}
+}
+
+func TestRunCtlAgentWaitUsesBackendLifecycleWait(t *testing.T) {
+	resetCommandGlobals(t)
+	globalWorkspace = mutableFixtureWorkspace(t)
+	featureDir := filepath.Join(globalWorkspace, "features", "HOT-42-login-500-error")
+	if err := state.Update(featureDir, func(s *state.State) error {
+		s.Runtime.Mux = &state.MuxRuntime{Backend: "herdr", Workspace: "w9", Tab: "w9:t1", Pane: "w9:p1"}
+		s.Runtime.Tmux = nil
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	muxBackend = &ctlTestBackend{
+		Fake: &muxtest.Fake{NameFunc: func() string { return "herdr" }},
+		promptFunc: func(mux.Target, string, bool, mux.AgentControlOptions) (mux.AgentControlResult, error) {
+			t.Fatal("unexpected prompt")
+			return mux.AgentControlResult{}, nil
+		},
+		waitFunc: func(target mux.Target, options mux.AgentControlOptions) (mux.AgentControlResult, error) {
+			if target.Pane != "w9:p1" || options.Timeout != 30*time.Second || len(options.Until) != 1 || options.Until[0] != "done" {
+				t.Fatalf("target=%#v options=%#v", target, options)
+			}
+			return mux.AgentControlResult{Backend: "herdr", Target: target, Agent: "codex", Lifecycle: "done"}, nil
+		},
+	}
+	ctlWaitTicket = "HOT-42"
+	ctlWaitUntil = []string{"done"}
+	ctlWaitTimeout = 30 * time.Second
+
+	out, err := captureStdout(func() error { return runCtlAgentWait(nil, nil) })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, `"agent_waited"`) || !strings.Contains(out, `"done"`) {
+		t.Fatalf("output = %s", out)
+	}
+}
+
+func TestRunCtlAgentPromptRejectsBackendWithoutLifecycleControl(t *testing.T) {
+	resetCommandGlobals(t)
+	globalWorkspace = mutableFixtureWorkspace(t)
+	featureDir := filepath.Join(globalWorkspace, "features", "HOT-42-login-500-error")
+	if err := state.Update(featureDir, func(s *state.State) error {
+		s.Runtime.Mux = &state.MuxRuntime{Backend: "tmux", Workspace: "hot-42", Tab: "develop", Pane: "%9"}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	ctlPromptTicket = "HOT-42"
+
+	err := runCtlAgentPrompt(nil, []string{"review this"})
+	var commandErr *ctlCommandError
+	if !errors.As(err, &commandErr) || commandErr.code != "unsupported_backend" {
+		t.Fatalf("error = %#v", err)
+	}
+}
+
+func TestWriteCtlErrorPreservesHerdrStallCode(t *testing.T) {
+	var out bytes.Buffer
+	writeCtlError(&out, &mux.AgentControlError{Backend: "herdr", Code: "agent_prompt_stalled", Message: "no observed state change"})
+	if !strings.Contains(out.String(), `"code":"agent_prompt_stalled"`) || !strings.Contains(out.String(), `"message":"no observed state change"`) {
+		t.Fatalf("error output = %s", out.String())
 	}
 }
 
@@ -1278,6 +1404,13 @@ func resetCommandGlobals(t *testing.T) {
 	oldPackInspectJSON := packInspectJSON
 	oldSendTransitionNotification := sendTransitionNotification
 	oldSendNativeTransitionNotification := sendNativeTransitionNotification
+	oldCtlPromptTicket := ctlPromptTicket
+	oldCtlPromptWait := ctlPromptWait
+	oldCtlPromptUntil := ctlPromptUntil
+	oldCtlPromptTimeout := ctlPromptTimeout
+	oldCtlWaitTicket := ctlWaitTicket
+	oldCtlWaitUntil := ctlWaitUntil
+	oldCtlWaitTimeout := ctlWaitTimeout
 	t.Cleanup(func() {
 		globalWorkspace = oldWorkspace
 		globalMux = oldMux
@@ -1303,6 +1436,13 @@ func resetCommandGlobals(t *testing.T) {
 		packInspectJSON = oldPackInspectJSON
 		sendTransitionNotification = oldSendTransitionNotification
 		sendNativeTransitionNotification = oldSendNativeTransitionNotification
+		ctlPromptTicket = oldCtlPromptTicket
+		ctlPromptWait = oldCtlPromptWait
+		ctlPromptUntil = oldCtlPromptUntil
+		ctlPromptTimeout = oldCtlPromptTimeout
+		ctlWaitTicket = oldCtlWaitTicket
+		ctlWaitUntil = oldCtlWaitUntil
+		ctlWaitTimeout = oldCtlWaitTimeout
 	})
 
 	globalWorkspace = "."
@@ -1327,6 +1467,13 @@ func resetCommandGlobals(t *testing.T) {
 	artifactsAll = false
 	artifactsJSON = false
 	packInspectJSON = false
+	ctlPromptTicket = ""
+	ctlPromptWait = false
+	ctlPromptUntil = nil
+	ctlPromptTimeout = 2 * time.Minute
+	ctlWaitTicket = ""
+	ctlWaitUntil = nil
+	ctlWaitTimeout = 2 * time.Minute
 }
 
 func writeCommandPack(t *testing.T, name, manifest string) string {

@@ -1,5 +1,7 @@
 package main
 
+import "time"
+
 func init() {
 	rootCmd.PersistentFlags().StringVar(&globalWorkspace, "workspace", ".", "Workspace root (default: current directory)")
 	rootCmd.PersistentFlags().StringVar(&globalMux, "mux", "", "Terminal multiplexer backend: tmux or herdr (default: recorded runtime, then tmux)")
@@ -49,6 +51,15 @@ func init() {
 	watchCmd.Flags().BoolVar(&watchTmuxToggle, "tmux-toggle", false, "Toggle a narrow watch pane in the current tmux window")
 	watchCmd.Flags().StringVar(&watchTmuxLayout, "tmux-layout", "right", "Tmux toggle split layout: right or bottom")
 	watchCmd.Flags().StringVar(&watchTmuxSize, "tmux-size", "32", "Tmux toggle pane size, e.g. 32 or 25%")
+	ctlAgentPromptCmd.Flags().StringVar(&ctlPromptTicket, "ticket", "", "Ticket whose exact recorded agent should receive the prompt")
+	_ = ctlAgentPromptCmd.MarkFlagRequired("ticket")
+	ctlAgentPromptCmd.Flags().BoolVar(&ctlPromptWait, "wait", false, "Wait for recognized lifecycle state after submitting")
+	ctlAgentPromptCmd.Flags().StringArrayVar(&ctlPromptUntil, "until", nil, "Lifecycle state to wait for; repeat for multiple states")
+	ctlAgentPromptCmd.Flags().DurationVar(&ctlPromptTimeout, "timeout", 2*time.Minute, "Maximum wait duration")
+	ctlAgentWaitCmd.Flags().StringVar(&ctlWaitTicket, "ticket", "", "Ticket whose exact recorded agent should be observed")
+	_ = ctlAgentWaitCmd.MarkFlagRequired("ticket")
+	ctlAgentWaitCmd.Flags().StringArrayVar(&ctlWaitUntil, "until", nil, "Lifecycle state to wait for; repeat for multiple states")
+	ctlAgentWaitCmd.Flags().DurationVar(&ctlWaitTimeout, "timeout", 2*time.Minute, "Maximum wait duration")
 
 	nextCmd.ValidArgsFunction = ticketCompleter([]string{"pending", "active", "paused"}, false)
 	statusCmd.ValidArgsFunction = ticketCompleter(nil, true)
@@ -88,6 +99,10 @@ func init() {
 	rootCmd.AddCommand(focusCmd)
 	rootCmd.AddCommand(dashboardCmd)
 	rootCmd.AddCommand(watchCmd)
+	ctlAgentCmd.AddCommand(ctlAgentPromptCmd)
+	ctlAgentCmd.AddCommand(ctlAgentWaitCmd)
+	ctlCmd.AddCommand(ctlAgentCmd)
+	rootCmd.AddCommand(ctlCmd)
 	rootCmd.AddCommand(helpAllCmd)
 	rootCmd.AddCommand(versionCmd)
 }

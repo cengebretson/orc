@@ -452,6 +452,8 @@ These are called by agents at the end of each session. They are hidden from `orc
 - `orc mark <ticket> pause "<reason>"` — pause for human input, approval, or an external blocker
 - `orc mark <ticket> done` — mark active, ready, or paused work as done
 - `orc mark <ticket> jit "<summary>"` — record a jit task as complete and clear `runtime.jit`
+- `orc ctl agent prompt --ticket <ticket> "<text>" --wait --timeout 120s` — atomically prompt the exact recorded Herdr agent and wait for a settled lifecycle state
+- `orc ctl agent wait --ticket <ticket> --until blocked --timeout 120s` — wait for recognized lifecycle state without scraping terminal text
 
 `orc mark` validates transitions before writing `STATE.yaml`: pending tickets must be started before `next`, `done` is rejected from `pending`, stage and worker overrides must exist, invalid workspace config blocks advancement, and `artifact_policy: block` blocks `next` when required artifacts are missing, empty, or unchanged from the feature template (override with `--force`). Use `orc artifacts <ticket>` when an agent or human needs the same artifact checklist without advancing the ticket.
 

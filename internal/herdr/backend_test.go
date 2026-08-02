@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/cengebretson/orc/internal/mux"
 )
@@ -79,6 +80,119 @@ func TestShowNotificationRequiresTitle(t *testing.T) {
 	}}
 	if err := b.ShowNotification(mux.Notification{}); err == nil {
 		t.Fatal("expected empty-title error")
+	}
+}
+
+func TestPromptAgentUsesExactPaneAndHerdrWaitSemantics(t *testing.T) {
+	var calls []string
+	b := Backend{run: func(args ...string) ([]byte, error) {
+		call := strings.Join(args, " ")
+		calls = append(calls, call)
+		switch call {
+		case "workspace get w9":
+			return response(`{"workspace":{"workspace_id":"w9"}}`), nil
+		case "tab get w9:t1":
+			return response(`{"tab":{"tab_id":"w9:t1","workspace_id":"w9"}}`), nil
+		case "pane get w9:p1":
+			return response(`{"pane":{"pane_id":"w9:p1","workspace_id":"w9","tab_id":"w9:t1"}}`), nil
+		case "agent prompt w9:p1 review this --wait --until blocked --timeout 120000":
+			return response(`{"type":"agent_prompted","agent":{"name":"builder","agent":"codex","agent_status":"blocked","state_change_seq":12}}`), nil
+		default:
+			return nil, errors.New("unexpected command: " + call)
+		}
+	}}
+
+	result, err := b.PromptAgent(
+		mux.Target{Backend: "herdr", Workspace: "w9", Tab: "w9:t1", Pane: "w9:p1"},
+		"review this", true,
+		mux.AgentControlOptions{Until: []string{"blocked"}, Timeout: 2 * time.Minute},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Backend != "herdr" || result.Target.Pane != "w9:p1" || result.Agent != "codex" || result.Name != "builder" || result.Lifecycle != "blocked" || result.StateChangeSeq != 12 {
+		t.Fatalf("result = %#v", result)
+	}
+	if len(calls) != 4 {
+		t.Fatalf("calls = %#v", calls)
+	}
+}
+
+func TestWaitAgentUsesHerdrLifecycleWait(t *testing.T) {
+	b := Backend{run: func(args ...string) ([]byte, error) {
+		switch strings.Join(args, " ") {
+		case "workspace get w9":
+			return response(`{"workspace":{"workspace_id":"w9"}}`), nil
+		case "tab get w9:t1":
+			return response(`{"tab":{"tab_id":"w9:t1","workspace_id":"w9"}}`), nil
+		case "pane get w9:p1":
+			return response(`{"pane":{"pane_id":"w9:p1","workspace_id":"w9","tab_id":"w9:t1"}}`), nil
+		case "agent wait w9:p1 --until done --timeout 30000":
+			return response(`{"agent":{"agent":"claude","agent_status":"done","state_change_seq":18}}`), nil
+		default:
+			return nil, errors.New("unexpected command: " + strings.Join(args, " "))
+		}
+	}}
+
+	result, err := b.WaitAgent(
+		mux.Target{Backend: "herdr", Workspace: "w9", Tab: "w9:t1", Pane: "w9:p1"},
+		mux.AgentControlOptions{Until: []string{"done"}, Timeout: 30 * time.Second},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Lifecycle != "done" || result.Agent != "claude" {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestPromptAgentPreservesHerdrStallErrorCode(t *testing.T) {
+	b := Backend{run: func(args ...string) ([]byte, error) {
+		switch strings.Join(args, " ") {
+		case "workspace get w9":
+			return response(`{"workspace":{"workspace_id":"w9"}}`), nil
+		case "tab get w9:t1":
+			return response(`{"tab":{"tab_id":"w9:t1","workspace_id":"w9"}}`), nil
+		case "pane get w9:p1":
+			return response(`{"pane":{"pane_id":"w9:p1","workspace_id":"w9","tab_id":"w9:t1"}}`), nil
+		case "agent prompt w9:p1 dropped --wait --timeout 6000":
+			return []byte(`{"error":{"code":"agent_prompt_stalled","message":"state_change_seq remained 9"}}`), errors.New("exit status 1")
+		default:
+			return nil, errors.New("unexpected command: " + strings.Join(args, " "))
+		}
+	}}
+
+	_, err := b.PromptAgent(
+		mux.Target{Backend: "herdr", Workspace: "w9", Tab: "w9:t1", Pane: "w9:p1"},
+		"dropped", true, mux.AgentControlOptions{Timeout: 6 * time.Second},
+	)
+	var controlErr *mux.AgentControlError
+	if !errors.As(err, &controlErr) || controlErr.Code != "agent_prompt_stalled" {
+		t.Fatalf("error = %#v", err)
+	}
+}
+
+func TestWaitAgentRejectsStaleExactPaneWithoutFallback(t *testing.T) {
+	b := Backend{run: func(args ...string) ([]byte, error) {
+		switch strings.Join(args, " ") {
+		case "workspace get w9":
+			return response(`{"workspace":{"workspace_id":"w9"}}`), nil
+		case "tab get w9:t1":
+			return response(`{"tab":{"tab_id":"w9:t1","workspace_id":"w9"}}`), nil
+		case "pane get w9:p1":
+			return response(`{"pane":{"pane_id":"w9:p1","workspace_id":"w9","tab_id":"w9:t2"}}`), nil
+		default:
+			t.Fatalf("unexpected fallback command: %s", strings.Join(args, " "))
+			return nil, nil
+		}
+	}}
+
+	_, err := b.WaitAgent(
+		mux.Target{Backend: "herdr", Workspace: "w9", Tab: "w9:t1", Pane: "w9:p1"},
+		mux.AgentControlOptions{Timeout: time.Second},
+	)
+	if err == nil || !strings.Contains(err.Error(), "not in recorded tab") {
+		t.Fatalf("error = %v", err)
 	}
 }
 
