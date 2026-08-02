@@ -4,26 +4,16 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/cengebretson/orc/internal/mux"
 )
 
 // Pane describes the process and Orc metadata attached to a tmux pane.
-type Pane struct {
-	ID                string `json:"id"`
-	Session           string `json:"session"`
-	Window            string `json:"window"`
-	CWD               string `json:"cwd,omitempty"`
-	Command           string `json:"command,omitempty"`
-	PID               int    `json:"pid,omitempty"`
-	Agent             bool   `json:"agent"`
-	Ticket            string `json:"ticket,omitempty"`
-	Stage             string `json:"stage,omitempty"`
-	Worker            string `json:"worker,omitempty"`
-	Engine            string `json:"engine,omitempty"`
-	ProviderEngine    string `json:"provider_engine,omitempty"`
-	ProviderSessionID string `json:"provider_session_id,omitempty"`
-	FeatureDir        string `json:"feature_dir,omitempty"`
-	Attention         string `json:"attention,omitempty"`
-}
+//
+// It is an alias for mux.Pane. The fields describe a terminal pane and the
+// identity Orc stamped on it, neither of which is tmux-specific; only the
+// user-option storage below is.
+type Pane = mux.Pane
 
 // ListPanesDetailed returns all tmux panes with the small metadata surface Orc
 // owns. A missing tmux server is the empty inventory, not an error.

@@ -1,0 +1,141 @@
+// Package mux defines the terminal multiplexer seam.
+//
+// Orc is agent-agnostic by contract — worker behavior is gated on the worker's
+// engine field rather than hardcoded — but it has been multiplexer-coupled in
+// practice: tmux calls were spread across the orchestrator, watch, dashboard,
+// and session packages, so every tmux assumption (user options as the metadata
+// store, session:window targeting, send-keys as the input path) was reachable
+// from anywhere.
+//
+// This package holds the vocabulary those callers actually need — a pane, the
+// identity metadata Orc stamps onto one, the attention states it reads back —
+// and the Backend interface that supplies them. internal/tmux is the first and
+// currently only implementation.
+//
+// The interface is deliberately derived from the calls Orc makes today rather
+// than from what a multiplexer could theoretically do. It is a seam, not a
+// portability layer, and it should grow only when a caller needs it to.
+package mux
+
+import "os/exec"
+
+// Attention states an agent (or an external tool) can report for a window.
+// STATE.yaml remains authoritative for workflow status; these are live urgency
+// hints that refine the display, never a replacement for durable state.
+const (
+	AttentionInput   = "input"
+	AttentionBlocked = "blocked"
+	AttentionReview  = "review"
+	AttentionDone    = "done"
+)
+
+// EnvResumedFrom names the environment variable Orc sets when a session is
+// recreated from a parked snapshot, so the relaunched provider can resume its
+// own prior session rather than starting cold.
+const EnvResumedFrom = "ORC_RESUMED_FROM"
+
+// Metadata identifies the Orc work running in a window or pane. STATE.yaml
+// remains authoritative; a backend stores this to provide a live reverse
+// lookup from a terminal back to the ticket that owns it.
+//
+// Backends are not required to store it as tmux-style user options — only to
+// return what they were given through ListPanes.
+type Metadata struct {
+	Ticket            string
+	Stage             string
+	Worker            string
+	Engine            string
+	ProviderSessionID string
+	FeatureDir        string
+}
+
+// Pane describes one terminal pane: the process running in it, and whatever
+// Orc metadata the backend has stamped on it.
+type Pane struct {
+	ID                string `json:"id"`
+	Session           string `json:"session"`
+	Window            string `json:"window"`
+	CWD               string `json:"cwd,omitempty"`
+	Command           string `json:"command,omitempty"`
+	PID               int    `json:"pid,omitempty"`
+	Agent             bool   `json:"agent"`
+	Ticket            string `json:"ticket,omitempty"`
+	Stage             string `json:"stage,omitempty"`
+	Worker            string `json:"worker,omitempty"`
+	Engine            string `json:"engine,omitempty"`
+	ProviderEngine    string `json:"provider_engine,omitempty"`
+	ProviderSessionID string `json:"provider_session_id,omitempty"`
+	FeatureDir        string `json:"feature_dir,omitempty"`
+	Attention         string `json:"attention,omitempty"`
+}
+
+// Backend is a terminal multiplexer Orc can drive.
+//
+// Implementations must treat an absent multiplexer as an empty inventory
+// rather than an error: Available reports false, ListPanes and ListSessions
+// return nothing, and SessionExists reports false. Orc's read paths run on
+// every dashboard refresh and must not fail because no server is running.
+type Backend interface {
+	// Name identifies the backend in diagnostics and in STATE.yaml.
+	Name() string
+
+	// Available reports whether this multiplexer is installed and usable.
+	Available() bool
+
+	// CreateSession creates a detached session rooted at dir, with one window
+	// per entry in windows.
+	CreateSession(name, dir string, windows []string) error
+
+	// SessionExists reports whether a session of this name is live.
+	SessionExists(name string) bool
+
+	// KillSession terminates a session and the processes inside it.
+	KillSession(name string) error
+
+	// ListSessions returns every live session name, or nil when there are none.
+	ListSessions() []string
+
+	// ListPanes returns every live pane with the Orc metadata stamped on it.
+	// A missing server is the empty inventory, not an error.
+	ListPanes() ([]Pane, error)
+
+	// ResolvePane returns the pane a command or attach should target in the
+	// given window. Ambiguous windows are an error rather than a guess — the
+	// wrong pane means keystrokes land in someone else's agent.
+	ResolvePane(session, window string) (string, error)
+
+	// SetWindowMetadata stamps Orc identity onto a window.
+	SetWindowMetadata(session, window string, meta Metadata) error
+
+	// SetPaneMetadata stamps Orc identity onto the exact agent pane.
+	SetPaneMetadata(pane string, meta Metadata) error
+
+	// SetSessionEnvironment records a variable in the session environment, for
+	// processes the session starts later.
+	SetSessionEnvironment(session, name, value string) error
+
+	// Attention returns the live attention state for a window, or the empty
+	// string when none is set. See the Attention* constants.
+	Attention(session, window string) string
+
+	// SendCommand runs argv in the target pane, creating the window if needed,
+	// and returns the pane it landed in. An empty pane resolves through
+	// ResolvePane. runDir is the working directory for the command itself.
+	SendCommand(session, window, pane, dir, runDir string, argv []string) (string, error)
+
+	// AttachSession attaches to a session by raw target ("session" or
+	// "session:window"), switching instead when already inside the multiplexer.
+	AttachSession(target string) error
+
+	// AttachPane attaches with an exact pane focused, validating a stored pane
+	// id first so a stale id cannot focus unrelated work.
+	AttachPane(session, window, pane string) error
+
+	// AttachCommand builds the command AttachPane would run, for callers that
+	// must hand over the terminal themselves (the Bubble Tea paths).
+	AttachCommand(session, window, pane string) (*exec.Cmd, error)
+
+	// AttachHint returns the shell command a human would type to attach, for
+	// display in launch output and ticket summaries.
+	AttachHint(session, window string) string
+}
