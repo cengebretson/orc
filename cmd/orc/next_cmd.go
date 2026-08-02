@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/cengebretson/orc/internal/mux"
 	"github.com/cengebretson/orc/internal/orchestrator"
 	"github.com/cengebretson/orc/internal/resume"
 	"github.com/cengebretson/orc/internal/runner"
@@ -26,6 +27,9 @@ func runNext(cmd *cobra.Command, args []string) error {
 	}
 	featureDir := t.FeatureDir
 	s := t.State
+	if err := selectMuxForState(s); err != nil {
+		return err
+	}
 
 	if nextJSON {
 		plan, err := runner.Compute(root, featureDir, nextWorker)
@@ -67,20 +71,27 @@ func runNext(cmd *cobra.Command, args []string) error {
 		}
 
 	case "active":
-		sessionActive := s.Runtime.Tmux != nil && muxBackend.Available() && muxBackend.SessionExists(s.Runtime.Tmux.Session)
+		target, configured := runtimeTarget(s)
+		sessionActive := configured && target.Backend == muxBackend.Name() && muxBackend.Available() && muxBackend.SessionExists(target.Workspace)
 		if sessionActive {
 			fmt.Println()
-			fmt.Printf("⚠ tmux session %q is already running.\n", s.Runtime.Tmux.Session)
+			fmt.Printf("⚠ %s workspace %q is already running.\n", muxBackend.Name(), target.Workspace)
 			if interactive {
 				ans := promptLine("  Attach to existing session? [Y/n]: ")
 				ans = strings.ToLower(strings.TrimSpace(ans))
 				if ans == "" || ans == "y" || ans == "yes" {
-					return muxBackend.AttachSession(s.Runtime.Tmux.Session)
+					if backend, ok := muxBackend.(mux.TargetBackend); ok {
+						return backend.AttachTarget(target)
+					}
+					return muxBackend.AttachSession(target.Workspace)
 				}
 				fmt.Println("Cancelled.")
 				return nil
 			}
-			return muxBackend.AttachSession(s.Runtime.Tmux.Session)
+			if backend, ok := muxBackend.(mux.TargetBackend); ok {
+				return backend.AttachTarget(target)
+			}
+			return muxBackend.AttachSession(target.Workspace)
 		} else {
 			fmt.Println()
 			fmt.Println("⚠ Ticket is active but no session found — likely interrupted.")
@@ -139,6 +150,7 @@ func runNext(cmd *cobra.Command, args []string) error {
 
 func launchPlan(root, featureDir string, s *state.State, plan *runner.Plan) error {
 	launcher := orchestrator.NewLauncher()
+	launcher.Mux = muxBackend
 	result, err := launcher.Launch(orchestrator.LaunchOptions{
 		Root:       root,
 		FeatureDir: featureDir,
@@ -158,7 +170,7 @@ func launchPlan(root, featureDir string, s *state.State, plan *runner.Plan) erro
 			fmt.Println(message)
 		},
 		OnTmuxSend: func(session, window string) {
-			fmt.Printf("Sending to tmux session %s:%s...\n", session, window)
+			fmt.Printf("Sending to %s target %s:%s...\n", muxBackend.Name(), session, window)
 		},
 		OnForeground: func() {
 			fmt.Printf("Launching %s (%s)...\n", plan.Worker.Name, plan.Worker.Engine)

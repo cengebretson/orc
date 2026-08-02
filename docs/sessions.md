@@ -2,8 +2,10 @@
 
 `orc sessions` joins three deliberately separate sources:
 
-1. `STATE.yaml` supplies durable ticket, workflow, stage, worker, and tmux identity.
-2. Tmux supplies current pane liveness and Orc-owned metadata.
+1. `STATE.yaml` supplies durable ticket, workflow, stage, worker, and
+   backend-neutral multiplexer identity.
+2. The selected multiplexer supplies current pane liveness, lifecycle, and
+   Orc-owned metadata. Tmux is the default; use `--mux herdr` for Herdr.
 3. Claude and Codex local session files supply an optional live overlay: provider
    session ID, model, effort, state, context use, working directory, and last activity.
 
@@ -33,11 +35,12 @@ refreshes.
 orc sessions
 orc sessions --all
 orc sessions --json
+orc sessions --mux herdr --json
 ```
 
 The default inventory includes:
 
-- `managed`: a durable Orc feature with a configured tmux target. `running`
+- `managed`: a durable Orc feature with a configured multiplexer target. `running`
   distinguishes a current pane from a stopped target.
 - `orphaned`: a pane marked with Orc metadata whose ticket no longer exists in
   the workspace.
@@ -53,6 +56,9 @@ process-local cache, so refreshes do not repeatedly probe the same directory.
 Rows group by kind, repository, and branch while ticket and stage remain their
 primary workflow identity. JSON preserves every managed repository in the
 `repositories` array instead of collapsing multi-repository tickets.
+Targets include `backend`, `session` (workspace), `window` (tab), and the exact
+pane ID. Herdr rows also expose its structured agent `lifecycle`; that live
+value never advances durable workflow state by itself.
 
 For a single ticket, `orc status <ticket> --json` keeps the existing durable
 state shape and adds a `live` field only when a running pane can be matched to
@@ -92,6 +98,8 @@ omits telemetry. It does not infer a rollover from CWD alone.
 
 See [Tmux integration](tmux.md) for optional popup bindings for inventory,
 interactive resume, and attention-driven focus.
+See [Herdr integration](herdr.md) for native launch, attach, lifecycle, and
+sidebar metadata behavior.
 
 ## Exact resume
 

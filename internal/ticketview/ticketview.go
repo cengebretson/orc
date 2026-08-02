@@ -103,15 +103,19 @@ func Build(root, featureDir string, s *state.State, opts Options) Summary {
 		}
 	}
 
-	if s.Runtime.Tmux != nil {
-		session := s.Runtime.Tmux.Session
+	if target, configured := s.Runtime.MuxTarget(s.Stage.Name); configured {
+		session := target.Workspace
 		summary.TmuxConfigured = true
 		summary.TmuxSession = session
 		summary.TmuxAvailable = opts.Mux.Available()
 		summary.TmuxRestart = fmt.Sprintf("run `orc next %s` to restart", s.Ticket)
 		if summary.TmuxAvailable && opts.Mux.SessionExists(session) {
 			summary.TmuxLive = true
-			summary.TmuxAttachHint = opts.Mux.AttachHint(session, s.Stage.Name)
+			if backend, ok := opts.Mux.(mux.TargetBackend); ok {
+				summary.TmuxAttachHint = backend.AttachTargetHint(mux.Target{Backend: target.Backend, Workspace: target.Workspace, Tab: target.Tab, Pane: target.Pane})
+			} else {
+				summary.TmuxAttachHint = opts.Mux.AttachHint(session, target.Tab)
+			}
 		}
 	}
 

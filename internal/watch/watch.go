@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/cengebretson/orc/internal/contextpressure"
+	"github.com/cengebretson/orc/internal/mux"
+	"github.com/cengebretson/orc/internal/tmux"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -39,6 +41,7 @@ type Options struct {
 	Mode      Mode
 	PetLayout PetLayout
 	Demo      bool
+	Mux       mux.Backend
 }
 
 type workflowStep struct {
@@ -99,6 +102,7 @@ type Model struct {
 	help     bool
 	uiFrame  int
 	now      time.Time
+	mux      mux.Backend
 
 	allRows    []row
 	rows       []row
@@ -121,6 +125,10 @@ type Model struct {
 // New constructs the watch model without starting a Bubble Tea program so it
 // can run either standalone or as the Live section of the shared dashboard.
 func New(root string, opts Options) (Model, error) {
+	backend := opts.Mux
+	if backend == nil {
+		backend = tmux.New()
+	}
 	interval := opts.Interval
 	if interval <= 0 {
 		interval = defaultInterval
@@ -147,6 +155,7 @@ func New(root string, opts Options) (Model, error) {
 		petLayout:  petLayout,
 		petTicking: mode == ModePet,
 		searchBox:  searchBox,
+		mux:        backend,
 	}, nil
 }
 
@@ -178,7 +187,7 @@ func (m Model) Init() tea.Cmd {
 	if m.inactive {
 		return nil
 	}
-	commands := []tea.Cmd{loadData(m.root, m.ticket, m.demo), tickEvery(m.interval, m.epoch), watchAnimationTick(m.epoch)}
+	commands := []tea.Cmd{loadDataWithMux(m.root, m.ticket, m.demo, m.mux), tickEvery(m.interval, m.epoch), watchAnimationTick(m.epoch)}
 	if m.mode == ModePet {
 		commands = append(commands, petTick(m.epoch))
 	}
@@ -199,7 +208,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.inactive || msg.epoch != m.epoch {
 			return m, nil
 		}
-		return m, tea.Batch(loadData(m.root, m.ticket, m.demo), tickEvery(m.interval, m.epoch))
+		return m, tea.Batch(loadDataWithMux(m.root, m.ticket, m.demo, m.mux), tickEvery(m.interval, m.epoch))
 	case watchAnimationMsg:
 		if m.inactive || msg.epoch != m.epoch {
 			return m, nil
@@ -368,7 +377,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case key.Matches(msg, keys.refresh):
 			m.message = ""
-			return m, loadData(m.root, m.ticket, m.demo)
+			return m, loadDataWithMux(m.root, m.ticket, m.demo, m.mux)
 		case key.Matches(msg, keys.attach):
 			cmd, message := m.attachSelected()
 			m.message = message

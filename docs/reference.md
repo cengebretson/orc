@@ -276,9 +276,11 @@ next_action:
   cwd: worktrees/my-app/STORY-123-add-login
 
 runtime:
-  tmux:                         # present when a tmux session is configured
-    session: STORY-123-add-login
-    pane: "%7"                  # exact agent pane, added after launch
+  mux:                          # exact target written by new launches
+    backend: herdr              # tmux or herdr
+    workspace: w-01K2ABC
+    tab: t-01K2DEF
+    pane: p-01K2GHI
 
   jit:                          # present while a jit task is running, absent otherwise
     worker: default:zach
@@ -311,13 +313,16 @@ history:
 | `done` | All stages complete, or explicitly closed | `orc mark <ticket> next` (final stage) or `orc mark <ticket> done` |
 | `archived` | Feature folder moved to `_archive/` | `orc archive` |
 
-`runtime.tmux.session` is the source of truth for tmux operations once present,
-and `runtime.tmux.pane` records the exact agent pane after a successful launch.
-Older tickets without that field fall back to the feature slug. `orc attach`,
-`orc status`, `orc dashboard`, and archive cleanup all use the recorded runtime session
-so custom or restored session names continue to work. Older tickets without a
-pane continue to use their stage window; if that window later has multiple panes,
-Orc requires exactly one pane marked `@orc_agent=1` instead of guessing.
+`runtime.mux` is the source of truth for new multiplexer launches. Its backend,
+workspace, tab, and pane values are opaque identities returned by the selected
+backend; labels are never reconstructed into IDs. `orc attach`, inventory,
+status, dashboard, and archive cleanup use that recorded target.
+
+Legacy `runtime.tmux.session` and `runtime.tmux.pane` remain readable and are
+projected as a tmux target in memory. Loading old state does not rewrite it.
+Older tickets without a pane continue to use their stage window; if that window
+later has multiple panes, Orc requires exactly one pane marked
+`@orc_agent=1` instead of guessing.
 
 `runtime.jit` is present only while a one-off JIT task is open. Finish the task
 with `orc mark <ticket> jit "<summary>"`; that records a history entry and clears

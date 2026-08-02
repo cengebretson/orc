@@ -30,6 +30,7 @@ var (
 )
 
 var globalWorkspace string
+var globalMux string
 
 var rootCmd = &cobra.Command{
 	Use:   "orc",
@@ -37,8 +38,12 @@ var rootCmd = &cobra.Command{
 	Long:  banner,
 	// Runs after flag/arg validation, so usage still prints for misuse
 	// but not for errors returned by the command itself.
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		cmd.SilenceUsage = true
+		if globalMux != "" {
+			return selectMuxBackend(globalMux)
+		}
+		return nil
 	},
 }
 

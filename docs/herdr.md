@@ -1,0 +1,71 @@
+# Herdr integration
+
+Herdr is an optional native multiplexer backend. Tmux remains Orc's default;
+select Herdr per command with `--mux herdr`:
+
+```sh
+orc next STORY-123 --mux herdr
+orc status STORY-123 --mux herdr
+orc sessions --mux herdr
+orc attach STORY-123
+orc dashboard --mux herdr
+```
+
+The first launch creates one Herdr workspace for the ticket and tabs for its
+workflow stages, starts a recognized Claude or Codex agent, and submits the
+stage prompt through Herdr's agent API. Orc stores the exact IDs Herdr returns:
+
+```yaml
+runtime:
+  mux:
+    backend: herdr
+    workspace: w-01K2ABC
+    tab: t-01K2DEF
+    pane: p-01K2GHI
+```
+
+Later ticket-specific commands select the recorded backend automatically.
+Explicit `--mux` remains useful for workspace-wide inventory and dashboards.
+If Herdr or its server is unavailable, live inventory is empty and launch can
+use Orc's normal foreground fallback.
+
+## Lifecycle and exact attach
+
+`orc sessions --mux herdr --json` preserves Herdr's structured agent lifecycle
+in `lifecycle` and reports exact backend/workspace/tab/pane targets. Durable
+workflow status in `STATE.yaml` remains authoritative; live lifecycle never
+advances an Orc stage.
+
+`orc attach` validates and targets the recorded pane. Inside Herdr it focuses
+that agent or tab; outside Herdr it resolves the pane's terminal and attaches
+to that terminal explicitly. Archive cleanup accepts only a recorded exact
+Herdr workspace ID, never a matching display label.
+
+## Sidebar metadata
+
+Orc reports metadata with `source=orc` on the workspace and agent pane. Tokens
+include `ticket`, `workflow`, `repository`, `branch`, `stage`, `next_action`,
+`worker`, `engine`, `model`, `provider_session`, and `feature_dir` when those
+values are available.
+
+Herdr owns sidebar layout and navigation. To display Orc's tokens, add or adapt
+user-owned sidebar rows in `~/.config/herdr/config.toml`; Orc does not rewrite
+that file:
+
+```toml
+[ui.sidebar.agents]
+rows = [
+  ["state_icon", "$ticket", "$stage"],
+  ["agent", "$worker"],
+]
+
+[ui.sidebar.spaces]
+rows = [
+  ["state_icon", "$ticket", "$workflow"],
+  ["branch", "$next_action"],
+]
+```
+
+Sidebar width remains a Herdr preference. For a wider rail, a practical range
+is `sidebar_width = 64`, `sidebar_min_width = 56`, and
+`sidebar_max_width = 72`.

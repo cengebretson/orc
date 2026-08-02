@@ -104,10 +104,11 @@ func collectDir(root, dir string, archived bool, cfg *config.Config, allWorkers 
 
 		workflow := resolveWorkflow(cfg, s)
 		workerID := resolveWorkerID(cfg, workflow, s)
-		tmuxLive := s.Runtime.Tmux != nil && activeSessions[s.Runtime.Tmux.Session]
+		target, configured := s.Runtime.MuxTarget(s.Stage.Name)
+		tmuxLive := configured && activeSessions[target.Workspace]
 		attention := ""
 		if tmuxLive && windowAttention != nil {
-			attention = windowAttention(s.Runtime.Tmux.Session, s.Stage.Name)
+			attention = windowAttention(target.Workspace, target.Tab)
 		}
 		worker := workers.FindByID(allWorkers, workerID)
 		engine := ""

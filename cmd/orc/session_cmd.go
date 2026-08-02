@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/cengebretson/orc/internal/dashboard"
+	"github.com/cengebretson/orc/internal/mux"
 	"github.com/cengebretson/orc/internal/ticket"
 
 	"github.com/cengebretson/orc/internal/watch"
@@ -20,6 +21,7 @@ func runDashboard(cmd *cobra.Command, args []string) error {
 		Adaptive:  true,
 		Version:   version,
 		BuildDate: buildDate,
+		Mux:       muxBackend,
 	})
 }
 
@@ -28,30 +30,30 @@ func runAttach(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	if !muxBackend.Available() {
-		return fmt.Errorf("tmux is not installed or not in PATH")
-	}
-
 	t, err := ticket.Load(root, args[0])
 	if err != nil {
 		return err
 	}
 	s := t.State
-
-	session := s.Slug
-	if s.Runtime.Tmux != nil && s.Runtime.Tmux.Session != "" {
-		session = s.Runtime.Tmux.Session
+	if err := selectMuxForState(s); err != nil {
+		return err
+	}
+	if !muxBackend.Available() {
+		return fmt.Errorf("%s is not installed or its server is unavailable", muxBackend.Name())
 	}
 
-	if !muxBackend.SessionExists(session) {
-		return fmt.Errorf("no tmux session for %s — run `orc next %s` to start one", s.Ticket, s.Ticket)
+	target, configured := runtimeTarget(s)
+	if !configured {
+		target = mux.Target{Backend: muxBackend.Name(), Workspace: s.Slug, Tab: s.Stage.Name}
 	}
 
-	pane := ""
-	if s.Runtime.Tmux != nil {
-		pane = s.Runtime.Tmux.Pane
+	if !muxBackend.SessionExists(target.Workspace) {
+		return fmt.Errorf("no %s workspace for %s — run `orc next %s` to start one", muxBackend.Name(), s.Ticket, s.Ticket)
 	}
-	return muxBackend.AttachPane(session, s.Stage.Name, pane)
+	if backend, ok := muxBackend.(mux.TargetBackend); ok {
+		return backend.AttachTarget(target)
+	}
+	return muxBackend.AttachPane(target.Workspace, target.Tab, target.Pane)
 }
 
 func runFocus(cmd *cobra.Command, args []string) error {
@@ -62,7 +64,7 @@ func runFocus(cmd *cobra.Command, args []string) error {
 	if !muxBackend.Available() {
 		return fmt.Errorf("tmux is not installed or not in PATH")
 	}
-	return watch.Focus(root)
+	return watch.FocusWithMux(root, muxBackend)
 }
 
 // resolveWorkflow returns the ticket's workflow name for display purposes.

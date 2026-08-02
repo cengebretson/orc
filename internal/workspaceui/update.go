@@ -38,14 +38,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if interval == 0 {
 			interval = defaultRefreshInterval
 		}
-		return m, tea.Batch(loadData(m.root), tickEvery(interval, m.lifecycle.epoch))
+		return m, tea.Batch(loadDataWithMux(m.root, m.mux), tickEvery(interval, m.lifecycle.epoch))
 
 	case liveTickMsg:
 		if m.lifecycle.inactive || msg.epoch != m.lifecycle.epoch {
 			return m, nil
 		}
 		return m, tea.Batch(
-			loadLiveData(m.root, m.data.config, m.data.allWorkers),
+			loadLiveDataWithMux(m.root, m.data.config, m.data.allWorkers, m.mux),
 			liveTickEvery(defaultLiveRefreshInterval, m.lifecycle.epoch),
 		)
 

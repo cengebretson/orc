@@ -10,6 +10,7 @@ import (
 	"github.com/cengebretson/orc/internal/contextpressure"
 	"github.com/cengebretson/orc/internal/doctor"
 	"github.com/cengebretson/orc/internal/featurelist"
+	"github.com/cengebretson/orc/internal/mux"
 	"github.com/cengebretson/orc/internal/sessionlist"
 	"github.com/cengebretson/orc/internal/telemetry"
 	"github.com/cengebretson/orc/internal/workers"
@@ -34,11 +35,16 @@ type WorkItem struct {
 }
 
 func Load(root string) (*Snapshot, error) {
+	return LoadWithMux(root, nil)
+}
+
+// LoadWithMux builds a snapshot from the selected multiplexer backend.
+func LoadWithMux(root string, backend mux.Backend) (*Snapshot, error) {
 	ctx, err := workspacectx.Load(root)
 	if err != nil {
 		return nil, err
 	}
-	items, err := LoadItems(root, ctx.Config, ctx.Workers)
+	items, err := LoadItemsWithMux(root, ctx.Config, ctx.Workers, backend)
 	if err != nil {
 		return nil, err
 	}
@@ -53,15 +59,21 @@ func Load(root string) (*Snapshot, error) {
 // LoadItems refreshes durable feature state and live session telemetry without
 // rerunning the slower workspace health checks used by a full Snapshot.
 func LoadItems(root string, cfg *config.Config, allWorkers []*workers.Worker) ([]*WorkItem, error) {
+	return LoadItemsWithMux(root, cfg, allWorkers, nil)
+}
+
+// LoadItemsWithMux refreshes items using the selected multiplexer backend.
+func LoadItemsWithMux(root string, cfg *config.Config, allWorkers []*workers.Worker, backend mux.Backend) ([]*WorkItem, error) {
 	features, err := featurelist.Collect(root, featurelist.Options{
 		IncludeArchived: true,
 		Config:          cfg,
 		Workers:         allWorkers,
+		Mux:             backend,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("loading features: %w", err)
 	}
-	liveByFeature := sessionlist.ManagedTelemetry(root, features)
+	liveByFeature := sessionlist.ManagedTelemetryWithMux(root, features, backend)
 	thresholds := cfg.ContextPressureThresholds()
 	items := buildItems(features, liveByFeature, thresholds)
 	return items, nil

@@ -669,7 +669,7 @@ func TestRuntimeMutators(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, _ := state.Load(dir)
-	if got.Runtime.Tmux == nil || got.Runtime.Tmux.Session != "ORC-2" {
+	if got.Runtime.Mux == nil || got.Runtime.Mux.Backend != "tmux" || got.Runtime.Mux.Workspace != "ORC-2" || got.Runtime.Tmux != nil {
 		t.Fatalf("runtime after SetRuntime = %+v", got.Runtime)
 	}
 	if err := state.SetRuntimeTarget(dir, "ORC-2", "%7"); err != nil {
@@ -679,14 +679,14 @@ func TestRuntimeMutators(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, _ = state.Load(dir)
-	if got.Runtime.Tmux == nil || got.Runtime.Tmux.Pane != "%7" || got.Runtime.JIT == nil || got.Runtime.JIT.Worker != "default:fred" || got.Runtime.JIT.StartedAt == "" {
+	if got.Runtime.Mux == nil || got.Runtime.Mux.Pane != "%7" || got.Runtime.JIT == nil || got.Runtime.JIT.Worker != "default:fred" || got.Runtime.JIT.StartedAt == "" {
 		t.Fatalf("runtime after target/JIT = %+v", got.Runtime)
 	}
 	if err := state.ClearJIT(dir); err != nil {
 		t.Fatal(err)
 	}
 	got, _ = state.Load(dir)
-	if got.Runtime.JIT != nil || got.Runtime.Tmux == nil {
+	if got.Runtime.JIT != nil || got.Runtime.Mux == nil {
 		t.Fatalf("runtime after ClearJIT = %+v", got.Runtime)
 	}
 	if err := state.ClearRuntime(dir); err != nil {
@@ -696,6 +696,27 @@ func TestRuntimeMutators(t *testing.T) {
 	if got.Runtime != (state.Runtime{}) {
 		t.Fatalf("runtime after ClearRuntime = %+v", got.Runtime)
 	}
+}
+
+func TestMuxTargetReadsNewAndLegacyRuntime(t *testing.T) {
+	t.Run("new", func(t *testing.T) {
+		runtime := state.Runtime{Mux: &state.MuxRuntime{Backend: "herdr", Workspace: "w7", Tab: "w7:t2", Pane: "w7:p4"}}
+		got, ok := runtime.MuxTarget("develop")
+		if !ok || got.Backend != "herdr" || got.Workspace != "w7" || got.Tab != "w7:t2" || got.Pane != "w7:p4" {
+			t.Fatalf("MuxTarget() = %+v, %v", got, ok)
+		}
+	})
+
+	t.Run("legacy tmux", func(t *testing.T) {
+		runtime := state.Runtime{Tmux: &state.TmuxRuntime{Session: "ORC-7", Pane: "%4"}}
+		got, ok := runtime.MuxTarget("review")
+		if !ok || got.Backend != "tmux" || got.Workspace != "ORC-7" || got.Tab != "review" || got.Pane != "%4" {
+			t.Fatalf("MuxTarget() = %+v, %v", got, ok)
+		}
+		if runtime.Mux != nil {
+			t.Fatal("legacy projection mutated runtime")
+		}
+	})
 }
 
 func TestInspectLockAndArchivedLookup(t *testing.T) {

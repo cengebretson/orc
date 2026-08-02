@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os/exec"
 
+	"github.com/cengebretson/orc/internal/mux"
 	"github.com/cengebretson/orc/internal/tmux"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -26,7 +27,17 @@ func (m Model) attachSelected() (tea.Cmd, string) {
 	if r.pane != "" {
 		target = r.pane
 	}
-	cmd, err := newAttachCmd(r.session, r.window, r.pane)
+	backend := m.mux
+	if backend == nil || backend.Name() == "tmux" {
+		cmd, err := newAttachCmd(r.session, r.window, r.pane)
+		if err != nil {
+			return nil, "attach failed: " + err.Error()
+		}
+		return tea.ExecProcess(cmd, func(err error) tea.Msg {
+			return attachDoneMsg{err: err}
+		}), "attaching " + target
+	}
+	cmd, err := backend.AttachCommand(r.session, r.window, r.pane)
 	if err != nil {
 		return nil, "attach failed: " + err.Error()
 	}
@@ -57,7 +68,15 @@ func (m *Model) focusNext() (tea.Cmd, string) {
 
 // Focus attaches to the highest-priority live Orc session that needs human attention.
 func Focus(root string) error {
-	rows, err := collectRows(root, "")
+	return FocusWithMux(root, nil)
+}
+
+// FocusWithMux attaches to the highest-priority live Orc session using backend.
+func FocusWithMux(root string, backend mux.Backend) error {
+	if backend == nil {
+		backend = tmux.New()
+	}
+	rows, err := collectRowsWithMux(root, "", backend)
 	if err != nil {
 		return err
 	}
@@ -65,7 +84,7 @@ func Focus(root string) error {
 		if !attentionNeeded(r) || r.tmuxState != "live" || r.session == "" || r.window == "" {
 			continue
 		}
-		return tmux.New().AttachPane(r.session, r.window, r.pane)
+		return backend.AttachPane(r.session, r.window, r.pane)
 	}
 	return fmt.Errorf("no live session needs attention")
 }

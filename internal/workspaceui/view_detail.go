@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/cengebretson/orc/internal/artifactcheck"
+	"github.com/cengebretson/orc/internal/mux"
 	"github.com/cengebretson/orc/internal/report"
 	"github.com/cengebretson/orc/internal/ticketview"
-	"github.com/cengebretson/orc/internal/tmux"
 	"github.com/cengebretson/orc/internal/ui"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -50,7 +50,7 @@ func (m Model) viewDetail() string {
 // Everything else — notably the attach hint — falls through to the real
 // backend, which is why this embeds it instead of reimplementing the interface.
 type cachedLiveness struct {
-	tmux.Backend
+	mux.Backend
 	session string
 	live    bool
 }
@@ -65,9 +65,9 @@ func (c cachedLiveness) SessionExists(session string) bool {
 // Repos, Timing, History, and Files boxes — for the viewport.
 func (m Model) renderDetailBody() string {
 	s := m.detail.feature.s
-	liveness := cachedLiveness{live: m.detail.feature.tmuxLive}
-	if s.Runtime.Tmux != nil {
-		liveness.session = s.Runtime.Tmux.Session
+	liveness := cachedLiveness{Backend: m.mux, live: m.detail.feature.tmuxLive}
+	if target, ok := s.Runtime.MuxTarget(s.Stage.Name); ok {
+		liveness.session = target.Workspace
 	}
 	summary := ticketview.Build(m.root, m.detail.feature.featureDir, s, ticketview.Options{
 		Mux: liveness,

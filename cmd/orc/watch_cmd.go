@@ -61,6 +61,7 @@ func runWatch(cmd *cobra.Command, args []string) error {
 		Mode:      mode,
 		PetLayout: petLayout,
 		Demo:      watchDemo,
+		Mux:       muxBackend,
 	}
 	return dashboard.Run(root, dashboard.Options{
 		Start:     dashboard.SectionLive,
@@ -68,5 +69,6 @@ func runWatch(cmd *cobra.Command, args []string) error {
 		Version:   version,
 		BuildDate: buildDate,
 		Watch:     watchOpts,
+		Mux:       muxBackend,
 	})
 }

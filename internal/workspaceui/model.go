@@ -8,8 +8,10 @@ import (
 	"github.com/cengebretson/orc/internal/config"
 	"github.com/cengebretson/orc/internal/contextpressure"
 	"github.com/cengebretson/orc/internal/doctor"
+	"github.com/cengebretson/orc/internal/mux"
 	"github.com/cengebretson/orc/internal/searchmatch"
 	"github.com/cengebretson/orc/internal/state"
+	"github.com/cengebretson/orc/internal/tmux"
 	terminalui "github.com/cengebretson/orc/internal/ui"
 	"github.com/cengebretson/orc/internal/workers"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -224,6 +226,7 @@ type Model struct {
 	width    int
 	height   int
 	embedded bool
+	mux      mux.Backend
 
 	data       workspaceData
 	lifecycle  lifecycleState
@@ -332,6 +335,14 @@ type detailFile struct {
 }
 
 func New(root string) Model {
+	return NewWithMux(root, nil)
+}
+
+// NewWithMux constructs the workspace UI with a selected multiplexer backend.
+func NewWithMux(root string, backend mux.Backend) Model {
+	if backend == nil {
+		backend = tmux.New()
+	}
 	ti := textinput.New()
 	ti.Placeholder = "filter tickets..."
 	ti.PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(activeTheme.Palette.Mauve))
@@ -341,6 +352,7 @@ func New(root string) Model {
 
 	return Model{
 		root: root,
+		mux:  backend,
 		lifecycle: lifecycleState{
 			lastRefresh: time.Now(),
 		},
@@ -357,7 +369,12 @@ func New(root string) Model {
 // NewEmbedded constructs the Workspace section for the shared dashboard and
 // suppresses duplicated persistent navigation legends owned by the shell.
 func NewEmbedded(root string) Model {
-	m := New(root)
+	return NewEmbeddedWithMux(root, nil)
+}
+
+// NewEmbeddedWithMux constructs an embedded workspace UI with backend.
+func NewEmbeddedWithMux(root string, backend mux.Backend) Model {
+	m := NewWithMux(root, backend)
 	m.embedded = true
 	return m
 }
@@ -432,7 +449,7 @@ func (m Model) Init() tea.Cmd {
 		return nil
 	}
 	return tea.Batch(
-		loadData(m.root),
+		loadDataWithMux(m.root, m.mux),
 		tickEvery(defaultRefreshInterval, m.lifecycle.epoch),
 		liveTickEvery(defaultLiveRefreshInterval, m.lifecycle.epoch),
 		quoteRotateTick(m.lifecycle.epoch),

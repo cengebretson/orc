@@ -71,7 +71,7 @@ func parseDetailedPanes(out []byte) []mux.Pane {
 		pid, _ := strconv.Atoi(fields[5])
 		since, _ := strconv.ParseInt(fields[15], 10, 64)
 		panes = append(panes, mux.Pane{
-			ID: fields[0], Session: fields[1], Window: fields[2],
+			Backend: "tmux", ID: fields[0], Session: fields[1], Window: fields[2],
 			CWD: fields[3], Command: fields[4], PID: pid, Agent: fields[6] == "1",
 			Ticket: fields[7], Stage: fields[8], Worker: fields[9], Engine: fields[10],
 			ProviderEngine: fields[11], ProviderSessionID: fields[12],

@@ -2,6 +2,7 @@ package main
 
 func init() {
 	rootCmd.PersistentFlags().StringVar(&globalWorkspace, "workspace", ".", "Workspace root (default: current directory)")
+	rootCmd.PersistentFlags().StringVar(&globalMux, "mux", "", "Terminal multiplexer backend: tmux or herdr (default: recorded runtime, then tmux)")
 
 	initCmd.Flags().BoolVar(&initSkipDefaultPack, "skip-default-pack", false, "Create the base workspace without installing the default pack")
 	initCmd.Flags().BoolVar(&initDryRun, "dry-run", false, "Print what would be created without writing files")

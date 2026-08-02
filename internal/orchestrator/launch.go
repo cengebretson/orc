@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"sort"
 
 	"github.com/cengebretson/orc/internal/config"
 	"github.com/cengebretson/orc/internal/mux"
@@ -57,6 +58,7 @@ type Launcher struct {
 	// assemble a launcher from mismatched halves.
 	Mux mux.Backend
 
+	SetMuxRuntime    func(featureDir string, target state.MuxRuntime) error
 	SetRuntime       func(featureDir, tmuxSession string) error
 	SetRuntimeTarget func(featureDir, tmuxSession, pane string) error
 	AppendHistory    func(featureDir, stage, workerID, result string) error
@@ -66,6 +68,7 @@ type Launcher struct {
 func NewLauncher() Launcher {
 	return Launcher{
 		Mux:              tmux.New(),
+		SetMuxRuntime:    state.SetMuxRuntime,
 		SetRuntime:       state.SetRuntime,
 		SetRuntimeTarget: state.SetRuntimeTarget,
 		AppendHistory:    state.AppendHistory,
@@ -92,6 +95,9 @@ func (l Launcher) Launch(opts LaunchOptions) (*LaunchResult, error) {
 	if l.SetRuntime == nil {
 		l.SetRuntime = state.SetRuntime
 	}
+	if l.SetMuxRuntime == nil {
+		l.SetMuxRuntime = state.SetMuxRuntime
+	}
 	if l.AppendHistory == nil {
 		l.AppendHistory = state.AppendHistory
 	}
@@ -108,6 +114,18 @@ func (l Launcher) Launch(opts LaunchOptions) (*LaunchResult, error) {
 	}
 
 	if !opts.DisableTmux && l.Mux.Available() {
+		if backend, ok := l.Mux.(mux.TargetBackend); ok {
+			if launched, err := l.launchTarget(backend, opts, result); err != nil {
+				return nil, err
+			} else if launched {
+				return result, nil
+			}
+			// Target-capable backends own their fallback reporting. If they could
+			// not launch, continue in the foreground rather than trying the legacy
+			// tmux-shaped path a second time.
+			goto foreground
+		}
+
 		session := opts.State.Slug
 		if opts.State.Runtime.Tmux != nil {
 			session = opts.State.Runtime.Tmux.Session
@@ -182,6 +200,7 @@ func (l Launcher) Launch(opts LaunchOptions) (*LaunchResult, error) {
 		}
 	}
 
+foreground:
 	if opts.OnForeground != nil {
 		opts.OnForeground()
 	}
@@ -193,11 +212,86 @@ func (l Launcher) Launch(opts LaunchOptions) (*LaunchResult, error) {
 	return result, nil
 }
 
+func (l Launcher) launchTarget(backend mux.TargetBackend, opts LaunchOptions, result *LaunchResult) (bool, error) {
+	logicalWindow := result.Window
+	stored, hasStored := opts.State.Runtime.MuxTarget(result.Window)
+	if hasStored && stored.Backend != backend.Name() {
+		return false, fmt.Errorf("ticket runtime belongs to %s, not selected backend %s", stored.Backend, backend.Name())
+	}
+
+	target := mux.Target{Backend: backend.Name(), Workspace: opts.State.Slug, Tab: result.Window}
+	if hasStored {
+		target = mux.Target{Backend: stored.Backend, Workspace: stored.Workspace, Tab: stored.Tab, Pane: stored.Pane}
+	}
+
+	ready := false
+	if opts.RequireExistingTmux {
+		ready = hasStored && backend.SessionExists(target.Workspace)
+	} else if hasStored && backend.SessionExists(target.Workspace) {
+		ready = true
+	} else if !hasStored && backend.Name() == "tmux" && backend.SessionExists(target.Workspace) {
+		// Compatibility adoption is safe for tmux's conventional slug-named
+		// sessions. Other backends should make label lookup unambiguous.
+		ready = true
+	} else {
+		created, err := backend.CreateTarget(opts.State.Slug, opts.FeatureDir, stageNamesForTicket(opts.Root, opts.State))
+		if err != nil {
+			result.addFallback(opts, fmt.Sprintf("%s workspace create failed (%v)", backend.Name(), err))
+			return false, nil
+		}
+		target = created
+		ready = true
+	}
+	if !ready {
+		return false, nil
+	}
+
+	if opts.OnTmuxSend != nil {
+		opts.OnTmuxSend(target.Workspace, result.Window)
+	}
+	sent, err := backend.SendTarget(target, result.Window, opts.FeatureDir, opts.Plan.CWD, opts.Plan.LaunchArgv)
+	if err != nil {
+		result.addFallback(opts, fmt.Sprintf("%s send failed (%v)", backend.Name(), err))
+		return false, nil
+	}
+	result.Session = sent.Workspace
+	result.Window = sent.Tab
+	result.Pane = sent.Pane
+
+	metadata := windowMetadata(opts, logicalWindow)
+	if err := backend.SetTargetMetadata(sent, metadata); err != nil {
+		result.addFallback(opts, fmt.Sprintf("warning: could not set %s metadata: %v", backend.Name(), err))
+	}
+	if err := l.SetMuxRuntime(opts.FeatureDir, state.MuxRuntime{
+		Backend: sent.Backend, Workspace: sent.Workspace, Tab: sent.Tab, Pane: sent.Pane,
+	}); err != nil {
+		result.addFallback(opts, fmt.Sprintf("warning: could not write %s target to STATE.yaml: %v", backend.Name(), err))
+	}
+
+	result.Mode = LaunchModeTmux
+	result.AttachHint = backend.AttachTargetHint(sent)
+	l.recordLaunch(opts, result, fmt.Sprintf("launched in %s workspace %s tab %s", backend.Name(), sent.Workspace, sent.Tab))
+	return true, nil
+}
+
 func windowMetadata(opts LaunchOptions, window string) mux.Metadata {
 	metadata := mux.Metadata{
 		Ticket:     opts.State.Ticket,
 		Stage:      window,
+		Workflow:   opts.State.Workflow,
+		NextAction: opts.State.NextAction.Prompt,
 		FeatureDir: opts.FeatureDir,
+	}
+	repositories := make([]string, 0, len(opts.State.Repos))
+	for name := range opts.State.Repos {
+		repositories = append(repositories, name)
+	}
+	sort.Strings(repositories)
+	for _, name := range repositories {
+		repo := opts.State.Repos[name]
+		metadata.Repository = name
+		metadata.Branch = repo.Branch
+		break
 	}
 	if opts.Plan.Worker != nil {
 		metadata.Worker = opts.Plan.Worker.ID
@@ -205,6 +299,7 @@ func windowMetadata(opts LaunchOptions, window string) mux.Metadata {
 			metadata.Worker = opts.Plan.Worker.Name
 		}
 		metadata.Engine = opts.Plan.Worker.Engine
+		metadata.Model = opts.Plan.Worker.Model
 	}
 	return metadata
 }

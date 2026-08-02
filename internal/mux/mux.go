@@ -43,10 +43,24 @@ const EnvResumedFrom = "ORC_RESUMED_FROM"
 type Metadata struct {
 	Ticket            string
 	Stage             string
+	Workflow          string
+	Repository        string
+	Branch            string
+	NextAction        string
 	Worker            string
 	Engine            string
+	Model             string
 	ProviderSessionID string
 	FeatureDir        string
+}
+
+// Target is an exact backend-owned terminal location. Identifiers are opaque:
+// callers persist and return them but never derive them from labels.
+type Target struct {
+	Backend   string `json:"backend"`
+	Workspace string `json:"workspace"`
+	Tab       string `json:"tab,omitempty"`
+	Pane      string `json:"pane,omitempty"`
 }
 
 // AttentionRank orders attention states by how much they need a human, most
@@ -107,6 +121,7 @@ func RollUpAttention(panes []Pane) (state string, since int64) {
 // Pane describes one terminal pane: the process running in it, and whatever
 // Orc metadata the backend has stamped on it.
 type Pane struct {
+	Backend           string `json:"backend,omitempty"`
 	ID                string `json:"id"`
 	Session           string `json:"session"`
 	Window            string `json:"window"`
@@ -122,6 +137,7 @@ type Pane struct {
 	ProviderSessionID string `json:"provider_session_id,omitempty"`
 	FeatureDir        string `json:"feature_dir,omitempty"`
 	Attention         string `json:"attention,omitempty"`
+	Lifecycle         string `json:"lifecycle,omitempty"`
 	// AttentionSince is when the pane entered its current attention state, in
 	// epoch seconds. Zero means the reporter did not say — treat it as unknown
 	// rather than as the epoch.
@@ -197,4 +213,17 @@ type Backend interface {
 	// AttachHint returns the shell command a human would type to attach, for
 	// display in launch output and ticket summaries.
 	AttachHint(session, window string) string
+}
+
+// TargetBackend is the backend-neutral extension used by new launch paths.
+// Backend remains embedded so existing tmux-oriented callers can migrate a
+// package at a time without losing the safety of a single implementation.
+type TargetBackend interface {
+	Backend
+
+	CreateTarget(name, dir string, tabs []string) (Target, error)
+	SendTarget(target Target, tab, dir, runDir string, argv []string) (Target, error)
+	SetTargetMetadata(target Target, meta Metadata) error
+	AttachTarget(target Target) error
+	AttachTargetHint(target Target) string
 }

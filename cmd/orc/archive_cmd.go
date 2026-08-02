@@ -27,7 +27,12 @@ func runArchive(cmd *cobra.Command, args []string) error {
 }
 
 func archiveFeature(root, featureDir string, s *state.State) error {
-	result, err := orchestrator.Archive(orchestrator.ArchiveOptions{
+	if err := selectMuxForState(s); err != nil {
+		return err
+	}
+	archiver := orchestrator.NewArchiver()
+	archiver.Mux = muxBackend
+	result, err := archiver.Archive(orchestrator.ArchiveOptions{
 		Root:       root,
 		FeatureDir: featureDir,
 		State:      s,
@@ -54,7 +59,7 @@ func printArchiveResult(result *orchestrator.ArchiveResult) {
 	if result.TmuxKillWarn != "" {
 		fmt.Printf("warning: %s\n", result.TmuxKillWarn)
 	} else if result.KilledTmux {
-		fmt.Printf("Killed tmux session: %s\n", result.TmuxSession)
+		fmt.Printf("Stopped multiplexer workspace: %s\n", result.TmuxSession)
 	}
 	if result.RuntimeClearWarn != "" {
 		fmt.Printf("warning: %s\n", result.RuntimeClearWarn)

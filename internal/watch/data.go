@@ -15,18 +15,18 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-func loadData(root, ticket string, demo bool) tea.Cmd {
+func loadDataWithMux(root, ticket string, demo bool, backend mux.Backend) tea.Cmd {
 	return func() tea.Msg {
 		if demo {
 			return dataMsg{rows: demoRows(ticket)}
 		}
-		rows, err := collectRows(root, ticket)
+		rows, err := collectRowsWithMux(root, ticket, backend)
 		return dataMsg{rows: rows, err: err}
 	}
 }
 
-func collectRows(root, ticket string) ([]row, error) {
-	snapshot, err := workspacesnapshot.Load(root)
+func collectRowsWithMux(root, ticket string, backend mux.Backend) ([]row, error) {
+	snapshot, err := workspacesnapshot.LoadWithMux(root, backend)
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +198,7 @@ func rowFromFeature(f *featurelist.Feature, cfg *config.Config) row {
 		status:        s.Status,
 		next:          s.NextAction.Prompt,
 		session:       tmuxSession(s),
-		window:        s.Stage.Name,
+		window:        muxTab(s),
 		pane:          tmuxPane(s),
 		tmuxState:     tmuxState(s, f.TmuxLive),
 		attention:     f.Attention,
@@ -210,18 +210,27 @@ func rowFromFeature(f *featurelist.Feature, cfg *config.Config) row {
 	}
 }
 
+func muxTab(s *state.State) string {
+	if target, ok := s.Runtime.MuxTarget(s.Stage.Name); ok {
+		return target.Tab
+	}
+	return s.Stage.Name
+}
+
 func tmuxSession(s *state.State) string {
-	if s.Runtime.Tmux == nil {
+	target, ok := s.Runtime.MuxTarget(s.Stage.Name)
+	if !ok {
 		return ""
 	}
-	return s.Runtime.Tmux.Session
+	return target.Workspace
 }
 
 func tmuxPane(s *state.State) string {
-	if s.Runtime.Tmux == nil {
+	target, ok := s.Runtime.MuxTarget(s.Stage.Name)
+	if !ok {
 		return ""
 	}
-	return s.Runtime.Tmux.Pane
+	return target.Pane
 }
 
 func historyRows(entries []state.HistoryEntry) []historyRow {
@@ -238,7 +247,7 @@ func historyRows(entries []state.HistoryEntry) []historyRow {
 }
 
 func tmuxState(s *state.State, live bool) string {
-	if s.Runtime.Tmux == nil {
+	if _, ok := s.Runtime.MuxTarget(s.Stage.Name); !ok {
 		return "-"
 	}
 	if live {

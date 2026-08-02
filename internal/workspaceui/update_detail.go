@@ -25,8 +25,10 @@ func (m Model) handleDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.reRenderDetail()
 		}
 	case key.Matches(msg, keys.attach):
-		if m.detail.feature.s.Runtime.Tmux != nil && m.detail.feature.tmuxLive {
-			return m, attachTmux(m.detail.feature.s.Runtime.Tmux.Session, m.detail.feature.s.Stage.Name)
+		if m.detail.feature.tmuxLive {
+			if target, ok := m.detail.feature.s.Runtime.MuxTarget(m.detail.feature.s.Stage.Name); ok {
+				return m, attachMux(m.mux, target)
+			}
 		}
 	case key.Matches(msg, keys.open):
 		if m.detail.fileIndex < len(m.detail.files) {

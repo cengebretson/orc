@@ -24,6 +24,7 @@ const (
 )
 
 type Target struct {
+	Backend string `json:"backend,omitempty"`
 	Session string `json:"session"`
 	Window  string `json:"window"`
 	Pane    string `json:"pane,omitempty"`
@@ -45,6 +46,7 @@ type Session struct {
 	Engine       string          `json:"engine,omitempty"`
 	FeatureDir   string          `json:"feature_dir,omitempty"`
 	Attention    string          `json:"attention,omitempty"`
+	Lifecycle    string          `json:"lifecycle,omitempty"`
 	Repositories []Repository    `json:"repositories,omitempty"`
 	Target       *Target         `json:"target,omitempty"`
 	Live         *telemetry.Live `json:"live,omitempty"`
@@ -67,10 +69,16 @@ type Options struct {
 // ManagedTelemetry returns optional live provider metadata keyed by feature
 // directory. Discovery failures leave the durable feature list untouched.
 func ManagedTelemetry(root string, features []*featurelist.Feature) map[string]telemetry.Live {
+	return ManagedTelemetryWithMux(root, features, nil)
+}
+
+// ManagedTelemetryWithMux returns provider telemetry using the selected live
+// multiplexer inventory.
+func ManagedTelemetryWithMux(root string, features []*featurelist.Feature, backend mux.Backend) map[string]telemetry.Live {
 	if len(features) == 0 {
 		return nil
 	}
-	sessions, err := Collect(root, Options{Features: features})
+	sessions, err := Collect(root, Options{Features: features, Mux: backend})
 	if err != nil {
 		return nil
 	}
@@ -134,8 +142,9 @@ func Collect(root string, opts Options) ([]Session, error) {
 			continue
 		}
 		s := feature.State
+		runtimeTarget, configured := s.Runtime.MuxTarget(s.Stage.Name)
 		pane := matchFeaturePane(feature, panes, usedPanes)
-		if pane == nil && (s.Runtime.Tmux == nil || s.Runtime.Tmux.Session == "") {
+		if pane == nil && !configured {
 			continue
 		}
 		entry := Session{
@@ -143,19 +152,22 @@ func Collect(root string, opts Options) ([]Session, error) {
 			Worker: feature.WorkerID, Engine: feature.Engine, FeatureDir: feature.FeatureDir,
 			Repositories: durableRepositories(s.Repos),
 		}
-		if s.Runtime.Tmux != nil {
-			entry.Target = &Target{Session: s.Runtime.Tmux.Session, Window: s.Stage.Name, Pane: s.Runtime.Tmux.Pane}
+		if configured {
+			entry.Target = &Target{Backend: runtimeTarget.Backend, Session: runtimeTarget.Workspace, Window: runtimeTarget.Tab, Pane: runtimeTarget.Pane}
 		}
 		if pane != nil {
 			entry.Running = true
 			usedPanes[pane.ID] = true
-			entry.Target = &Target{Session: pane.Session, Window: pane.Window, Pane: pane.ID}
+			entry.Target = &Target{Backend: pane.Backend, Session: pane.Session, Window: pane.Window, Pane: pane.ID}
 			entry.Attention = pane.Attention
-			if entry.Engine == "" {
+			entry.Lifecycle = pane.Lifecycle
+			if pane.ProviderEngine != "" {
 				entry.Engine = pane.ProviderEngine
-				if entry.Engine == "" {
-					entry.Engine = pane.Engine
-				}
+			} else if pane.Engine != "" {
+				entry.Engine = pane.Engine
+			}
+			if s.Stage.Worker == "" && pane.Worker != "" {
+				entry.Worker = pane.Worker
 			}
 		}
 		if pane != nil {
@@ -178,8 +190,8 @@ func Collect(root string, opts Options) ([]Session, error) {
 		}
 		entry := Session{
 			Kind: KindOrphaned, Running: true, Ticket: pane.Ticket, Stage: pane.Stage, Worker: pane.Worker,
-			Engine: pane.Engine, FeatureDir: pane.FeatureDir, Attention: pane.Attention,
-			Target: &Target{Session: pane.Session, Window: pane.Window, Pane: pane.ID},
+			Engine: pane.Engine, FeatureDir: pane.FeatureDir, Attention: pane.Attention, Lifecycle: pane.Lifecycle,
+			Target: &Target{Backend: pane.Backend, Session: pane.Session, Window: pane.Window, Pane: pane.ID},
 		}
 		if entry.Engine == "" {
 			entry.Engine = pane.ProviderEngine
@@ -284,16 +296,17 @@ func firstNonEmpty(values ...string) string {
 
 func matchFeaturePane(feature *featurelist.Feature, panes []mux.Pane, used map[string]bool) *mux.Pane {
 	s := feature.State
-	if s.Runtime.Tmux != nil && s.Runtime.Tmux.Pane != "" {
+	target, configured := s.Runtime.MuxTarget(s.Stage.Name)
+	if configured && target.Pane != "" {
 		for i := range panes {
-			if !used[panes[i].ID] && panes[i].ID == s.Runtime.Tmux.Pane {
+			if !used[panes[i].ID] && panes[i].ID == target.Pane && backendMatches(target.Backend, panes[i].Backend) {
 				return &panes[i]
 			}
 		}
 	}
-	if s.Runtime.Tmux != nil {
+	if configured {
 		for i := range panes {
-			if !used[panes[i].ID] && panes[i].Session == s.Runtime.Tmux.Session && panes[i].Window == s.Stage.Name {
+			if !used[panes[i].ID] && panes[i].Session == target.Workspace && panes[i].Window == target.Tab && backendMatches(target.Backend, panes[i].Backend) {
 				return &panes[i]
 			}
 		}
@@ -307,6 +320,10 @@ func matchFeaturePane(feature *featurelist.Feature, panes []mux.Pane, used map[s
 		}
 	}
 	return nil
+}
+
+func backendMatches(target, pane string) bool {
+	return target == "" || pane == "" || target == pane
 }
 
 func matchTelemetry(engine, cwd string, pane *mux.Pane, sessions []telemetry.Live, used map[int]bool) (telemetry.Live, []int, bool) {

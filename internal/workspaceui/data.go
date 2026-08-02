@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/cengebretson/orc/internal/config"
+	"github.com/cengebretson/orc/internal/mux"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/workers"
 	"github.com/cengebretson/orc/internal/workspacesnapshot"
@@ -14,8 +15,12 @@ import (
 )
 
 func loadData(root string) tea.Cmd {
+	return loadDataWithMux(root, nil)
+}
+
+func loadDataWithMux(root string, backend mux.Backend) tea.Cmd {
 	return func() tea.Msg {
-		snapshot, err := workspacesnapshot.Load(root)
+		snapshot, err := workspacesnapshot.LoadWithMux(root, backend)
 		if err != nil {
 			return dataMsg{err: err}
 		}
@@ -146,12 +151,12 @@ func loadData(root string) tea.Cmd {
 	}
 }
 
-func loadLiveData(root string, cfg *config.Config, allWorkers []*workers.Worker) tea.Cmd {
+func loadLiveDataWithMux(root string, cfg *config.Config, allWorkers []*workers.Worker, backend mux.Backend) tea.Cmd {
 	return func() tea.Msg {
 		if cfg == nil {
 			return liveDataMsg{}
 		}
-		items, err := workspacesnapshot.LoadItems(root, cfg, allWorkers)
+		items, err := workspacesnapshot.LoadItemsWithMux(root, cfg, allWorkers, backend)
 		if err != nil {
 			return liveDataMsg{err: err}
 		}

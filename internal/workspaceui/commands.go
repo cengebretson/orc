@@ -1,12 +1,24 @@
 package workspaceui
 
 import (
-	"os"
-	"os/exec"
 	"time"
 
+	"github.com/cengebretson/orc/internal/mux"
+	"github.com/cengebretson/orc/internal/state"
+	"github.com/cengebretson/orc/internal/tmux"
 	tea "github.com/charmbracelet/bubbletea"
 )
+
+func attachMux(backend mux.Backend, target state.MuxRuntime) tea.Cmd {
+	if backend == nil {
+		backend = tmux.New()
+	}
+	cmd, err := backend.AttachCommand(target.Workspace, target.Tab, target.Pane)
+	if err != nil {
+		return func() tea.Msg { return err }
+	}
+	return tea.ExecProcess(cmd, func(error) tea.Msg { return nil })
+}
 
 func tickEvery(d time.Duration, epoch uint64) tea.Cmd {
 	return tea.Tick(d, func(t time.Time) tea.Msg {
@@ -30,19 +42,4 @@ func breathTick(epoch uint64) tea.Cmd {
 	return tea.Tick(breathInterval, func(time.Time) tea.Msg {
 		return breathTickMsg{epoch: epoch}
 	})
-}
-
-func attachTmux(session, window string) tea.Cmd {
-	return tea.ExecProcess(
-		newTmuxCmd(session, window),
-		func(err error) tea.Msg { return nil },
-	)
-}
-
-func newTmuxCmd(session, window string) *exec.Cmd {
-	target := session + ":" + window
-	if os.Getenv("TMUX") != "" {
-		return exec.Command("tmux", "switch-client", "-t", target)
-	}
-	return exec.Command("tmux", "attach-session", "-t", target)
 }

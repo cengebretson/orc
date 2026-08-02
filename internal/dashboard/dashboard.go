@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/cengebretson/orc/internal/config"
+	"github.com/cengebretson/orc/internal/mux"
 	terminalui "github.com/cengebretson/orc/internal/ui"
 	"github.com/cengebretson/orc/internal/watch"
 	"github.com/cengebretson/orc/internal/workspaceui"
@@ -45,6 +46,7 @@ type Options struct {
 	BuildDate string
 	Revision  string
 	Watch     watch.Options
+	Mux       mux.Backend
 }
 
 // Model owns the shared shell, delegates dashboard tabs to Workspace, and keeps
@@ -112,6 +114,9 @@ func pulseTick() tea.Cmd {
 
 // New constructs a dashboard without starting the terminal program.
 func New(root string, opts Options) (Model, error) {
+	if opts.Watch.Mux == nil {
+		opts.Watch.Mux = opts.Mux
+	}
 	quotes := []string{defaultLegacyQuote}
 	version, buildDate, revision := resolveBuildMetadata(opts.Version, opts.BuildDate, opts.Revision)
 	if cfg, err := config.Load(root); err == nil {
@@ -128,7 +133,7 @@ func New(root string, opts Options) (Model, error) {
 	if err != nil {
 		return Model{}, err
 	}
-	workspace := workspaceui.NewEmbedded(root).SetDestination(workspaceDestination(opts.Start))
+	workspace := workspaceui.NewEmbeddedWithMux(root, opts.Mux).SetDestination(workspaceDestination(opts.Start))
 	live = live.SetActive(opts.Start == SectionLive)
 	workspace = workspace.SetActive(opts.Start != SectionLive && opts.Start != SectionOrc)
 	return Model{

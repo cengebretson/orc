@@ -42,9 +42,12 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
+		if err := selectMuxForState(t.State); err != nil {
+			return err
+		}
 		if statusJSON {
 			view := statusJSONView{State: t.State}
-			if sessions, liveErr := sessionlist.Collect(root, sessionlist.Options{}); liveErr == nil {
+			if sessions, liveErr := sessionlist.Collect(root, sessionlist.Options{Mux: muxBackend}); liveErr == nil {
 				for _, session := range sessions {
 					if session.Ticket == t.State.Ticket && session.Live != nil {
 						view.Live = session.Live
@@ -69,6 +72,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 
 	features, err := featurelist.Collect(root, featurelist.Options{
 		IncludeArchived: true,
+		Mux:             muxBackend,
 	})
 	if err != nil {
 		return err
@@ -131,7 +135,7 @@ func statusRowForFeature(f *featurelist.Feature) statusRow {
 		next = next[:40] + "…"
 	}
 	session := "-"
-	if s.Runtime.Tmux != nil {
+	if _, ok := s.Runtime.MuxTarget(s.Stage.Name); ok {
 		if f.TmuxLive {
 			session = "✓"
 		} else {
@@ -181,7 +185,7 @@ func printStatusTable(rows []statusRow, showTmux bool) {
 }
 
 func printShow(root, featureDir string, s *state.State) error {
-	summary := ticketview.Build(root, featureDir, s, ticketview.Options{})
+	summary := ticketview.Build(root, featureDir, s, ticketview.Options{Mux: muxBackend})
 
 	fmt.Printf("Ticket:   %s\n", s.Ticket)
 	fmt.Printf("Slug:     %s\n", s.Slug)

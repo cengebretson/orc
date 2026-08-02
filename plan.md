@@ -79,18 +79,173 @@ Effort: Medium.
 
 ### Record which multiplexer produced a session
 
+Status: Implemented. New launches write `runtime.mux` with backend and exact
+workspace/tab/pane IDs; legacy `runtime.tmux` remains a read-only compatibility
+fallback.
+
 Leftover from the `mux.Backend` seam, which shipped without it.
 `runtime.tmux.session` in `STATE.yaml` still names its backend in the field
 itself, so a workspace cannot say a session came from anything but tmux.
 
 - Keep `runtime.tmux.session` readable forever; old state must not need
   migrating.
-- New writes should record the backend name alongside the handle —
-  `mux.Backend.Name()` already supplies it.
-- Only worth doing when a second backend actually exists. Until then it is a
-  field nothing varies, and guessing its shape now risks getting it wrong.
+- Introduce a backend-neutral target only as the first slice of the native
+  herdr backend below, when its actual identifiers make the required shape
+  concrete. One likely shape is `runtime.mux: {backend, workspace, tab, pane}`.
+- New writes record `mux.Backend.Name()` alongside the backend's opaque target
+  identifiers. Labels are presentation; they are not durable identity.
+- Keep reading `runtime.tmux` as a compatibility fallback and do not rewrite old
+  state merely because it was loaded.
 
 Effort: Small.
+
+### Add a native herdr multiplexer backend
+
+Status: First vertical slice implemented. Launch, exact identity, agent
+lifecycle inventory, attach/focus, dashboard/watch selection, archive cleanup,
+and sidebar metadata are wired through `--mux herdr`. The extension ideas after
+the vertical slice remain future work. A live disposable-workspace smoke test
+verified Codex launch, exact target persistence, lifecycle inventory, sidebar
+tokens, attach targeting, and owned archive cleanup.
+
+Herdr is a strong second implementation of `mux.Backend`: it owns the live
+terminal layer Orc deliberately does not, recognizes agent lifecycle directly,
+and exposes structured workspace, tab, pane, agent, worktree, notification, and
+terminal operations through its CLI and socket API. The conceptual mapping is
+clean:
+
+| Orc | herdr |
+|-----|-------|
+| ticket session | workspace |
+| workflow stage/window | tab |
+| worker process | recognized agent pane |
+| watch/tests | sibling panes |
+| live attention | agent lifecycle state |
+| ticket worktree | worktree-backed workspace |
+
+Do not implement this as string substitution around the tmux backend. The
+current interface still encodes tmux assumptions that herdr does not share:
+named sessions, windows addressable by name, metadata on a window, and an
+environment that can be mutated after session creation. Herdr returns opaque
+workspace/tab/pane IDs, reports metadata on workspaces and panes, and supplies
+environment during workspace/tab/pane creation.
+
+Prerequisite interface work:
+
+- Replace `CreateSession(... ) error` with a creation result that returns the
+  exact workspace, tab, and root-pane identifiers Orc must persist.
+- Pass creation environment as options instead of relying on
+  `SetSessionEnvironment` after creation. This matters for `ORC=1`, ticket
+  identity, and `ORC_RESUMED_FROM`.
+- Introduce a backend-neutral target value rather than passing loose
+  `session`, `window`, and `pane` strings through every call.
+- Keep tmux as the default backend and preserve foreground fallback. Selecting
+  herdr must be additive; an Orc workspace remains usable when herdr is absent.
+- Remove remaining hidden tmux defaults after backend selection is centralized;
+  `sessionlist`, watch, dashboard, attach/focus, parking, archive, and resume
+  must all receive the selected backend.
+
+First vertical slice:
+
+1. Add `internal/herdr`, executing the installed CLI and decoding its JSON
+   responses. The installed binary is the syntax authority; never derive an ID
+   from a label or sidebar position.
+2. `orc next --mux herdr` creates or reopens one workspace per ticket and one
+   tab per stage, then records the returned workspace/tab/pane IDs.
+3. Start the configured engine with `herdr agent start` and submit the stage
+   prompt with `herdr agent prompt`. Use the agent surface, not raw pane input,
+   whenever herdr recognizes the worker.
+4. Populate `orc sessions`, status, watch, and dashboard from herdr workspace,
+   pane, and agent inventory. Keep transcript telemetry only for fields herdr
+   does not supply, such as model detail or context consumption.
+5. Attach/focus the exact stored pane. From inside herdr, focus the target;
+   from outside, resolve its terminal and attach explicitly rather than acting
+   on whichever workspace another client has focused.
+6. Park/archive may close only a workspace stamped as Orc-owned. A matching
+   label is never proof of ownership.
+
+Lifecycle mapping:
+
+| herdr state | Orc live meaning |
+|-------------|------------------|
+| `working` | active |
+| `blocked` | blocked / input required |
+| `done` | done or ready for review |
+| `idle` | ready for another prompt |
+| `unknown` | present but unclassified; never completion |
+
+Herdr distinguishes `idle` from `done` using whether completed background work
+has been seen. Preserve that distinction in structured output even if a compact
+rail rolls both into a lower-urgency presentation. Durable workflow state in
+`STATE.yaml` still wins; live lifecycle never advances a stage by itself.
+
+#### Enrich herdr's sidebar instead of replacing it
+
+Herdr owns sidebar rendering, navigation, selection, built-in lifecycle icons,
+and the agent/space sections. Orc should not ship a competing sidebar renderer.
+Herdr's configurable sidebar rows and custom metadata tokens are the native
+extension point:
+
+- Workspace tokens: `ticket`, `workflow`, `repository`, `branch`, `stage`, and
+  `next_action`.
+- Pane tokens: `ticket`, `stage`, `worker`, `model`, `context_pressure`, and
+  `next_action`.
+- State labels: Orc-specific text such as `awaiting review`, `QA blocked`, or
+  `ready to merge`, while herdr retains the underlying lifecycle state.
+- Report every value with `source=orc`. Use monotonic sequence numbers and TTLs
+  for ephemeral values so stale live metadata cannot outlive its producer;
+  durable identity continues to come from `STATE.yaml`.
+
+An optional user-owned config snippet can render the values:
+
+```toml
+[ui.sidebar.agents]
+rows = [
+  ["state_icon", "$ticket", "$stage"],
+  ["agent", "$worker"],
+]
+
+[ui.sidebar.spaces]
+rows = [
+  ["state_icon", "$ticket", "$workflow"],
+  ["branch", "$next_action"],
+]
+```
+
+Document the snippet first. If Orc later offers `orc herdr configure`, make it
+explicit, previewable with `--dry-run`, and conservative with the user's
+`~/.config/herdr/config.toml`; never silently replace their sidebar rows. For a
+fully custom ticket dashboard, keep `orc watch` as a herdr pane or popup. That
+is the right surface for arbitrary Bubble Tea UI.
+
+After the vertical slice is stable:
+
+- Use `herdr worktree create/open` to create or reopen ticket workspaces instead
+  of merely printing a worktree setup command. Never remove a worktree without
+  the same ownership and confirmation rules Orc applies today.
+- Offer a task-cell layout: agent pane plus optional test and watch panes.
+- Send herdr notifications when background work blocks or completes.
+- Reuse herdr's blocking prompt/wait and stall detection underneath `orc ctl`
+  rather than rebuilding those semantics for this backend.
+- Defer named-session, remote attach, and event-stream optimization until the
+  local lifecycle is correct.
+
+Acceptance criteria for the first slice:
+
+- `orc next --mux herdr` starts one configured Claude or Codex worker and
+  records exact opaque target IDs.
+- `orc sessions --json` distinguishes working, blocked, idle, done, unknown,
+  stopped, orphaned, and unmanaged work without inferring completion from
+  screen text.
+- `orc attach` targets the recorded pane even when user focus has moved.
+- Sidebar tokens update from Orc metadata without moving workflow authority out
+  of `STATE.yaml`.
+- No herdr server is an empty live inventory, not a dashboard failure; the
+  normal foreground fallback remains available.
+- Orc never closes, parks, or adopts a herdr workspace it cannot prove it owns.
+- Existing tmux workspaces and old `runtime.tmux` state continue to work.
+
+Effort: Large.
 
 ### Ship the agent hook installer
 

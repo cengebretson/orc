@@ -76,7 +76,7 @@ func (m Model) renderTable(rows []*featureRow, w int, selectedIdx int) string {
 			plainWorker = "—"
 		}
 		plainTmux := "-"
-		if s.Runtime.Tmux != nil {
+		if _, ok := s.Runtime.MuxTarget(s.Stage.Name); ok {
 			if row.tmuxLive {
 				plainTmux = "✓"
 			} else {
@@ -119,7 +119,7 @@ func (m Model) renderTable(rows []*featureRow, w int, selectedIdx int) string {
 				contextCell = spark
 			}
 			var tmuxCell string
-			if s.Runtime.Tmux != nil {
+			if _, ok := s.Runtime.MuxTarget(s.Stage.Name); ok {
 				if row.tmuxLive {
 					tmuxCell = styleTmuxLive.Render(plainTmux)
 				} else {
@@ -157,7 +157,7 @@ func featureDisplayState(row *featureRow) (string, string) {
 	case "done", "archived":
 		return "✓", row.s.Status
 	case "active":
-		if row.s.Runtime.Tmux != nil && !row.tmuxLive {
+		if _, ok := row.s.Runtime.MuxTarget(row.s.Stage.Name); ok && !row.tmuxLive {
 			return "×", "stopped"
 		}
 		switch row.attention {

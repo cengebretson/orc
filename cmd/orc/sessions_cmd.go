@@ -29,7 +29,7 @@ func runSessions(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	sessions, err := sessionlist.Collect(root, sessionlist.Options{IncludeUnmanaged: sessionsAll, ResolveGit: gitmeta.Resolve})
+	sessions, err := sessionlist.Collect(root, sessionlist.Options{IncludeUnmanaged: sessionsAll, ResolveGit: gitmeta.Resolve, Mux: muxBackend})
 	if err != nil {
 		return err
 	}
@@ -49,6 +49,9 @@ func runSessions(cmd *cobra.Command, args []string) error {
 	fmt.Printf("%-10s  %-14s  %-22s  %-24s  %-9s  %-18s  %-11s  %-17s  %-10s  %s\n", "----", "------", "----------", "------", "------", "-----", "-----", "------", "-------", "-----------")
 	for _, session := range sessions {
 		model, liveState, context, active := liveColumns(session.Live)
+		if liveState == "" {
+			liveState = session.Lifecycle
+		}
 		if liveState == "" && session.Kind == sessionlist.KindManaged && !session.Running {
 			liveState = "stopped"
 		}

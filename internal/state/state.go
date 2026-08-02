@@ -56,13 +56,45 @@ type State struct {
 }
 
 type Runtime struct {
+	Mux  *MuxRuntime  `yaml:"mux,omitempty"`
 	Tmux *TmuxRuntime `yaml:"tmux,omitempty"`
 	JIT  *JITRuntime  `yaml:"jit,omitempty"`
+}
+
+// MuxRuntime records the exact target created by a terminal multiplexer.
+// Workspace, tab, and pane are opaque backend identifiers; labels such as a
+// ticket slug or stage name are presentation and must not be used as identity.
+type MuxRuntime struct {
+	Backend   string `yaml:"backend"`
+	Workspace string `yaml:"workspace"`
+	Tab       string `yaml:"tab,omitempty"`
+	Pane      string `yaml:"pane,omitempty"`
 }
 
 type TmuxRuntime struct {
 	Session string `yaml:"session"`
 	Pane    string `yaml:"pane,omitempty"`
+}
+
+// MuxTarget returns the backend-neutral live target. Legacy runtime.tmux state
+// is projected as a tmux target without mutating the loaded state.
+func (r Runtime) MuxTarget(stage string) (MuxRuntime, bool) {
+	if r.Mux != nil && r.Mux.Backend != "" && r.Mux.Workspace != "" {
+		target := *r.Mux
+		if target.Tab == "" {
+			target.Tab = stage
+		}
+		return target, true
+	}
+	if r.Tmux != nil && r.Tmux.Session != "" {
+		return MuxRuntime{
+			Backend:   "tmux",
+			Workspace: r.Tmux.Session,
+			Tab:       stage,
+			Pane:      r.Tmux.Pane,
+		}, true
+	}
+	return MuxRuntime{}, false
 }
 
 type JITRuntime struct {

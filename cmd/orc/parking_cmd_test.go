@@ -136,7 +136,8 @@ func TestUnparkEntryReconcilesMatchingExistingSession(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Runtime.Tmux == nil || got.Runtime.Tmux.Session != entry.TmuxSession || got.Runtime.Tmux.Pane != pane {
-		t.Fatalf("runtime target = %#v", got.Runtime.Tmux)
+	target, ok := got.Runtime.MuxTarget(got.Stage.Name)
+	if !ok || target.Backend != "tmux" || target.Workspace != entry.TmuxSession || target.Pane != pane {
+		t.Fatalf("runtime target = %#v", target)
 	}
 }

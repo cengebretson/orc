@@ -15,6 +15,7 @@ type Backend struct{}
 func New() Backend { return Backend{} }
 
 var _ mux.Backend = Backend{}
+var _ mux.TargetBackend = Backend{}
 
 // Name identifies this backend.
 func (Backend) Name() string { return "tmux" }
@@ -82,3 +83,46 @@ func (Backend) AttachCommand(session, window, pane string) (*exec.Cmd, error) {
 
 // AttachHint returns the shell command a human would type to attach.
 func (Backend) AttachHint(session, window string) string { return AttachHint(session, window) }
+
+// CreateTarget creates a tmux session and returns its exact initial target.
+func (Backend) CreateTarget(name, dir string, tabs []string) (mux.Target, error) {
+	if err := CreateSession(name, dir, tabs); err != nil {
+		return mux.Target{}, err
+	}
+	tab := "shell"
+	if len(tabs) > 0 {
+		tab = tabs[0]
+	}
+	pane, err := ResolvePaneTarget(name, tab)
+	if err != nil {
+		return mux.Target{}, err
+	}
+	return mux.Target{Backend: "tmux", Workspace: name, Tab: tab, Pane: pane}, nil
+}
+
+// SendTarget runs argv at an exact tmux target and returns the resolved pane.
+func (Backend) SendTarget(target mux.Target, tab, dir, runDir string, argv []string) (mux.Target, error) {
+	if tab == "" {
+		tab = target.Tab
+	}
+	pane, err := SendCommandTarget(target.Workspace, tab, target.Pane, dir, runDir, argv)
+	if err != nil {
+		return mux.Target{}, err
+	}
+	return mux.Target{Backend: "tmux", Workspace: target.Workspace, Tab: tab, Pane: pane}, nil
+}
+
+func (Backend) SetTargetMetadata(target mux.Target, meta mux.Metadata) error {
+	if err := SetWindowMetadata(target.Workspace, target.Tab, meta); err != nil {
+		return err
+	}
+	return SetPaneMetadata(target.Pane, meta)
+}
+
+func (Backend) AttachTarget(target mux.Target) error {
+	return AttachTarget(target.Workspace, target.Tab, target.Pane)
+}
+
+func (Backend) AttachTargetHint(target mux.Target) string {
+	return AttachHint(target.Workspace, target.Tab)
+}

@@ -8,6 +8,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- A native Herdr multiplexer backend is available with `--mux herdr`. Orc can
+  create ticket workspaces and stage tabs, launch Claude or Codex through
+  Herdr's agent API, persist exact workspace/tab/pane IDs, inventory lifecycle
+  state, attach to the recorded pane, and publish Orc identity tokens for
+  Herdr's sidebar.
+- Live runtime identity is now backend-neutral in `STATE.yaml` under
+  `runtime.mux`. Existing `runtime.tmux` state remains readable without an
+  eager migration, while new launches record the backend and opaque target IDs.
 - Dashboard tabs are clickable — clicking a tab label in the header switches
   to it, matching the existing `1`-`5` and arrow-key navigation.
 - Each worker now gets a stable accent color, assigned so no two workers

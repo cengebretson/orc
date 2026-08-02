@@ -1,19 +1,27 @@
 package state
 
-func SetRuntime(featureDir, tmuxSession string) error {
+// SetMuxRuntime records the exact backend-neutral multiplexer target.
+func SetMuxRuntime(featureDir string, target MuxRuntime) error {
 	return Update(featureDir, func(s *State) error {
-		s.Runtime.Tmux = &TmuxRuntime{Session: tmuxSession}
+		s.Runtime.Mux = &target
+		// New writes use runtime.mux. Preserve runtime.tmux only when loading old
+		// state; do not write two competing sources of truth.
+		s.Runtime.Tmux = nil
 		return nil
 	})
+}
+
+// SetRuntime is the legacy tmux-shaped entry point. New orchestration code
+// should call SetMuxRuntime; this wrapper keeps older callers source-compatible
+// while ensuring new STATE.yaml writes use runtime.mux.
+func SetRuntime(featureDir, tmuxSession string) error {
+	return SetMuxRuntime(featureDir, MuxRuntime{Backend: "tmux", Workspace: tmuxSession})
 }
 
 // SetRuntimeTarget records the exact pane used by the active agent. The pane is
 // optional for compatibility with existing STATE.yaml files.
 func SetRuntimeTarget(featureDir, tmuxSession, pane string) error {
-	return Update(featureDir, func(s *State) error {
-		s.Runtime.Tmux = &TmuxRuntime{Session: tmuxSession, Pane: pane}
-		return nil
-	})
+	return SetMuxRuntime(featureDir, MuxRuntime{Backend: "tmux", Workspace: tmuxSession, Pane: pane})
 }
 
 // ClearRuntime removes the runtime block from STATE.yaml.

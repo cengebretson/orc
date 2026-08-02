@@ -50,7 +50,7 @@ func (m Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.quit):
 		return m, tea.Quit
 	case key.Matches(msg, keys.refresh):
-		return m, loadData(m.root)
+		return m, loadDataWithMux(m.root, m.mux)
 	case key.Matches(msg, keys.filter):
 		if m.navigation.pane == paneFeatures {
 			m.filter.active = true
@@ -124,8 +124,10 @@ func (m Model) handleDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			rows := m.visibleFeatures()
 			if m.navigation.featureCursor < len(rows) {
 				row := rows[m.navigation.featureCursor]
-				if row.s != nil && row.s.Runtime.Tmux != nil && row.tmuxLive {
-					return m, attachTmux(row.s.Runtime.Tmux.Session, row.s.Stage.Name)
+				if row.s != nil && row.tmuxLive {
+					if target, ok := row.s.Runtime.MuxTarget(row.s.Stage.Name); ok {
+						return m, attachMux(m.mux, target)
+					}
 				}
 			}
 		}

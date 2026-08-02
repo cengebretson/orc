@@ -67,6 +67,28 @@ func TestManagedTelemetryFromSessionsUsesManagedFeatureDirectory(t *testing.T) {
 	}
 }
 
+func TestCollectUsesExactLiveWorkerOverrideAndEngine(t *testing.T) {
+	feature := &featurelist.Feature{
+		State: &state.State{
+			Ticket: "ORC-9", Stage: state.Stage{Name: "intake"},
+			Runtime: state.Runtime{Mux: &state.MuxRuntime{Backend: "herdr", Workspace: "w9", Tab: "w9:t1", Pane: "w9:p1"}},
+		},
+		FeatureDir: "/work/orc-9", WorkerID: "default:fred", Engine: "claude",
+	}
+	panes := []mux.Pane{{
+		Backend: "herdr", ID: "w9:p1", Session: "w9", Window: "w9:t1", Agent: true,
+		Ticket: "ORC-9", Worker: "default:bob", ProviderEngine: "codex", Lifecycle: "idle",
+	}}
+
+	got, err := Collect("/work", Options{Features: []*featurelist.Feature{feature}, Panes: panes, Telemetry: []telemetry.Live{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].Worker != "default:bob" || got[0].Engine != "codex" || got[0].Lifecycle != "idle" {
+		t.Fatalf("managed live identity = %#v", got)
+	}
+}
+
 func TestCollectUsesDurableManagedRepositoriesWithoutGit(t *testing.T) {
 	feature := &featurelist.Feature{
 		State: &state.State{

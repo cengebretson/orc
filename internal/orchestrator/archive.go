@@ -96,7 +96,7 @@ func (a Archiver) Archive(opts ArchiveOptions) (*ArchiveResult, error) {
 
 	result := &ArchiveResult{
 		Slug:        filepath.Base(opts.FeatureDir),
-		TmuxSession: tmuxSessionName(opts.State),
+		TmuxSession: runtimeWorkspaceName(opts.State),
 	}
 
 	archiveDir := filepath.Join(opts.Root, "features", "_archive")
@@ -138,10 +138,19 @@ func (a Archiver) Archive(opts ArchiveOptions) (*ArchiveResult, error) {
 	}
 	result.Destination = dest
 
-	session := tmuxSessionName(opts.State)
-	if a.Mux.Available() && a.Mux.SessionExists(session) {
+	session := runtimeWorkspaceName(opts.State)
+	target, configured := opts.State.Runtime.MuxTarget(opts.State.Stage.Name)
+	nativeTarget := opts.State.Runtime.Mux != nil
+	backendMatches := !nativeTarget || !configured || target.Backend == "" || target.Backend == a.Mux.Name()
+	if configured && !backendMatches {
+		result.TmuxKillWarn = fmt.Sprintf("could not stop %s workspace %s with selected %s backend", target.Backend, session, a.Mux.Name())
+	} else if a.Mux.Available() && a.Mux.SessionExists(session) {
 		if err := a.Mux.KillSession(session); err != nil {
-			result.TmuxKillWarn = fmt.Sprintf("could not kill tmux session %s: %v", session, err)
+			if nativeTarget && target.Backend != "tmux" {
+				result.TmuxKillWarn = fmt.Sprintf("could not stop %s workspace %s: %v", a.Mux.Name(), session, err)
+			} else {
+				result.TmuxKillWarn = fmt.Sprintf("could not kill tmux session %s: %v", session, err)
+			}
 		} else {
 			result.KilledTmux = true
 			result.TmuxSession = session
@@ -165,9 +174,9 @@ func removeWorktree(repoMain, worktreePath string) error {
 	return nil
 }
 
-func tmuxSessionName(s *state.State) string {
-	if s.Runtime.Tmux != nil && s.Runtime.Tmux.Session != "" {
-		return s.Runtime.Tmux.Session
+func runtimeWorkspaceName(s *state.State) string {
+	if target, ok := s.Runtime.MuxTarget(s.Stage.Name); ok {
+		return target.Workspace
 	}
 	return s.Slug
 }

@@ -466,6 +466,7 @@ Deep reference lives in **[docs/reference.md](docs/reference.md)**:
 - **[STATE.yaml](docs/reference.md#stateyaml)** — the per-ticket state machine, status values, and runtime/lock semantics
 - **[Sessions](docs/sessions.md)** — live telemetry, managed/orphan classification, exact resume, and park/unpark safety
 - **[Tmux integration](docs/tmux.md)** — optional popup, split-pane, resume, and focus bindings
+- **[Herdr integration](docs/herdr.md)** — native workspace/agent launch, exact attach, lifecycle inventory, and sidebar tokens
 - **[Release readiness](docs/release.md)** — v1 scope, automated gates, disposable-workspace manual QA, and tag verification
 - **[Workers](docs/reference.md#workers)** — worker definition files, prompt construction, and resolution order
 
