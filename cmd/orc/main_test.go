@@ -23,8 +23,13 @@ import (
 
 type ctlTestBackend struct {
 	*muxtest.Fake
+	stateFunc  func(mux.Target) (mux.AgentControlResult, error)
 	promptFunc func(mux.Target, string, bool, mux.AgentControlOptions) (mux.AgentControlResult, error)
 	waitFunc   func(mux.Target, mux.AgentControlOptions) (mux.AgentControlResult, error)
+}
+
+func (b *ctlTestBackend) StateAgent(target mux.Target) (mux.AgentControlResult, error) {
+	return b.stateFunc(target)
 }
 
 func (b *ctlTestBackend) PromptAgent(target mux.Target, text string, wait bool, options mux.AgentControlOptions) (mux.AgentControlResult, error) {
@@ -56,6 +61,59 @@ func TestRunStatusTicketPrintsDetail(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Fatalf("status output missing %q:\n%s", want, out)
 		}
+	}
+}
+
+func TestRunCtlAgentStateTargetsRecordedHerdrPane(t *testing.T) {
+	resetCommandGlobals(t)
+	globalWorkspace = mutableFixtureWorkspace(t)
+	featureDir := filepath.Join(globalWorkspace, "features", "HOT-42-login-500-error")
+	if err := state.Update(featureDir, func(s *state.State) error {
+		s.Runtime.Mux = &state.MuxRuntime{Backend: "herdr", Workspace: "w9", Tab: "w9:t1", Pane: "w9:p1"}
+		s.Runtime.Tmux = nil
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	var gotTarget mux.Target
+	muxBackend = &ctlTestBackend{
+		Fake: &muxtest.Fake{NameFunc: func() string { return "herdr" }},
+		stateFunc: func(target mux.Target) (mux.AgentControlResult, error) {
+			gotTarget = target
+			return mux.AgentControlResult{
+				Backend: "herdr", Target: target, Agent: "codex", Name: "builder",
+				Lifecycle: "working", StateChangeSeq: 14,
+			}, nil
+		},
+		promptFunc: func(mux.Target, string, bool, mux.AgentControlOptions) (mux.AgentControlResult, error) {
+			t.Fatal("unexpected prompt")
+			return mux.AgentControlResult{}, nil
+		},
+		waitFunc: func(mux.Target, mux.AgentControlOptions) (mux.AgentControlResult, error) {
+			t.Fatal("unexpected wait")
+			return mux.AgentControlResult{}, nil
+		},
+	}
+	ctlStateTicket = "HOT-42"
+
+	out, err := captureStdout(func() error { return runCtlAgentState(nil, nil) })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotTarget.Pane != "w9:p1" {
+		t.Fatalf("target = %#v", gotTarget)
+	}
+	var payload struct {
+		Type   string                 `json:"type"`
+		Ticket string                 `json:"ticket"`
+		Agent  mux.AgentControlResult `json:"agent"`
+	}
+	if err := json.Unmarshal([]byte(out), &payload); err != nil {
+		t.Fatalf("unmarshal output: %v\n%s", err, out)
+	}
+	if payload.Type != "agent_state" || payload.Ticket != "HOT-42" || payload.Agent.Lifecycle != "working" || payload.Agent.StateChangeSeq != 14 {
+		t.Fatalf("payload = %#v", payload)
 	}
 }
 
@@ -1404,6 +1462,7 @@ func resetCommandGlobals(t *testing.T) {
 	oldPackInspectJSON := packInspectJSON
 	oldSendTransitionNotification := sendTransitionNotification
 	oldSendNativeTransitionNotification := sendNativeTransitionNotification
+	oldCtlStateTicket := ctlStateTicket
 	oldCtlPromptTicket := ctlPromptTicket
 	oldCtlPromptWait := ctlPromptWait
 	oldCtlPromptUntil := ctlPromptUntil
@@ -1436,6 +1495,7 @@ func resetCommandGlobals(t *testing.T) {
 		packInspectJSON = oldPackInspectJSON
 		sendTransitionNotification = oldSendTransitionNotification
 		sendNativeTransitionNotification = oldSendNativeTransitionNotification
+		ctlStateTicket = oldCtlStateTicket
 		ctlPromptTicket = oldCtlPromptTicket
 		ctlPromptWait = oldCtlPromptWait
 		ctlPromptUntil = oldCtlPromptUntil
@@ -1467,6 +1527,7 @@ func resetCommandGlobals(t *testing.T) {
 	artifactsAll = false
 	artifactsJSON = false
 	packInspectJSON = false
+	ctlStateTicket = ""
 	ctlPromptTicket = ""
 	ctlPromptWait = false
 	ctlPromptUntil = nil

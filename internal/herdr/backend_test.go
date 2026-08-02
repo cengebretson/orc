@@ -83,6 +83,39 @@ func TestShowNotificationRequiresTitle(t *testing.T) {
 	}
 }
 
+func TestStateAgentUsesExactPaneAndReturnsLifecycle(t *testing.T) {
+	var calls []string
+	b := Backend{run: func(args ...string) ([]byte, error) {
+		call := strings.Join(args, " ")
+		calls = append(calls, call)
+		switch call {
+		case "workspace get w9":
+			return response(`{"workspace":{"workspace_id":"w9"}}`), nil
+		case "tab get w9:t1":
+			return response(`{"tab":{"tab_id":"w9:t1","workspace_id":"w9"}}`), nil
+		case "pane get w9:p1":
+			return response(`{"pane":{"pane_id":"w9:p1","workspace_id":"w9","tab_id":"w9:t1"}}`), nil
+		case "agent get w9:p1":
+			return response(`{"agent":{"name":"builder","agent":"codex","agent_status":"working","state_change_seq":14}}`), nil
+		default:
+			return nil, errors.New("unexpected command: " + call)
+		}
+	}}
+
+	result, err := b.StateAgent(mux.Target{
+		Backend: "herdr", Workspace: "w9", Tab: "w9:t1", Pane: "w9:p1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Backend != "herdr" || result.Target.Pane != "w9:p1" || result.Agent != "codex" || result.Name != "builder" || result.Lifecycle != "working" || result.StateChangeSeq != 14 {
+		t.Fatalf("result = %#v", result)
+	}
+	if len(calls) != 4 {
+		t.Fatalf("calls = %#v", calls)
+	}
+}
+
 func TestPromptAgentUsesExactPaneAndHerdrWaitSemantics(t *testing.T) {
 	var calls []string
 	b := Backend{run: func(args ...string) ([]byte, error) {

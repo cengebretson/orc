@@ -33,6 +33,16 @@ var _ mux.AgentControlBackend = Backend{}
 
 func (Backend) Name() string { return "herdr" }
 
+// StateAgent returns Herdr's recognized lifecycle state for the exact
+// recorded agent pane without changing focus or waiting for a transition.
+func (b Backend) StateAgent(target mux.Target) (mux.AgentControlResult, error) {
+	target, err := b.resolveExactAgentTarget(target)
+	if err != nil {
+		return mux.AgentControlResult{}, err
+	}
+	return b.agentControl(target, "agent", "get", target.Pane)
+}
+
 // ShowNotification publishes an Orc transition through Herdr's session-native
 // notification surface.
 func (b Backend) ShowNotification(notification mux.Notification) error {

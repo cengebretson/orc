@@ -107,8 +107,8 @@ type AgentControlOptions struct {
 	Timeout time.Duration
 }
 
-// AgentControlResult is the structured live state returned after a prompt or
-// wait. Target remains the exact opaque location recorded by Orc.
+// AgentControlResult is the structured live state returned by a state read,
+// prompt, or wait. Target remains the exact opaque location recorded by Orc.
 type AgentControlResult struct {
 	Backend        string `json:"backend"`
 	Target         Target `json:"target"`
@@ -329,12 +329,14 @@ type NotificationBackend interface {
 }
 
 // AgentControlBackend is an optional capability for multiplexers that can
-// submit prompts atomically and wait on recognized agent lifecycle state.
+// read recognized agent lifecycle state, submit prompts atomically, and wait
+// for state transitions.
 // Backends without reliable lifecycle detection must not emulate it by
 // scraping screen text.
 type AgentControlBackend interface {
 	Backend
 
+	StateAgent(target Target) (AgentControlResult, error)
 	PromptAgent(target Target, text string, wait bool, options AgentControlOptions) (AgentControlResult, error)
 	WaitAgent(target Target, options AgentControlOptions) (AgentControlResult, error)
 }

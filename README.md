@@ -452,6 +452,7 @@ These are called by agents at the end of each session. They are hidden from `orc
 - `orc mark <ticket> pause "<reason>"` — pause for human input, approval, or an external blocker
 - `orc mark <ticket> done` — mark active, ready, or paused work as done
 - `orc mark <ticket> jit "<summary>"` — record a jit task as complete and clear `runtime.jit`
+- `orc ctl agent state --ticket <ticket>` — read the exact recorded Herdr agent's recognized lifecycle as JSON
 - `orc ctl agent prompt --ticket <ticket> "<text>" --wait --timeout 120s` — atomically prompt the exact recorded Herdr agent and wait for a settled lifecycle state
 - `orc ctl agent wait --ticket <ticket> --until blocked --timeout 120s` — wait for recognized lifecycle state without scraping terminal text
 

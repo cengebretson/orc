@@ -14,6 +14,7 @@ import (
 )
 
 var (
+	ctlStateTicket   string
 	ctlPromptTicket  string
 	ctlPromptWait    bool
 	ctlPromptUntil   []string
@@ -31,6 +32,13 @@ var ctlCmd = &cobra.Command{
 var ctlAgentCmd = &cobra.Command{
 	Use:   "agent",
 	Short: "Control a ticket's exact recorded agent",
+}
+
+var ctlAgentStateCmd = &cobra.Command{
+	Use:   "state",
+	Short: "Read recognized lifecycle state for the exact recorded agent",
+	Args:  cobra.NoArgs,
+	RunE:  runCtlAgentState,
 }
 
 var ctlAgentPromptCmd = &cobra.Command{
@@ -56,6 +64,18 @@ func (e *ctlCommandError) Error() string { return e.message }
 
 func ctlError(code, format string, args ...any) error {
 	return &ctlCommandError{code: code, message: fmt.Sprintf(format, args...)}
+}
+
+func runCtlAgentState(_ *cobra.Command, _ []string) error {
+	controller, target, ticketID, err := resolveCtlAgent(ctlStateTicket)
+	if err != nil {
+		return err
+	}
+	result, err := controller.StateAgent(target)
+	if err != nil {
+		return err
+	}
+	return printJSON(map[string]any{"type": "agent_state", "ticket": ticketID, "agent": result})
 }
 
 func runCtlAgentPrompt(cmd *cobra.Command, args []string) error {
@@ -133,7 +153,7 @@ func resolveCtlAgent(ticketArg string) (mux.AgentControlBackend, mux.Target, str
 	controller, ok := muxBackend.(mux.AgentControlBackend)
 	if !ok {
 		return nil, mux.Target{}, "", ctlError(
-			"unsupported_backend", "%s does not provide recognized agent prompt/wait semantics", muxBackend.Name(),
+			"unsupported_backend", "%s does not provide recognized agent lifecycle control", muxBackend.Name(),
 		)
 	}
 	return controller, target, t.State.Ticket, nil

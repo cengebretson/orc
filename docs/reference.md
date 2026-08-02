@@ -344,13 +344,15 @@ The first structured agent-control surface is available for Herdr-backed
 tickets:
 
 ```bash
+orc ctl agent state --ticket ORC-9
 orc ctl agent prompt --ticket ORC-9 "Review this diff" --wait --timeout 120s
 orc ctl agent wait --ticket ORC-9 --until blocked --timeout 120s
 ```
 
-Both commands target the exact recorded pane and emit JSON. `--until` may be
-repeated with `idle`, `working`, `blocked`, `done`, or `unknown`; without it,
-Herdr waits for its settled defaults (`idle`, `done`, or `blocked`). Prompt
+All commands target the exact recorded pane and emit JSON. `agent state` reads
+the current recognized lifecycle without waiting or changing focus. `--until`
+may be repeated with `idle`, `working`, `blocked`, `done`, or `unknown`; without
+it, Herdr waits for its settled defaults (`idle`, `done`, or `blocked`). Prompt
 waits preserve Herdr's distinct `agent_prompt_stalled` error when submission
 produces no observed lifecycle change. The tmux backend reports this capability
 as unsupported because Orc does not infer lifecycle state from screen text.

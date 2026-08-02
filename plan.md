@@ -383,10 +383,10 @@ Effort: Small (timestamp display) / Medium (the derived tier).
 
 ### `orc ctl` — agent-facing control surface
 
-Status: First vertical slice implemented for Herdr: exact-ticket `agent
-prompt` and `agent wait`, structured results/errors, repeatable lifecycle
-targets, timeouts, and native stall detection. Status/state/watch/capture and a
-tmux lifecycle provider remain future work.
+Status: First vertical slice implemented for Herdr: exact-ticket `agent state`,
+`agent prompt`, and `agent wait`, structured results/errors, repeatable
+lifecycle targets, timeouts, and native stall detection. Status/watch/capture
+and a tmux lifecycle provider remain future work.
 
 Orc has `orc mark` (an agent writes its own durable state) and `orc status
 --json` (a human or script reads it). It has nothing that lets an agent
@@ -396,7 +396,7 @@ stamping, `internal/sessionlist`, `internal/telemetry`); the surface does not.
 
 ```bash
 orc ctl status                              # one snapshot: what exists, what needs me
-orc ctl agent state [--ticket T]            # structured live state
+orc ctl agent state --ticket T              # structured live state
 orc ctl agent watch [--ticket T]            # JSONL stream of transitions
 orc ctl agent prompt --ticket T "<text>" --wait --timeout 120s
 orc ctl agent wait --ticket T --until blocked --timeout 120s

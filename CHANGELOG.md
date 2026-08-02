@@ -8,10 +8,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- `orc ctl agent prompt` and `orc ctl agent wait` provide structured control of
-  an exact recorded Herdr agent. Waiting delegates to Herdr's recognized
-  lifecycle states and preserves distinct timeout and `agent_prompt_stalled`
-  errors instead of inferring completion from terminal text.
+- `orc ctl agent state`, `agent prompt`, and `agent wait` provide structured
+  control of an exact recorded Herdr agent. State reads return Herdr's current
+  recognized lifecycle without changing focus; waiting delegates to Herdr and
+  preserves distinct timeout and `agent_prompt_stalled` errors instead of
+  inferring completion from terminal text.
 - Tickets running through Herdr now publish native session notifications when
   they block or complete, using distinct request and completion sounds without
   replacing the existing user-configured notification command.
