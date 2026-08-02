@@ -138,6 +138,10 @@ settings:
   notify:                # optional transition notification command
     on: [blocked, complete]
     command: "notify-send 'orc' '{{ticket}} {{event}}'"
+  herdr:                 # optional native Herdr layout
+    task_cell:
+      test_command: "make test"
+      watch: true
 
 repos:
   - name: my-app
@@ -184,6 +188,15 @@ workflows:
         worker: default:brian
         advance: auto
 ```
+
+`settings.herdr.task_cell` applies only to `--mux herdr` launches. A non-empty
+`test_command` creates a test pane and runs the configured shell command from
+the agent's resolved worktree cwd. `watch: true` creates an `orc watch` pane for
+the ticket. With both enabled, the agent occupies the left side while tests and
+watch share a 35% utility column on the right. Orc stamps the utility panes with
+ownership metadata tied to the exact feature directory and reuses them on later
+launches; it never identifies them from display labels alone. Task-cell setup
+failures are warnings and do not prevent the agent from launching.
 
 `default_workflow` is used by `orc work <ticket>` when `--workflow` is omitted.
 If it is not set, `orc work` returns an error. `advance: auto` tells agents to

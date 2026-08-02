@@ -106,14 +106,15 @@ Effort: Small.
 
 ### Add a native herdr multiplexer backend
 
-Status: First vertical slice and native worktree create/open implemented.
-Launch, exact identity, agent lifecycle inventory, attach/focus,
-dashboard/watch selection, archive cleanup, sidebar metadata, and
-worktree-backed workspace creation are wired through `--mux herdr`. The
-remaining extension ideas stay future work. Live disposable-workspace smoke
-tests verified Codex launch, exact target persistence, lifecycle inventory,
-sidebar tokens, attach targeting, owned archive cleanup, and Herdr's native
-worktree create/open response shapes.
+Status: First vertical slice, native worktree create/open, and task-cell
+layouts implemented. Launch, exact identity, agent lifecycle inventory,
+attach/focus, dashboard/watch selection, archive cleanup, sidebar metadata,
+worktree-backed workspace creation, and optional test/watch panes are wired
+through `--mux herdr`. The remaining extension ideas stay future work. Live
+disposable-workspace smoke tests verified Codex launch, exact target
+persistence, lifecycle inventory, sidebar tokens, attach targeting, owned
+archive cleanup, Herdr's native worktree create/open response shapes, and the
+split/rename/run topology used by task cells.
 
 Herdr is a strong second implementation of `mux.Backend`: it owns the live
 terminal layer Orc deliberately does not, recognizes agent lifecycle directly,
@@ -231,7 +232,9 @@ After the vertical slice is stable:
   unambiguous ticket workspaces, persist the checkout before agent launch, and
   preserve repository-owned `worktree_setup` commands. Removal continues
   through Orc's existing ownership and archive safeguards.
-- Offer a task-cell layout: agent pane plus optional test and watch panes.
+- Implemented: offer a metadata-owned task-cell layout with the agent pane plus
+  optional test and watch panes. Repeated launches reuse exact Orc-owned panes
+  and leave user-created panes alone.
 - Send herdr notifications when background work blocks or completes.
 - Reuse herdr's blocking prompt/wait and stall detection underneath `orc ctl`
   rather than rebuilding those semantics for this backend.

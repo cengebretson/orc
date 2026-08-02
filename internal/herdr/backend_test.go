@@ -208,6 +208,92 @@ func TestSendTargetRetriesWhileCreatedPaneShellStarts(t *testing.T) {
 	}
 }
 
+func TestConfigureTaskCellCreatesOwnedTestAndWatchPanes(t *testing.T) {
+	var calls []string
+	b := Backend{run: func(args ...string) ([]byte, error) {
+		call := strings.Join(args, " ")
+		calls = append(calls, call)
+		switch call {
+		case "workspace get w9":
+			return response(`{"workspace":{"workspace_id":"w9","label":"ORC-9"}}`), nil
+		case "tab get t1":
+			return response(`{"tab":{"tab_id":"t1","workspace_id":"w9","label":"develop"}}`), nil
+		case "pane get p1":
+			return response(`{"pane":{"pane_id":"p1","workspace_id":"w9","tab_id":"t1"}}`), nil
+		case "pane list --workspace w9":
+			return response(`{"panes":[{"pane_id":"p1","workspace_id":"w9","tab_id":"t1"}]}`), nil
+		case "pane split p1 --direction right --ratio 0.35 --cwd /work/orc-9 --env ORC=1 --no-focus":
+			return response(`{"pane":{"pane_id":"p2","workspace_id":"w9","tab_id":"t1"}}`), nil
+		case "pane split p2 --direction down --ratio 0.5 --cwd /work/orc-9 --env ORC=1 --no-focus":
+			return response(`{"pane":{"pane_id":"p3","workspace_id":"w9","tab_id":"t1"}}`), nil
+		default:
+			if strings.HasPrefix(call, "pane report-metadata ") || strings.HasPrefix(call, "pane rename ") || strings.HasPrefix(call, "pane run ") {
+				return response(`{}`), nil
+			}
+			return nil, errors.New("unexpected command: " + call)
+		}
+	}}
+
+	err := b.ConfigureTaskCell(
+		mux.Target{Backend: "herdr", Workspace: "w9", Tab: "t1", Pane: "p1"},
+		mux.TaskCellSpec{
+			CWD: "/work/orc-9", TestCommand: "make test",
+			WatchCommand: "orc --workspace /work watch ORC-9",
+			Metadata:     mux.Metadata{Ticket: "ORC-9", Stage: "develop", FeatureDir: "/work/features/orc-9"},
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(calls, "\n")
+	for _, want := range []string{
+		"pane split p1 --direction right --ratio 0.35",
+		"pane report-metadata p2 --source orc --display-agent tests --token task_cell=tests --token orc_task_cell_owner=/work/features/orc-9",
+		"pane rename p2 tests", "pane run p2 make test",
+		"pane split p2 --direction down --ratio 0.5",
+		"pane report-metadata p3 --source orc --display-agent watch --token task_cell=watch --token orc_task_cell_owner=/work/features/orc-9",
+		"pane rename p3 watch", "pane run p3 orc --workspace /work watch ORC-9",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("calls missing %q:\n%s", want, joined)
+		}
+	}
+}
+
+func TestConfigureTaskCellReusesOwnedPanes(t *testing.T) {
+	var calls []string
+	b := Backend{run: func(args ...string) ([]byte, error) {
+		call := strings.Join(args, " ")
+		calls = append(calls, call)
+		switch call {
+		case "workspace get w9":
+			return response(`{"workspace":{"workspace_id":"w9"}}`), nil
+		case "tab get t1":
+			return response(`{"tab":{"tab_id":"t1","workspace_id":"w9"}}`), nil
+		case "pane get p1":
+			return response(`{"pane":{"pane_id":"p1","workspace_id":"w9","tab_id":"t1"}}`), nil
+		case "pane list --workspace w9":
+			return response(`{"panes":[{"pane_id":"p1","workspace_id":"w9","tab_id":"t1"},{"pane_id":"p2","workspace_id":"w9","tab_id":"t1","tokens":{"task_cell":"tests","orc_task_cell_owner":"/work/features/orc-9"}},{"pane_id":"p3","workspace_id":"w9","tab_id":"t1","tokens":{"task_cell":"watch","orc_task_cell_owner":"/work/features/orc-9"}}]}`), nil
+		default:
+			return nil, errors.New("unexpected command: " + call)
+		}
+	}}
+
+	err := b.ConfigureTaskCell(
+		mux.Target{Backend: "herdr", Workspace: "w9", Tab: "t1", Pane: "p1"},
+		mux.TaskCellSpec{
+			CWD: "/work", TestCommand: "make test", WatchCommand: "orc watch ORC-9",
+			Metadata: mux.Metadata{FeatureDir: "/work/features/orc-9"},
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(calls) != 4 {
+		t.Fatalf("existing task cell should not be recreated; calls = %#v", calls)
+	}
+}
+
 func TestSetTargetMetadataPublishesSidebarTokens(t *testing.T) {
 	var calls []string
 	b := Backend{run: func(args ...string) ([]byte, error) {

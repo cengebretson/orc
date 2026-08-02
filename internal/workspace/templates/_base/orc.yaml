@@ -19,6 +19,10 @@
 #   notify:                       # optional best-effort transition hook
 #     on: [blocked, complete]
 #     command: "notify-send 'orc' '{{ticket}} {{event}}'"
+#   herdr:                        # optional native Herdr task-cell layout
+#     task_cell:
+#       test_command: "make test" # right-side test pane; any shell command
+#       watch: true               # right-side `orc watch <ticket>` pane
 
 settings:
   default_workflow: default

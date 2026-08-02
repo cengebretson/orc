@@ -8,6 +8,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Herdr launches can optionally build an Orc-owned task cell beside each stage
+  agent: a configured test command runs in a right-side pane, `orc watch` can
+  run below it, and metadata-backed ownership makes repeated launches reuse the
+  utility panes without adopting user-created panes.
 - Herdr launches can now create a ticket's Git worktree through
   `herdr worktree create` or reopen its exact recorded checkout through
   `herdr worktree open`. Orc records the repository, branch, and checkout in

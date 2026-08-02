@@ -53,6 +53,10 @@ settings:
   notify:
     on: [blocked, complete]
     command: "notify-send orc '{{ticket}} {{event}}'"
+  herdr:
+    task_cell:
+      test_command: make test
+      watch: true
 repos: []
 `)
 
@@ -80,6 +84,9 @@ repos: []
 	}
 	if strings.Join(cfg.Settings.Notify.On, ",") != "blocked,complete" || cfg.Settings.Notify.Command != "notify-send orc '{{ticket}} {{event}}'" {
 		t.Errorf("notify settings = %#v", cfg.Settings.Notify)
+	}
+	if cfg.Settings.Herdr == nil || cfg.Settings.Herdr.TaskCell == nil || cfg.Settings.Herdr.TaskCell.TestCommand != "make test" || !cfg.Settings.Herdr.TaskCell.Watch {
+		t.Errorf("herdr task cell settings = %#v", cfg.Settings.Herdr)
 	}
 }
 

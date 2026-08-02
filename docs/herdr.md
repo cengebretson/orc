@@ -80,3 +80,27 @@ rows = [
 Sidebar width remains a Herdr preference. For a wider rail, a practical range
 is `sidebar_width = 64`, `sidebar_min_width = 56`, and
 `sidebar_max_width = 72`.
+
+## Task-cell layout
+
+Herdr can arrange optional Orc-owned utility panes beside each stage agent:
+
+```yaml
+settings:
+  herdr:
+    task_cell:
+      test_command: "make test"
+      watch: true
+```
+
+The agent remains on the left. A test pane occupies a 35% column on the right;
+when watch is also enabled, `orc watch <ticket>` opens below tests in that
+column. Either pane can be enabled independently. Both commands start in the
+agent's resolved worktree cwd, while the watch command receives the workspace
+path explicitly.
+
+Orc marks these panes with `source=orc`, `task_cell=tests` or
+`task_cell=watch`, and an `orc_task_cell_owner` token tied to the exact feature
+directory. Later launches reuse exact matching panes and never adopt a user
+pane merely because it has a `tests` or `watch` label. Layout failures are
+reported as warnings without preventing the stage agent from launching.

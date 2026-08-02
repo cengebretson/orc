@@ -76,6 +76,16 @@ type WorktreeTargetSpec struct {
 	Tabs        []string
 }
 
+// TaskCellSpec describes optional utility panes arranged beside an agent.
+// Commands are user-configured shell text; the backend is responsible for
+// targeting only panes it can prove Orc owns and for preserving user focus.
+type TaskCellSpec struct {
+	CWD          string
+	TestCommand  string
+	WatchCommand string
+	Metadata     Metadata
+}
+
 // AttentionRank orders attention states by how much they need a human, most
 // urgent first. An unrecognized or empty state ranks last.
 //
@@ -248,4 +258,13 @@ type WorktreeTargetBackend interface {
 	TargetBackend
 
 	CreateWorktreeTarget(spec WorktreeTargetSpec) (Target, error)
+}
+
+// TaskCellBackend is an optional layout capability. It is separate from
+// TargetBackend because tmux and foreground launches do not need to adopt
+// Herdr's pane topology.
+type TaskCellBackend interface {
+	TargetBackend
+
+	ConfigureTaskCell(target Target, spec TaskCellSpec) error
 }

@@ -41,6 +41,20 @@ type Settings struct {
 	Theme            string                   `yaml:"theme"` // e.g. "catppuccin-mocha"; defaults to catppuccin-mocha
 	ContextPressure  *ContextPressureSettings `yaml:"context_pressure,omitempty"`
 	Notify           NotifySettings           `yaml:"notify,omitempty"`
+	Herdr            *HerdrSettings           `yaml:"herdr,omitempty"`
+}
+
+// HerdrSettings contains opt-in UI behavior for the native Herdr backend.
+type HerdrSettings struct {
+	TaskCell *HerdrTaskCellSettings `yaml:"task_cell,omitempty"`
+}
+
+// HerdrTaskCellSettings adds Orc-owned utility panes beside the stage agent.
+// TestCommand is passed to the user's shell through `herdr pane run`; Watch
+// launches Orc's ticket rail when enabled.
+type HerdrTaskCellSettings struct {
+	TestCommand string `yaml:"test_command,omitempty"`
+	Watch       bool   `yaml:"watch,omitempty"`
 }
 
 // NotifySettings configures an optional best-effort command after selected

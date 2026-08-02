@@ -307,6 +307,13 @@ func (l Launcher) launchTarget(backend mux.TargetBackend, opts LaunchOptions, re
 	if err := backend.SetTargetMetadata(sent, metadata); err != nil {
 		result.addFallback(opts, fmt.Sprintf("warning: could not set %s metadata: %v", backend.Name(), err))
 	}
+	if taskBackend, ok := backend.(mux.TaskCellBackend); ok {
+		if spec, enabled := resolveTaskCell(opts.Root, runDir, opts.State, metadata); enabled {
+			if err := taskBackend.ConfigureTaskCell(sent, spec); err != nil {
+				result.addFallback(opts, fmt.Sprintf("warning: could not configure %s task cell: %v", backend.Name(), err))
+			}
+		}
+	}
 	if err := l.SetMuxRuntime(opts.FeatureDir, state.MuxRuntime{
 		Backend: sent.Backend, Workspace: sent.Workspace, Tab: sent.Tab, Pane: sent.Pane,
 	}); err != nil {

@@ -21,6 +21,7 @@ type nativeTargetFake struct {
 	createWorktreeTarget func(spec mux.WorktreeTargetSpec) (mux.Target, error)
 	sendTarget           func(target mux.Target, tab, dir, runDir string, argv []string) (mux.Target, error)
 	setTargetMetadata    func(target mux.Target, meta mux.Metadata) error
+	configureTaskCell    func(target mux.Target, spec mux.TaskCellSpec) error
 }
 
 func (f *nativeTargetFake) CreateTarget(name, dir string, tabs []string) (mux.Target, error) {
@@ -42,6 +43,13 @@ func (f *nativeTargetFake) SetTargetMetadata(target mux.Target, meta mux.Metadat
 	return f.setTargetMetadata(target, meta)
 }
 
+func (f *nativeTargetFake) ConfigureTaskCell(target mux.Target, spec mux.TaskCellSpec) error {
+	if f.configureTaskCell == nil {
+		return nil
+	}
+	return f.configureTaskCell(target, spec)
+}
+
 func (f *nativeTargetFake) AttachTarget(mux.Target) error { return nil }
 
 func (f *nativeTargetFake) AttachTargetHint(target mux.Target) string {
@@ -60,6 +68,10 @@ func TestLauncherCreatesNativeWorktreeTarget(t *testing.T) {
 	configYAML := `
 settings:
   default_workflow: default
+  herdr:
+    task_cell:
+      test_command: make test
+      watch: true
 repos:
   - name: app
     path: source
@@ -88,6 +100,7 @@ workflows:
 	var recorded worktreeLaunch
 	var sentDir, sentRunDir string
 	var sentArgv []string
+	var taskCell mux.TaskCellSpec
 	target := mux.Target{Backend: "herdr", Workspace: "w9", Tab: "t1", Pane: "p1"}
 	fake := &nativeTargetFake{
 		Fake: &muxtest.Fake{
@@ -105,6 +118,10 @@ workflows:
 		sendTarget: func(got mux.Target, tab, dir, runDir string, argv []string) (mux.Target, error) {
 			sentDir, sentRunDir, sentArgv = dir, runDir, append([]string(nil), argv...)
 			return got, nil
+		},
+		configureTaskCell: func(got mux.Target, spec mux.TaskCellSpec) error {
+			taskCell = spec
+			return nil
 		},
 	}
 	launcher := Launcher{
@@ -134,6 +151,12 @@ workflows:
 	}
 	if joined := strings.Join(sentArgv, " "); !strings.Contains(joined, "--cd "+wantWorktree) || sentArgv[len(sentArgv)-1] != "build this" {
 		t.Fatalf("sent argv = %#v", sentArgv)
+	}
+	if taskCell.CWD != wantWorktree || taskCell.TestCommand != "make test" || taskCell.WatchCommand != "orc --workspace '"+root+"' --mux herdr watch 'ORC-9'" {
+		t.Fatalf("task cell = %#v", taskCell)
+	}
+	if taskCell.Metadata.Ticket != "ORC-9" || taskCell.Metadata.Worker != "dev" {
+		t.Fatalf("task cell metadata = %#v", taskCell.Metadata)
 	}
 	if s.Repos["app"].Worktree != filepath.Join("worktrees", "app", "ORC-9-native") || s.NextAction.CWD != filepath.Join("worktrees", "app", "ORC-9-native") {
 		t.Fatalf("state worktree = %#v, cwd = %q", s.Repos, s.NextAction.CWD)

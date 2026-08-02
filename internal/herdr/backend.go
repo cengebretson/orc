@@ -26,6 +26,7 @@ func New() Backend { return Backend{run: runCLI} }
 var _ mux.Backend = Backend{}
 var _ mux.TargetBackend = Backend{}
 var _ mux.WorktreeTargetBackend = Backend{}
+var _ mux.TaskCellBackend = Backend{}
 
 func (Backend) Name() string { return "herdr" }
 
@@ -231,6 +232,113 @@ func (b Backend) SendTarget(target mux.Target, tab, dir, runDir string, argv []s
 		return mux.Target{}, fmt.Errorf("run command in herdr pane: %w", err)
 	}
 	return target, nil
+}
+
+// ConfigureTaskCell creates Orc-owned utility panes beside the exact agent
+// pane. Existing task panes are identified by metadata, never by labels alone,
+// so repeated launches do not duplicate panes or adopt user-created ones.
+func (b Backend) ConfigureTaskCell(target mux.Target, spec mux.TaskCellSpec) error {
+	if spec.TestCommand == "" && spec.WatchCommand == "" {
+		return nil
+	}
+	if spec.Metadata.FeatureDir == "" {
+		return fmt.Errorf("herdr task cell requires an exact Orc feature directory")
+	}
+	target, err := b.resolveTarget(target)
+	if err != nil {
+		return err
+	}
+	panes, err := b.listPaneInfo(target.Workspace)
+	if err != nil {
+		return err
+	}
+
+	testPane, err := taskPane(panes, target.Tab, "tests", spec.Metadata.FeatureDir)
+	if err != nil {
+		return err
+	}
+	watchPane, err := taskPane(panes, target.Tab, "watch", spec.Metadata.FeatureDir)
+	if err != nil {
+		return err
+	}
+
+	if spec.TestCommand != "" && testPane.PaneID == "" {
+		testPane, err = b.splitPane(target.Pane, "right", "0.35", spec.CWD)
+		if err != nil {
+			return fmt.Errorf("create herdr tests pane: %w", err)
+		}
+		if err := b.prepareTaskPane(testPane.PaneID, "tests", spec.TestCommand, spec.Metadata); err != nil {
+			_, _ = b.command("pane", "close", testPane.PaneID)
+			return err
+		}
+	}
+
+	if spec.WatchCommand != "" && watchPane.PaneID == "" {
+		parent, direction, ratio := target.Pane, "right", "0.35"
+		if spec.TestCommand != "" && testPane.PaneID != "" {
+			parent, direction, ratio = testPane.PaneID, "down", "0.5"
+		}
+		watchPane, err = b.splitPane(parent, direction, ratio, spec.CWD)
+		if err != nil {
+			return fmt.Errorf("create herdr watch pane: %w", err)
+		}
+		if err := b.prepareTaskPane(watchPane.PaneID, "watch", spec.WatchCommand, spec.Metadata); err != nil {
+			_, _ = b.command("pane", "close", watchPane.PaneID)
+			return err
+		}
+	}
+	return nil
+}
+
+func (b Backend) splitPane(parent, direction, ratio, cwd string) (paneInfo, error) {
+	var result struct {
+		Pane paneInfo `json:"pane"`
+	}
+	if err := b.decode(&result, "pane", "split", parent, "--direction", direction, "--ratio", ratio, "--cwd", cwd, "--env", "ORC=1", "--no-focus"); err != nil {
+		return paneInfo{}, err
+	}
+	if result.Pane.PaneID == "" {
+		return paneInfo{}, fmt.Errorf("herdr pane split returned no pane id")
+	}
+	return result.Pane, nil
+}
+
+func (b Backend) prepareTaskPane(pane, kind, command string, meta mux.Metadata) error {
+	meta.Worker = kind
+	meta.Engine = ""
+	meta.Model = ""
+	meta.ProviderSessionID = ""
+	if _, err := b.command("pane", "rename", pane, kind); err != nil {
+		return fmt.Errorf("rename herdr %s pane: %w", kind, err)
+	}
+	if _, err := b.command("pane", "run", pane, command); err != nil {
+		return fmt.Errorf("run herdr %s pane: %w", kind, err)
+	}
+	args := []string{
+		"pane", "report-metadata", pane, "--source", "orc", "--display-agent", kind,
+		"--token", "task_cell=" + kind, "--token", "orc_task_cell_owner=" + meta.FeatureDir,
+	}
+	args = appendTokens(args, meta)
+	if _, err := b.command(args...); err != nil {
+		return fmt.Errorf("mark herdr %s pane: %w", kind, err)
+	}
+	return nil
+}
+
+func taskPane(panes []paneInfo, tab, kind, owner string) (paneInfo, error) {
+	var matches []paneInfo
+	for _, pane := range panes {
+		if pane.TabID == tab && pane.token("task_cell") == kind && pane.token("orc_task_cell_owner") == owner {
+			matches = append(matches, pane)
+		}
+	}
+	if len(matches) > 1 {
+		return paneInfo{}, fmt.Errorf("herdr tab %s has %d Orc-owned %s panes", tab, len(matches), kind)
+	}
+	if len(matches) == 1 {
+		return matches[0], nil
+	}
+	return paneInfo{}, nil
 }
 
 // startAgent tolerates the short shell-startup window after Herdr creates a
