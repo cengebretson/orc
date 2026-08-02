@@ -2,7 +2,10 @@ package orchestrator
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/cengebretson/orc/internal/mux"
@@ -11,6 +14,134 @@ import (
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/workers"
 )
+
+type nativeTargetFake struct {
+	*muxtest.Fake
+	createTarget         func(name, dir string, tabs []string) (mux.Target, error)
+	createWorktreeTarget func(spec mux.WorktreeTargetSpec) (mux.Target, error)
+	sendTarget           func(target mux.Target, tab, dir, runDir string, argv []string) (mux.Target, error)
+	setTargetMetadata    func(target mux.Target, meta mux.Metadata) error
+}
+
+func (f *nativeTargetFake) CreateTarget(name, dir string, tabs []string) (mux.Target, error) {
+	return f.createTarget(name, dir, tabs)
+}
+
+func (f *nativeTargetFake) CreateWorktreeTarget(spec mux.WorktreeTargetSpec) (mux.Target, error) {
+	return f.createWorktreeTarget(spec)
+}
+
+func (f *nativeTargetFake) SendTarget(target mux.Target, tab, dir, runDir string, argv []string) (mux.Target, error) {
+	return f.sendTarget(target, tab, dir, runDir, argv)
+}
+
+func (f *nativeTargetFake) SetTargetMetadata(target mux.Target, meta mux.Metadata) error {
+	if f.setTargetMetadata == nil {
+		return nil
+	}
+	return f.setTargetMetadata(target, meta)
+}
+
+func (f *nativeTargetFake) AttachTarget(mux.Target) error { return nil }
+
+func (f *nativeTargetFake) AttachTargetHint(target mux.Target) string {
+	return "herdr agent attach " + target.Pane
+}
+
+func TestLauncherCreatesNativeWorktreeTarget(t *testing.T) {
+	root := t.TempDir()
+	source := filepath.Join(root, "source")
+	featureDir := filepath.Join(root, "features", "ORC-9-native")
+	for _, dir := range []string{source, featureDir} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	configYAML := `
+settings:
+  default_workflow: default
+repos:
+  - name: app
+    path: source
+workflows:
+  default:
+    stages:
+      - name: develop
+        worker: dev
+      - name: review
+        worker: reviewer
+`
+	if err := os.WriteFile(filepath.Join(root, "orc.yaml"), []byte(configYAML), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	s := &state.State{
+		Ticket: "ORC-9", Slug: "ORC-9-native", Workflow: "default",
+		Stage: state.Stage{Name: "develop"}, NextAction: state.NextAction{CWD: "."},
+	}
+	plan := &runner.Plan{
+		CWD: root, Prompt: "build this", LaunchArgv: []string{"codex", "--cd", root, "build this"},
+		Worker: &workers.Worker{ID: "dev", Name: "Dev", Engine: "codex", Model: "gpt-5"},
+	}
+
+	var created mux.WorktreeTargetSpec
+	var recorded worktreeLaunch
+	var sentDir, sentRunDir string
+	var sentArgv []string
+	target := mux.Target{Backend: "herdr", Workspace: "w9", Tab: "t1", Pane: "p1"}
+	fake := &nativeTargetFake{
+		Fake: &muxtest.Fake{
+			NameFunc: func() string { return "herdr" }, AvailableFunc: func() bool { return true },
+			SessionExistsFunc: func(string) bool { return false },
+		},
+		createTarget: func(name, dir string, tabs []string) (mux.Target, error) {
+			t.Fatal("generic target creation should not run")
+			return mux.Target{}, nil
+		},
+		createWorktreeTarget: func(spec mux.WorktreeTargetSpec) (mux.Target, error) {
+			created = spec
+			return target, nil
+		},
+		sendTarget: func(got mux.Target, tab, dir, runDir string, argv []string) (mux.Target, error) {
+			sentDir, sentRunDir, sentArgv = dir, runDir, append([]string(nil), argv...)
+			return got, nil
+		},
+	}
+	launcher := Launcher{
+		Mux: fake,
+		RecordWorktree: func(featureDir, root string, launch worktreeLaunch) error {
+			recorded = launch
+			return nil
+		},
+		SetMuxRuntime: func(string, state.MuxRuntime) error { return nil },
+		AppendHistory: func(string, string, string, string) error { return nil },
+		RunForeground: func(LaunchOptions) error {
+			t.Fatal("foreground should not run")
+			return nil
+		},
+	}
+
+	result, err := launcher.Launch(LaunchOptions{Root: root, FeatureDir: featureDir, State: s, Plan: plan})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantWorktree := filepath.Join(root, "worktrees", "app", "ORC-9-native")
+	if created.SourceDir != source || created.WorktreeDir != wantWorktree || created.Branch != "feature/orc-9-native" || !reflect.DeepEqual(created.Tabs, []string{"develop", "review"}) {
+		t.Fatalf("created spec = %#v", created)
+	}
+	if recorded.Spec.WorktreeDir != wantWorktree || sentDir != wantWorktree || sentRunDir != wantWorktree {
+		t.Fatalf("recorded/sent paths = %#v, %q, %q", recorded, sentDir, sentRunDir)
+	}
+	if joined := strings.Join(sentArgv, " "); !strings.Contains(joined, "--cd "+wantWorktree) || sentArgv[len(sentArgv)-1] != "build this" {
+		t.Fatalf("sent argv = %#v", sentArgv)
+	}
+	if s.Repos["app"].Worktree != filepath.Join("worktrees", "app", "ORC-9-native") || s.NextAction.CWD != filepath.Join("worktrees", "app", "ORC-9-native") {
+		t.Fatalf("state worktree = %#v, cwd = %q", s.Repos, s.NextAction.CWD)
+	}
+	if result.Session != "w9" || result.Pane != "p1" {
+		t.Fatalf("result = %#v", result)
+	}
+}
 
 func TestLauncherLaunchesInTmux(t *testing.T) {
 	s := &state.State{

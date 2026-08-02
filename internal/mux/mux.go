@@ -63,6 +63,19 @@ type Target struct {
 	Pane      string `json:"pane,omitempty"`
 }
 
+// WorktreeTargetSpec describes a backend-native workspace rooted in a Git
+// worktree. SourceDir is the existing checkout Herdr should derive from;
+// WorktreeDir is the checkout Orc will record and later remove through its
+// normal ownership-aware archive path.
+type WorktreeTargetSpec struct {
+	Name        string
+	Repository  string
+	SourceDir   string
+	WorktreeDir string
+	Branch      string
+	Tabs        []string
+}
+
 // AttentionRank orders attention states by how much they need a human, most
 // urgent first. An unrecognized or empty state ranks last.
 //
@@ -226,4 +239,13 @@ type TargetBackend interface {
 	SetTargetMetadata(target Target, meta Metadata) error
 	AttachTarget(target Target) error
 	AttachTargetHint(target Target) string
+}
+
+// WorktreeTargetBackend is an optional capability for multiplexers that can
+// create or reopen a workspace and Git worktree atomically. Backends without
+// it continue through CreateTarget unchanged.
+type WorktreeTargetBackend interface {
+	TargetBackend
+
+	CreateWorktreeTarget(spec WorktreeTargetSpec) (Target, error)
 }

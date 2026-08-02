@@ -8,6 +8,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Herdr launches can now create a ticket's Git worktree through
+  `herdr worktree create` or reopen its exact recorded checkout through
+  `herdr worktree open`. Orc records the repository, branch, and checkout in
+  `STATE.yaml` before launching the agent and starts the worker in that
+  worktree; repository-specific `worktree_setup` commands retain precedence.
 - Workspace-configurable transition notifications can run a short command after
   tickets block or complete a stage. Commands receive template placeholders and
   `ORC_*` environment variables; failures warn without rolling back durable

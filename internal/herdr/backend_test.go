@@ -2,12 +2,86 @@ package herdr
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/cengebretson/orc/internal/mux"
 )
+
+func TestCreateWorktreeTargetCreatesMissingCheckout(t *testing.T) {
+	root := t.TempDir()
+	source := filepath.Join(root, "source")
+	worktree := filepath.Join(root, "linked")
+	if err := os.MkdirAll(source, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	var calls []string
+	b := Backend{run: func(args ...string) ([]byte, error) {
+		call := strings.Join(args, " ")
+		calls = append(calls, call)
+		switch args[0] + " " + args[1] {
+		case "worktree create":
+			return response(`{"workspace":{"workspace_id":"w9","label":"ORC-9"},"tab":{"tab_id":"t1","workspace_id":"w9","label":"1"},"root_pane":{"pane_id":"p1","workspace_id":"w9","tab_id":"t1"}}`), nil
+		case "tab rename", "tab create":
+			return response(`{}`), nil
+		default:
+			return nil, errors.New("unexpected command: " + call)
+		}
+	}}
+
+	target, err := b.CreateWorktreeTarget(mux.WorktreeTargetSpec{
+		Name: "ORC-9", SourceDir: source, WorktreeDir: worktree,
+		Branch: "feature/orc-9", Tabs: []string{"develop", "review"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := (mux.Target{Backend: "herdr", Workspace: "w9", Tab: "t1", Pane: "p1"}); !reflect.DeepEqual(target, want) {
+		t.Fatalf("target = %#v, want %#v", target, want)
+	}
+	if !strings.Contains(calls[0], "worktree create --cwd "+source+" --branch feature/orc-9 --path "+worktree+" --label ORC-9 --no-focus --json") {
+		t.Fatalf("create call = %q", calls[0])
+	}
+	if calls[1] != "tab rename t1 develop" || !strings.Contains(calls[2], "tab create --workspace w9 --cwd "+worktree+" --label review") {
+		t.Fatalf("calls = %#v", calls)
+	}
+}
+
+func TestCreateWorktreeTargetOpensExistingCheckout(t *testing.T) {
+	root := t.TempDir()
+	source := filepath.Join(root, "source")
+	worktree := filepath.Join(root, "linked")
+	for _, dir := range []string{source, worktree} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	var call string
+	b := Backend{run: func(args ...string) ([]byte, error) {
+		call = strings.Join(args, " ")
+		return response(`{"workspace":{"workspace_id":"w10","label":"ORC-10"},"tab":{"tab_id":"t2","workspace_id":"w10","label":"develop"},"root_pane":{"pane_id":"p2","workspace_id":"w10","tab_id":"t2"}}`), nil
+	}}
+
+	target, err := b.CreateWorktreeTarget(mux.WorktreeTargetSpec{
+		Name: "ORC-10", SourceDir: source, WorktreeDir: worktree,
+		Branch: "feature/orc-10", Tabs: []string{"develop"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if target.Workspace != "w10" || target.Tab != "t2" || target.Pane != "p2" {
+		t.Fatalf("target = %#v", target)
+	}
+	want := "worktree open --cwd " + source + " --path " + worktree + " --label ORC-10 --no-focus --json"
+	if call != want {
+		t.Fatalf("call = %q, want %q", call, want)
+	}
+}
 
 func TestCreateTargetReturnsExactHerdrIDs(t *testing.T) {
 	var calls []string

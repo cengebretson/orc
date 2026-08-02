@@ -13,7 +13,11 @@ orc dashboard --mux herdr
 
 The first launch creates one Herdr workspace for the ticket and tabs for its
 workflow stages, starts a recognized Claude or Codex agent, and submits the
-stage prompt through Herdr's agent API. Orc stores the exact IDs Herdr returns:
+stage prompt through Herdr's agent API. When the target repository is
+unambiguous, Orc uses Herdr's native worktree surface: a missing checkout is
+created with `herdr worktree create`, while an existing recorded checkout is
+reopened with `herdr worktree open`. Orc stores the repository, branch,
+worktree path, and exact IDs Herdr returns before launching the worker:
 
 ```yaml
 runtime:
@@ -28,6 +32,13 @@ Later ticket-specific commands select the recorded backend automatically.
 Explicit `--mux` remains useful for workspace-wide inventory and dashboards.
 If Herdr or its server is unavailable, live inventory is empty and launch can
 use Orc's normal foreground fallback.
+
+For a new ticket, native creation is automatic when `orc.yaml` configures one
+repository. A multi-repo ticket must already select a recorded worktree through
+`next_action.cwd`, so Orc never guesses which checkout should own the Herdr
+workspace. A repository-specific `worktree_setup` command remains authoritative
+when its checkout is missing because it may perform setup beyond a raw Git
+worktree operation. Once that checkout exists, Herdr can reopen it natively.
 
 ## Lifecycle and exact attach
 

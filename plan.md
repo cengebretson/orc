@@ -106,12 +106,14 @@ Effort: Small.
 
 ### Add a native herdr multiplexer backend
 
-Status: First vertical slice implemented. Launch, exact identity, agent
-lifecycle inventory, attach/focus, dashboard/watch selection, archive cleanup,
-and sidebar metadata are wired through `--mux herdr`. The extension ideas after
-the vertical slice remain future work. A live disposable-workspace smoke test
-verified Codex launch, exact target persistence, lifecycle inventory, sidebar
-tokens, attach targeting, and owned archive cleanup.
+Status: First vertical slice and native worktree create/open implemented.
+Launch, exact identity, agent lifecycle inventory, attach/focus,
+dashboard/watch selection, archive cleanup, sidebar metadata, and
+worktree-backed workspace creation are wired through `--mux herdr`. The
+remaining extension ideas stay future work. Live disposable-workspace smoke
+tests verified Codex launch, exact target persistence, lifecycle inventory,
+sidebar tokens, attach targeting, owned archive cleanup, and Herdr's native
+worktree create/open response shapes.
 
 Herdr is a strong second implementation of `mux.Backend`: it owns the live
 terminal layer Orc deliberately does not, recognizes agent lifecycle directly,
@@ -225,9 +227,10 @@ is the right surface for arbitrary Bubble Tea UI.
 
 After the vertical slice is stable:
 
-- Use `herdr worktree create/open` to create or reopen ticket workspaces instead
-  of merely printing a worktree setup command. Never remove a worktree without
-  the same ownership and confirmation rules Orc applies today.
+- Implemented: use `herdr worktree create/open` to create or reopen
+  unambiguous ticket workspaces, persist the checkout before agent launch, and
+  preserve repository-owned `worktree_setup` commands. Removal continues
+  through Orc's existing ownership and archive safeguards.
 - Offer a task-cell layout: agent pane plus optional test and watch panes.
 - Send herdr notifications when background work blocks or completes.
 - Reuse herdr's blocking prompt/wait and stall detection underneath `orc ctl`

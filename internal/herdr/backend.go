@@ -25,6 +25,7 @@ func New() Backend { return Backend{run: runCLI} }
 
 var _ mux.Backend = Backend{}
 var _ mux.TargetBackend = Backend{}
+var _ mux.WorktreeTargetBackend = Backend{}
 
 func (Backend) Name() string { return "herdr" }
 
@@ -47,8 +48,32 @@ func (b Backend) CreateTarget(name, dir string, tabs []string) (mux.Target, erro
 	if err := b.decode(&created, args...); err != nil {
 		return mux.Target{}, err
 	}
+	return b.finishCreatedTarget(created, tabs, dir)
+}
+
+// CreateWorktreeTarget creates a new linked worktree or reopens the exact
+// checkout already recorded by Orc, then returns Herdr's opaque target IDs.
+func (b Backend) CreateWorktreeTarget(spec mux.WorktreeTargetSpec) (mux.Target, error) {
+	args := []string{"worktree"}
+	if _, err := os.Stat(spec.WorktreeDir); err == nil {
+		args = append(args, "open", "--cwd", spec.SourceDir, "--path", spec.WorktreeDir)
+	} else if !os.IsNotExist(err) {
+		return mux.Target{}, fmt.Errorf("inspect worktree %s: %w", spec.WorktreeDir, err)
+	} else {
+		args = append(args, "create", "--cwd", spec.SourceDir, "--branch", spec.Branch, "--path", spec.WorktreeDir)
+	}
+	args = append(args, "--label", spec.Name, "--no-focus", "--json")
+
+	var created createResult
+	if err := b.decode(&created, args...); err != nil {
+		return mux.Target{}, err
+	}
+	return b.finishCreatedTarget(created, spec.Tabs, spec.WorktreeDir)
+}
+
+func (b Backend) finishCreatedTarget(created createResult, tabs []string, dir string) (mux.Target, error) {
 	if created.Workspace.WorkspaceID == "" || created.Tab.TabID == "" || created.RootPane.PaneID == "" {
-		return mux.Target{}, fmt.Errorf("herdr workspace create returned incomplete target")
+		return mux.Target{}, fmt.Errorf("herdr workspace creation returned incomplete target")
 	}
 	if len(tabs) > 0 && tabs[0] != "" && created.Tab.Label != tabs[0] {
 		if _, err := b.command("tab", "rename", created.Tab.TabID, tabs[0]); err != nil {

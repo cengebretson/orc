@@ -12,6 +12,7 @@ import (
 	"github.com/cengebretson/orc/internal/runner"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/tmux"
+	"github.com/cengebretson/orc/internal/workers"
 )
 
 type LaunchMode string
@@ -61,6 +62,7 @@ type Launcher struct {
 	SetMuxRuntime    func(featureDir string, target state.MuxRuntime) error
 	SetRuntime       func(featureDir, tmuxSession string) error
 	SetRuntimeTarget func(featureDir, tmuxSession, pane string) error
+	RecordWorktree   func(featureDir, root string, launch worktreeLaunch) error
 	AppendHistory    func(featureDir, stage, workerID, result string) error
 	RunForeground    func(opts LaunchOptions) error
 }
@@ -71,6 +73,7 @@ func NewLauncher() Launcher {
 		SetMuxRuntime:    state.SetMuxRuntime,
 		SetRuntime:       state.SetRuntime,
 		SetRuntimeTarget: state.SetRuntimeTarget,
+		RecordWorktree:   recordWorktree,
 		AppendHistory:    state.AppendHistory,
 		RunForeground:    runForeground,
 	}
@@ -97,6 +100,9 @@ func (l Launcher) Launch(opts LaunchOptions) (*LaunchResult, error) {
 	}
 	if l.SetMuxRuntime == nil {
 		l.SetMuxRuntime = state.SetMuxRuntime
+	}
+	if l.RecordWorktree == nil {
+		l.RecordWorktree = recordWorktree
 	}
 	if l.AppendHistory == nil {
 		l.AppendHistory = state.AppendHistory
@@ -214,6 +220,10 @@ foreground:
 
 func (l Launcher) launchTarget(backend mux.TargetBackend, opts LaunchOptions, result *LaunchResult) (bool, error) {
 	logicalWindow := result.Window
+	tabs := stageNamesForTicket(opts.Root, opts.State)
+	worktree, hasWorktree := resolveWorktreeLaunch(opts, tabs)
+	worktreeReady := false
+	nativeWorktreeCreated := false
 	stored, hasStored := opts.State.Runtime.MuxTarget(result.Window)
 	if hasStored && stored.Backend != backend.Name() {
 		return false, fmt.Errorf("ticket runtime belongs to %s, not selected backend %s", stored.Backend, backend.Name())
@@ -234,8 +244,26 @@ func (l Launcher) launchTarget(backend mux.TargetBackend, opts LaunchOptions, re
 		// sessions. Other backends should make label lookup unambiguous.
 		ready = true
 	} else {
-		created, err := backend.CreateTarget(opts.State.Slug, opts.FeatureDir, stageNamesForTicket(opts.Root, opts.State))
+		var (
+			created mux.Target
+			err     error
+		)
+		if worktreeBackend, ok := backend.(mux.WorktreeTargetBackend); ok && hasWorktree {
+			created, err = worktreeBackend.CreateWorktreeTarget(worktree.Spec)
+			if err == nil {
+				nativeWorktreeCreated = true
+				if err = l.RecordWorktree(opts.FeatureDir, opts.Root, worktree); err == nil {
+					applyWorktreeState(opts.State, worktree)
+					worktreeReady = true
+				}
+			}
+		} else {
+			created, err = backend.CreateTarget(opts.State.Slug, opts.FeatureDir, tabs)
+		}
 		if err != nil {
+			if nativeWorktreeCreated {
+				return false, fmt.Errorf("record native worktree: %w", err)
+			}
 			result.addFallback(opts, fmt.Sprintf("%s workspace create failed (%v)", backend.Name(), err))
 			return false, nil
 		}
@@ -245,11 +273,28 @@ func (l Launcher) launchTarget(backend mux.TargetBackend, opts LaunchOptions, re
 	if !ready {
 		return false, nil
 	}
+	if hasWorktree && !worktreeReady {
+		if _, err := os.Stat(worktree.Spec.WorktreeDir); err == nil {
+			worktreeReady = true
+		}
+	}
 
 	if opts.OnTmuxSend != nil {
 		opts.OnTmuxSend(target.Workspace, result.Window)
 	}
-	sent, err := backend.SendTarget(target, result.Window, opts.FeatureDir, opts.Plan.CWD, opts.Plan.LaunchArgv)
+	launchDir := opts.FeatureDir
+	runDir := opts.Plan.CWD
+	launchArgv := opts.Plan.LaunchArgv
+	if worktreeReady {
+		launchDir = worktree.Spec.WorktreeDir
+		if !pathWithin(runDir, worktree.Spec.WorktreeDir) {
+			runDir = worktree.Spec.WorktreeDir
+		}
+		if opts.Plan.Worker != nil {
+			launchArgv = workers.LaunchArgs(opts.Plan.Worker, opts.Root, runDir, opts.Plan.Prompt)
+		}
+	}
+	sent, err := backend.SendTarget(target, result.Window, launchDir, runDir, launchArgv)
 	if err != nil {
 		result.addFallback(opts, fmt.Sprintf("%s send failed (%v)", backend.Name(), err))
 		return false, nil
