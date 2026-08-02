@@ -225,7 +225,8 @@ should display that as blocked/human-needed without requiring any tmux marker.
 
 - `STATE.yaml`: ticket, slug, workflow, stage, worker, status, next action.
 - tmux: session/window exists or stopped.
-- `tmux-attention`: optional current window marker from `@agent_attention`.
+- `tmux-attention`: optional live marker from `@agent_attention`, read per pane
+  and rolled up per window.
 - Provider telemetry: optional context usage and limit, correlated to the exact
   managed pane without changing durable state.
 
@@ -276,16 +277,28 @@ workflow state, stage advancement, or session lifecycle.
 `tmux-attention` can provide a low-level tmux notification primitive:
 
 - CLI states: `input`, `blocked`, `review`, `done`, `clear`.
-- tmux window option: `@agent_attention`.
+- tmux options: `@agent_attention`, and optionally `@agent_attention_since`
+  (epoch seconds) for how long that state has been held.
 - status rendering through `@tmux_attention_status`.
 - Claude/Codex hooks that call the CLI.
 - clear-on-view behavior through tmux hooks.
 
-`orc watch` consumes this state when available:
+`orc watch` reads the marker from each pane in the window:
 
 ```sh
-tmux show-options -w -t <session>:<window> -v @agent_attention
+tmux list-panes -t <session>:<window> -F '#{@agent_attention}	#{@agent_attention_since}'
 ```
+
+Reporters should prefer setting it on the pane they run in:
+
+```sh
+tmux set-option -p -t "$TMUX_PANE" @agent_attention blocked \; \
+     set-option -p -t "$TMUX_PANE" @agent_attention_since "$(date +%s)"
+```
+
+Setting it on the window still works — tmux resolves `@` options through
+pane → window → session, so a pane with no value of its own reports the
+window's.
 
 `orc` may optionally emit it from workflow transitions, but `STATE.yaml` remains
 authoritative:
@@ -304,9 +317,24 @@ When `STATE.yaml` says `paused`, watch should show `blocked` even if
 `@agent_attention` is empty or stale. When `STATE.yaml` says `active`,
 `@agent_attention=input|blocked|review|done` can refine the live display.
 
-Important constraint: `tmux-attention` is currently window-scoped. This fits
-`orc` because workflow stages map to tmux windows. If multiple agent panes share
-one tmux window, the most recent marker wins for that window.
+### Windows with more than one agent
+
+A window can host more than one agent — an `orc jit --tmux` task sent into a
+stage's existing session, or a split you made yourself — and each reports
+independently. `orc` reads every pane in the window and rolls them up:
+
+- **The most urgent state wins**, ordered `blocked` → `input` → `review` →
+  `done`. Blocked work has stopped and cannot continue; `input` is stopped but
+  answerable; `review` is finished work awaiting a decision; `done` needs
+  nothing. A blocked agent is therefore never hidden behind a finished one.
+- **Ties take the earliest `@agent_attention_since`**, so the elapsed time
+  tracks whichever agent has been waiting longest rather than whichever most
+  recently changed. A pane that reports a state without a time is treated as
+  unknown, not as the epoch.
+- **Unrecognized values are no signal.** Only the four states above are
+  displayed; anything else reads as no marker at all.
+
+A single-pane window behaves exactly as it always has.
 
 ## Tmux metadata
 
