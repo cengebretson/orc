@@ -1,5 +1,6 @@
-// Package sessionlist joins Orc's durable feature state with optional tmux and
-// provider telemetry. Durable state always wins when the sources disagree.
+// Package sessionlist joins Orc's durable feature state with optional
+// multiplexer and provider telemetry. Durable state always wins when the
+// sources disagree.
 package sessionlist
 
 import (
@@ -10,6 +11,7 @@ import (
 
 	"github.com/cengebretson/orc/internal/featurelist"
 	"github.com/cengebretson/orc/internal/gitmeta"
+	"github.com/cengebretson/orc/internal/mux"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/telemetry"
 	"github.com/cengebretson/orc/internal/tmux"
@@ -52,12 +54,14 @@ type Options struct {
 	IncludeUnmanaged bool
 	Home             string
 	Features         []*featurelist.Feature
-	Panes            []tmux.Pane
+	Panes            []mux.Pane
 	Telemetry        []telemetry.Live
 	LoadFeatures     func(string, featurelist.Options) ([]*featurelist.Feature, error)
-	ListPanes        func() ([]tmux.Pane, error)
-	Discover         func(string) ([]telemetry.Live, error)
-	ResolveGit       func(string) (gitmeta.Metadata, bool)
+	// Mux supplies the live pane inventory. Defaults to tmux when unset; tests
+	// usually bypass it entirely by passing Panes directly.
+	Mux        mux.Backend
+	Discover   func(string) ([]telemetry.Live, error)
+	ResolveGit func(string) (gitmeta.Metadata, bool)
 }
 
 // ManagedTelemetry returns optional live provider metadata keyed by feature
@@ -99,12 +103,12 @@ func Collect(root string, opts Options) ([]Session, error) {
 	}
 	panes := opts.Panes
 	if panes == nil {
-		list := opts.ListPanes
-		if list == nil {
-			list = tmux.ListPanesDetailed
+		backend := opts.Mux
+		if backend == nil {
+			backend = tmux.New()
 		}
 		var err error
-		panes, err = list()
+		panes, err = backend.ListPanes()
 		if err != nil {
 			return nil, err
 		}
@@ -278,7 +282,7 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-func matchFeaturePane(feature *featurelist.Feature, panes []tmux.Pane, used map[string]bool) *tmux.Pane {
+func matchFeaturePane(feature *featurelist.Feature, panes []mux.Pane, used map[string]bool) *mux.Pane {
 	s := feature.State
 	if s.Runtime.Tmux != nil && s.Runtime.Tmux.Pane != "" {
 		for i := range panes {
@@ -305,7 +309,7 @@ func matchFeaturePane(feature *featurelist.Feature, panes []tmux.Pane, used map[
 	return nil
 }
 
-func matchTelemetry(engine, cwd string, pane *tmux.Pane, sessions []telemetry.Live, used map[int]bool) (telemetry.Live, []int, bool) {
+func matchTelemetry(engine, cwd string, pane *mux.Pane, sessions []telemetry.Live, used map[int]bool) (telemetry.Live, []int, bool) {
 	providerEngine := engine
 	providerID := ""
 	panePID := 0

@@ -6,9 +6,9 @@ import (
 
 	"github.com/cengebretson/orc/internal/featurelist"
 	"github.com/cengebretson/orc/internal/gitmeta"
+	"github.com/cengebretson/orc/internal/mux"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/telemetry"
-	"github.com/cengebretson/orc/internal/tmux"
 )
 
 func TestCollectClassifiesManagedOrphanedAndUnmanaged(t *testing.T) {
@@ -19,7 +19,7 @@ func TestCollectClassifiesManagedOrphanedAndUnmanaged(t *testing.T) {
 		},
 		FeatureDir: "/work/orc-1", WorkerID: "default:dev", Engine: "codex",
 	}}
-	panes := []tmux.Pane{
+	panes := []mux.Pane{
 		{ID: "%1", Session: "orc-1", Window: "develop", CWD: "/work/orc-1", Agent: true, Ticket: "ORC-1"},
 		{ID: "%2", Session: "old", Window: "review", CWD: "/work/old", Agent: true, Ticket: "ORC-OLD", Engine: "claude"},
 	}
@@ -81,7 +81,7 @@ func TestCollectUsesDurableManagedRepositoriesWithoutGit(t *testing.T) {
 	}
 	gitCalls := 0
 	got, err := Collect("/work", Options{
-		Features: []*featurelist.Feature{feature}, Panes: []tmux.Pane{}, Telemetry: []telemetry.Live{},
+		Features: []*featurelist.Feature{feature}, Panes: []mux.Pane{}, Telemetry: []telemetry.Live{},
 		ResolveGit: func(string) (gitmeta.Metadata, bool) {
 			gitCalls++
 			return gitmeta.Metadata{}, false
@@ -105,7 +105,7 @@ func TestCollectUsesDurableManagedRepositoriesWithoutGit(t *testing.T) {
 }
 
 func TestCollectResolvesGitOnlyForOrphanedAndUnmanagedSessions(t *testing.T) {
-	panes := []tmux.Pane{{ID: "%1", Session: "old", Window: "review", CWD: "/work/orc", Agent: true, Ticket: "ORC-OLD"}}
+	panes := []mux.Pane{{ID: "%1", Session: "old", Window: "review", CWD: "/work/orc", Agent: true, Ticket: "ORC-OLD"}}
 	live := []telemetry.Live{
 		{Engine: "codex", ProviderSessionID: "orphan", CWD: "/work/orc"},
 		{Engine: "claude", ProviderSessionID: "personal", CWD: "/work/personal"},
@@ -138,7 +138,7 @@ func TestCollectResolvesGitOnlyForOrphanedAndUnmanagedSessions(t *testing.T) {
 func TestCollectOmitsUnmanagedByDefault(t *testing.T) {
 	got, err := Collect("/work", Options{
 		Features:  []*featurelist.Feature{},
-		Panes:     []tmux.Pane{},
+		Panes:     []mux.Pane{},
 		Telemetry: []telemetry.Live{{Engine: "codex", ProviderSessionID: "personal"}},
 	})
 	if err != nil {
@@ -157,7 +157,7 @@ func TestCollectPrefersDurableTmuxTargetOverStaleMetadata(t *testing.T) {
 		},
 		FeatureDir: "/work/current",
 	}
-	panes := []tmux.Pane{
+	panes := []mux.Pane{
 		{ID: "%1", Session: "stale", Window: "develop", Agent: true, Ticket: "ORC-1"},
 		{ID: "%2", Session: "current", Window: "develop", Agent: true},
 	}
@@ -176,7 +176,7 @@ func TestCollectPrefersExactProviderIDOverNewerCWDMatch(t *testing.T) {
 		FeatureDir: "/work/shared", Engine: "codex",
 	}
 	now := time.Now()
-	panes := []tmux.Pane{{ID: "%1", Session: "orc-1", Window: "develop", CWD: "/work/shared", Agent: true, ProviderEngine: "codex", ProviderSessionID: "exact"}}
+	panes := []mux.Pane{{ID: "%1", Session: "orc-1", Window: "develop", CWD: "/work/shared", Agent: true, ProviderEngine: "codex", ProviderSessionID: "exact"}}
 	live := []telemetry.Live{
 		{Engine: "codex", ProviderSessionID: "wrong-newer", CWD: "/work/shared", Model: "wrong", LastActive: now},
 		{Engine: "codex", ProviderSessionID: "exact", CWD: "/work/shared", Model: "right", LastActive: now.Add(-time.Minute)},
@@ -200,7 +200,7 @@ func TestCollectMergesExactResumeIdentityWithLivePanePID(t *testing.T) {
 		FeatureDir: "/work/shared", Engine: "claude",
 	}
 	now := time.Now()
-	panes := []tmux.Pane{{ID: "%1", Session: "orc-1", Window: "develop", CWD: "/work/shared", PID: 4242, Agent: true, ProviderEngine: "claude", ProviderSessionID: "original"}}
+	panes := []mux.Pane{{ID: "%1", Session: "orc-1", Window: "develop", CWD: "/work/shared", PID: 4242, Agent: true, ProviderEngine: "claude", ProviderSessionID: "original"}}
 	live := []telemetry.Live{
 		{Engine: "claude", ProviderSessionID: "current", CWD: "/work/shared", PID: 4242, State: "active", LastActive: now},
 		{Engine: "claude", ProviderSessionID: "original", CWD: "/work/shared", Model: "opus", ContextUsed: 1200, State: "idle", LastActive: now.Add(-time.Minute)},
@@ -224,7 +224,7 @@ func TestCollectDoesNotFallbackToCWDWhenExplicitProviderIDIsMissing(t *testing.T
 		State:      &state.State{Ticket: "ORC-1", Stage: state.Stage{Name: "develop"}, Runtime: state.Runtime{Tmux: &state.TmuxRuntime{Session: "orc-1", Pane: "%1"}}},
 		FeatureDir: "/work/shared", Engine: "codex",
 	}
-	panes := []tmux.Pane{{ID: "%1", Session: "orc-1", Window: "develop", CWD: "/work/shared", Agent: true, ProviderEngine: "codex", ProviderSessionID: "missing"}}
+	panes := []mux.Pane{{ID: "%1", Session: "orc-1", Window: "develop", CWD: "/work/shared", Agent: true, ProviderEngine: "codex", ProviderSessionID: "missing"}}
 	live := []telemetry.Live{{Engine: "codex", ProviderSessionID: "wrong", CWD: "/work/shared"}}
 
 	got, err := Collect("/work", Options{IncludeUnmanaged: true, Features: []*featurelist.Feature{feature}, Panes: panes, Telemetry: live})
@@ -237,7 +237,7 @@ func TestCollectDoesNotFallbackToCWDWhenExplicitProviderIDIsMissing(t *testing.T
 }
 
 func TestCollectDoesNotGuessTelemetryWhenPaneCWDIsEmpty(t *testing.T) {
-	panes := []tmux.Pane{{ID: "%1", Session: "orphan", Window: "shell", Agent: true, ProviderEngine: "codex"}}
+	panes := []mux.Pane{{ID: "%1", Session: "orphan", Window: "shell", Agent: true, ProviderEngine: "codex"}}
 	live := []telemetry.Live{{Engine: "codex", ProviderSessionID: "unrelated", CWD: "/work/elsewhere", LastActive: time.Now()}}
 
 	got, err := Collect("/work", Options{IncludeUnmanaged: true, Features: []*featurelist.Feature{}, Panes: panes, Telemetry: live})
@@ -255,7 +255,7 @@ func TestCollectPrefersExactPanePIDWithoutProviderMarker(t *testing.T) {
 		FeatureDir: "/work/shared", Engine: "claude",
 	}
 	now := time.Now()
-	panes := []tmux.Pane{{ID: "%1", Session: "orc-1", Window: "develop", CWD: "/work/shared", PID: 4242, Agent: true, ProviderEngine: "claude"}}
+	panes := []mux.Pane{{ID: "%1", Session: "orc-1", Window: "develop", CWD: "/work/shared", PID: 4242, Agent: true, ProviderEngine: "claude"}}
 	live := []telemetry.Live{
 		{Engine: "claude", ProviderSessionID: "wrong-newer", CWD: "/work/shared", PID: 9999, LastActive: now},
 		{Engine: "claude", ProviderSessionID: "exact-pid", CWD: "/work/shared", PID: 4242, LastActive: now.Add(-time.Minute)},
@@ -275,7 +275,7 @@ func TestCollectOmitsAmbiguousExplicitProviderIdentity(t *testing.T) {
 		State:      &state.State{Ticket: "ORC-1", Stage: state.Stage{Name: "develop"}, Runtime: state.Runtime{Tmux: &state.TmuxRuntime{Session: "orc-1", Pane: "%1"}}},
 		FeatureDir: "/work/shared", Engine: "codex",
 	}
-	panes := []tmux.Pane{{ID: "%1", Session: "orc-1", Window: "develop", CWD: "/work/shared", Agent: true, ProviderEngine: "codex", ProviderSessionID: "duplicate"}}
+	panes := []mux.Pane{{ID: "%1", Session: "orc-1", Window: "develop", CWD: "/work/shared", Agent: true, ProviderEngine: "codex", ProviderSessionID: "duplicate"}}
 	live := []telemetry.Live{
 		{Engine: "codex", ProviderSessionID: "duplicate", CWD: "/work/shared"},
 		{Engine: "codex", ProviderSessionID: "duplicate", CWD: "/work/shared"},
