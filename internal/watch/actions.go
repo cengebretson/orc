@@ -65,11 +65,11 @@ func Focus(root string) error {
 		if !attentionNeeded(r) || r.tmuxState != "live" || r.session == "" || r.window == "" {
 			continue
 		}
-		return tmux.AttachTarget(r.session, r.window, r.pane)
+		return tmux.New().AttachPane(r.session, r.window, r.pane)
 	}
 	return fmt.Errorf("no live session needs attention")
 }
 
 var newAttachCmd = func(session, window, pane string) (*exec.Cmd, error) {
-	return tmux.AttachCommandTarget(session, window, pane)
+	return tmux.New().AttachCommand(session, window, pane)
 }

@@ -3,7 +3,7 @@ package workspaceui
 import (
 	"strings"
 
-	"github.com/cengebretson/orc/internal/tmux"
+	"github.com/cengebretson/orc/internal/mux"
 	"github.com/cengebretson/orc/internal/ui"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -161,13 +161,13 @@ func featureDisplayState(row *featureRow) (string, string) {
 			return "×", "stopped"
 		}
 		switch row.attention {
-		case tmux.AttentionInput:
+		case mux.AttentionInput:
 			return "!", "input"
-		case tmux.AttentionBlocked:
+		case mux.AttentionBlocked:
 			return "!", "blocked"
-		case tmux.AttentionReview:
+		case mux.AttentionReview:
 			return "◆", "review"
-		case tmux.AttentionDone:
+		case mux.AttentionDone:
 			return "✓", "done"
 		}
 		return "●", "active"

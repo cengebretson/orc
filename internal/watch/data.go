@@ -9,8 +9,8 @@ import (
 	"github.com/cengebretson/orc/internal/config"
 	"github.com/cengebretson/orc/internal/contextpressure"
 	"github.com/cengebretson/orc/internal/featurelist"
+	"github.com/cengebretson/orc/internal/mux"
 	"github.com/cengebretson/orc/internal/state"
-	"github.com/cengebretson/orc/internal/tmux"
 	"github.com/cengebretson/orc/internal/workspacesnapshot"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -261,13 +261,13 @@ func displayState(r row) (string, string) {
 			return "x", "stopped"
 		}
 		switch r.attention {
-		case tmux.AttentionInput:
+		case mux.AttentionInput:
 			return "!", "input"
-		case tmux.AttentionBlocked:
+		case mux.AttentionBlocked:
 			return "!", "blocked"
-		case tmux.AttentionReview:
+		case mux.AttentionReview:
 			return "◆", "review"
-		case tmux.AttentionDone:
+		case mux.AttentionDone:
 			return "✓", "done"
 		}
 		return "●", "active"
