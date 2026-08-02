@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/cengebretson/orc/internal/mux"
 )
 
 func TestLiveTmuxWindowMetadataAttentionAndExactSend(t *testing.T) {
@@ -32,7 +34,7 @@ func TestLiveTmuxWindowMetadataAttentionAndExactSend(t *testing.T) {
 		t.Fatalf("CreateSession: %v", err)
 	}
 
-	metadata := WindowMetadata{
+	metadata := mux.Metadata{
 		Ticket:            "ORC-123",
 		Stage:             "review",
 		Worker:            "default:ada",
@@ -84,18 +86,18 @@ func TestLiveTmuxWindowMetadataAttentionAndExactSend(t *testing.T) {
 			t.Fatalf("WindowOption(%s) = %q, want %q", option, got, want)
 		}
 	}
-	if err := SetSessionEnvironment(session, EnvResumedFrom, metadata.ProviderSessionID); err != nil {
+	if err := SetSessionEnvironment(session, mux.EnvResumedFrom, metadata.ProviderSessionID); err != nil {
 		t.Fatalf("SetSessionEnvironment: %v", err)
 	}
-	if got, err := SessionEnvironment(session, EnvResumedFrom); err != nil || got != metadata.ProviderSessionID {
+	if got, err := SessionEnvironment(session, mux.EnvResumedFrom); err != nil || got != metadata.ProviderSessionID {
 		t.Fatalf("SessionEnvironment = %q, %v; want %q", got, err, metadata.ProviderSessionID)
 	}
 
-	if err := exec.Command("tmux", "set-option", "-w", "-t", session+":review", "@agent_attention", AttentionInput).Run(); err != nil {
+	if err := exec.Command("tmux", "set-option", "-w", "-t", session+":review", "@agent_attention", mux.AttentionInput).Run(); err != nil {
 		t.Fatalf("set attention: %v", err)
 	}
-	if got := WindowAttention(session, "review"); got != AttentionInput {
-		t.Fatalf("WindowAttention = %q, want %q", got, AttentionInput)
+	if got := WindowAttention(session, "review"); got != mux.AttentionInput {
+		t.Fatalf("WindowAttention = %q, want %q", got, mux.AttentionInput)
 	}
 
 	// Split the agent window and activate a different pane. Exact pane identity

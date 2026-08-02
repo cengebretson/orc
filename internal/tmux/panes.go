@@ -8,16 +8,9 @@ import (
 	"github.com/cengebretson/orc/internal/mux"
 )
 
-// Pane describes the process and Orc metadata attached to a tmux pane.
-//
-// It is an alias for mux.Pane. The fields describe a terminal pane and the
-// identity Orc stamped on it, neither of which is tmux-specific; only the
-// user-option storage below is.
-type Pane = mux.Pane
-
 // ListPanesDetailed returns all tmux panes with the small metadata surface Orc
 // owns. A missing tmux server is the empty inventory, not an error.
-func ListPanesDetailed() ([]Pane, error) {
+func ListPanesDetailed() ([]mux.Pane, error) {
 	if !Available() {
 		return nil, nil
 	}
@@ -40,8 +33,8 @@ func ListPanesDetailed() ([]Pane, error) {
 	return parseDetailedPanes(out), nil
 }
 
-func parseDetailedPanes(out []byte) []Pane {
-	var panes []Pane
+func parseDetailedPanes(out []byte) []mux.Pane {
+	var panes []mux.Pane
 	// Remove record terminators only. TrimSpace would also remove the final tab
 	// when @agent_attention is empty and make an otherwise valid pane look short.
 	text := strings.TrimRight(string(out), "\r\n")
@@ -55,7 +48,7 @@ func parseDetailedPanes(out []byte) []Pane {
 			continue
 		}
 		pid, _ := strconv.Atoi(fields[5])
-		panes = append(panes, Pane{
+		panes = append(panes, mux.Pane{
 			ID: fields[0], Session: fields[1], Window: fields[2],
 			CWD: fields[3], Command: fields[4], PID: pid, Agent: fields[6] == "1",
 			Ticket: fields[7], Stage: fields[8], Worker: fields[9], Engine: fields[10],

@@ -2,28 +2,12 @@ package tmux
 
 import (
 	"fmt"
-
-	"github.com/cengebretson/orc/internal/mux"
 )
 
-// The attention vocabulary and the resume variable are backend-neutral and now
-// live in internal/mux. They stay re-exported here so tmux-specific callers
-// read naturally without importing both packages.
-const (
-	AttentionInput   = mux.AttentionInput
-	AttentionBlocked = mux.AttentionBlocked
-	AttentionReview  = mux.AttentionReview
-	AttentionDone    = mux.AttentionDone
-	EnvResumedFrom   = mux.EnvResumedFrom
-)
-
-// WindowMetadata identifies the Orc work running in a tmux window. STATE.yaml
-// remains authoritative; these options provide a live reverse lookup from tmux.
-//
-// It is an alias for mux.Metadata: tmux stores it as window and pane user
-// options, but the shape is not tmux-specific and callers pass it across the
-// mux.Backend boundary.
-type WindowMetadata = mux.Metadata
+// The attention vocabulary, the resume variable, and the pane and metadata
+// shapes all live in internal/mux. They are not re-exported here: while they
+// were, a new call site could reach them through this package and stay coupled
+// to tmux without meaning to.
 
 // Available returns true if tmux is installed and in PATH.
 func Available() bool {

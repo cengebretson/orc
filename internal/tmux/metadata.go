@@ -3,11 +3,13 @@ package tmux
 import (
 	"fmt"
 	"strings"
+
+	"github.com/cengebretson/orc/internal/mux"
 )
 
 // SetWindowMetadata stamps Orc identity onto a tmux window using user options.
 // Empty values are omitted so partial metadata can still be recorded safely.
-func SetWindowMetadata(session, window string, metadata WindowMetadata) error {
+func SetWindowMetadata(session, window string, metadata mux.Metadata) error {
 	target := session + ":" + window
 	options := []struct {
 		name  string
@@ -38,7 +40,7 @@ func SetWindowMetadata(session, window string, metadata WindowMetadata) error {
 }
 
 // SetPaneMetadata stamps the exact agent pane used by Orc.
-func SetPaneMetadata(pane string, metadata WindowMetadata) error {
+func SetPaneMetadata(pane string, metadata mux.Metadata) error {
 	options := []struct {
 		name  string
 		value string
@@ -132,7 +134,7 @@ func WindowAttention(session, window string) string {
 		return ""
 	}
 	switch strings.ToLower(value) {
-	case AttentionInput, AttentionBlocked, AttentionReview, AttentionDone:
+	case mux.AttentionInput, mux.AttentionBlocked, mux.AttentionReview, mux.AttentionDone:
 		return strings.ToLower(value)
 	default:
 		return ""

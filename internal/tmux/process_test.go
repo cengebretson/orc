@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/cengebretson/orc/internal/mux"
 )
 
 type commandCall struct {
@@ -124,7 +126,7 @@ func TestValidatePaneTargetAndFallback(t *testing.T) {
 
 func TestMetadataUsesCommandBoundary(t *testing.T) {
 	calls := stubCommands(t)
-	err := SetWindowMetadata("orc", "build", WindowMetadata{
+	err := SetWindowMetadata("orc", "build", mux.Metadata{
 		Ticket:            "ENG-42",
 		Stage:             "build",
 		Worker:            "codex",
