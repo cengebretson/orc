@@ -131,9 +131,12 @@ stall detection to Herdr while continuing to use Orc's exact recorded pane
 identity:
 
 ```bash
+orc ctl status
 orc ctl agent state --ticket ORC-9
+orc ctl agent watch --ticket ORC-9
 orc ctl agent prompt --ticket ORC-9 "Review this diff" --wait --timeout 120s
 orc ctl agent wait --ticket ORC-9 --until blocked --timeout 120s
+orc ctl session capture --ticket ORC-9 --lines 80
 ```
 
 Results are JSON on stdout and failures are JSON on stderr. `agent state` is a
@@ -142,6 +145,13 @@ submitted from a non-working state that produces no observed lifecycle change
 preserves Herdr's `agent_prompt_stalled` error code. Waits observe lifecycle
 state rather than pretending to track an individual agent turn; if the agent is
 already working, the active turn settling may satisfy the wait.
+
+`agent watch` emits one compact JSON object per lifecycle transition until it
+is interrupted; without `--ticket` it watches every controllable recorded
+agent. It currently polls Herdr's recognized state, leaving a native event
+stream as a later optimization. `session capture` reads only the exact recorded
+pane and never changes focus. Capture is for terminal text a caller explicitly
+needs; Orc never infers lifecycle or completion from it.
 
 Accepted `--until` values are `idle`, `working`, `blocked`, `done`, and
 `unknown`. Repeat the flag to accept multiple states. Omitting it uses Herdr's

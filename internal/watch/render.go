@@ -31,14 +31,30 @@ func (m Model) renderRail() string {
 	}
 
 	if len(m.rows) == 0 {
-		b.WriteString(mutedStyle.Render("No active work"))
+		if m.parkedCount() == 0 {
+			b.WriteString(mutedStyle.Render("No active work"))
+		}
 	} else {
 		for i, r := range m.rows {
+			if r.parked && (i == 0 || !m.rows[i-1].parked) {
+				b.WriteString(mutedStyle.Render(fmt.Sprintf("  ▾ Parked (%d) · p to toggle", m.parkedCount())))
+				b.WriteString("\n")
+			}
 			b.WriteString(renderRailRow(r, i == m.cursor, inner, m.renderNow(), m.uiFrame))
 			if i != len(m.rows)-1 {
 				b.WriteString("\n")
 			}
 		}
+	}
+	if count := m.parkedCount(); count > 0 && !m.parkedExpanded {
+		if len(m.rows) > 0 {
+			b.WriteString("\n")
+		}
+		marker := "▸"
+		if m.parkedExpanded {
+			marker = "▾"
+		}
+		b.WriteString(mutedStyle.Render(fmt.Sprintf("  %s Parked (%d) · p to toggle", marker, count)))
 	}
 
 	b.WriteString("\n\n")
@@ -59,6 +75,9 @@ func (m Model) renderRail() string {
 func renderRailRow(r row, selected bool, width int, now time.Time, frame int) string {
 	icon, label := displayState(r)
 	icon = animatedStateIcon(r, icon, label, now, frame)
+	if r.woken {
+		icon, label = "↟", "woken"
+	}
 	style := selectedRowStyle
 	if now.Before(r.celebrateUntil) || r.demoCelebration {
 		style = doneFlashStyle
@@ -110,8 +129,15 @@ func (m Model) renderWorkListWide(b *strings.Builder, width int) {
 		terminalui.Cell("Tmux", tmuxW)))
 	b.WriteString("\n")
 	for i, r := range m.rows {
+		if r.parked && (i == 0 || !m.rows[i-1].parked) {
+			b.WriteString(mutedStyle.Render(fmt.Sprintf("  ▾ Parked (%d) · p to toggle", m.parkedCount())))
+			b.WriteString("\n")
+		}
 		icon, label := displayState(r)
 		icon = animatedStateIcon(r, icon, label, m.renderNow(), m.uiFrame)
+		if r.woken {
+			icon, label = "↟", "woken"
+		}
 		stateText := icon + " " + label
 		prefix := "  "
 		if i == m.cursor {
@@ -139,6 +165,14 @@ func (m Model) renderWorkListWide(b *strings.Builder, width int) {
 			b.WriteString(stateStyle(label).Render("  "))
 			b.WriteString(padStyledRight(stateStyle(label).Render(tmuxText), tmuxW))
 		}
+		b.WriteString("\n")
+	}
+	if count := m.parkedCount(); count > 0 && !m.parkedExpanded {
+		marker := "▸"
+		if m.parkedExpanded {
+			marker = "▾"
+		}
+		b.WriteString(mutedStyle.Render(fmt.Sprintf("  %s Parked (%d) · p to toggle", marker, count)))
 		b.WriteString("\n")
 	}
 }

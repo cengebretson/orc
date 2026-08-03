@@ -340,3 +340,12 @@ type AgentControlBackend interface {
 	PromptAgent(target Target, text string, wait bool, options AgentControlOptions) (AgentControlResult, error)
 	WaitAgent(target Target, options AgentControlOptions) (AgentControlResult, error)
 }
+
+// TerminalCaptureBackend is an optional capability for reading terminal text
+// from an exact recorded target. Captured text is diagnostic content only; it
+// must never be interpreted as agent lifecycle state.
+type TerminalCaptureBackend interface {
+	Backend
+
+	CaptureTarget(target Target, lines int) (string, error)
+}

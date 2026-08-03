@@ -10,6 +10,7 @@ import (
 	"github.com/cengebretson/orc/internal/contextpressure"
 	"github.com/cengebretson/orc/internal/featurelist"
 	"github.com/cengebretson/orc/internal/mux"
+	"github.com/cengebretson/orc/internal/parking"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/workspacesnapshot"
 	tea "github.com/charmbracelet/bubbletea"
@@ -53,12 +54,35 @@ func collectRowsWithMux(root, ticket string, backend mux.Backend) ([]row, error)
 		}
 		rows = append(rows, r)
 	}
+	if settings := snapshot.Config.Settings.Parking; settings != nil && len(settings.AutoPark) > 0 {
+		path, pathErr := parking.PolicyPath(root, "")
+		if pathErr != nil {
+			return nil, pathErr
+		}
+		observations := make([]parking.Observation, 0, len(rows))
+		for _, r := range rows {
+			observations = append(observations, parking.Observation{Ticket: r.ticket, Status: r.status, Stage: r.stageName, Attention: r.attention})
+		}
+		decisions, policyErr := parking.ApplyPolicy(path, root, parking.Policy{AutoPark: settings.AutoPark, WakeOn: settings.WakeOn}, observations, time.Now().UTC())
+		if policyErr != nil {
+			return nil, policyErr
+		}
+		for i := range rows {
+			decision := decisions[rows[i].ticket]
+			rows[i].parked = decision.Parked
+			rows[i].woken = decision.Woken
+			rows[i].wakeReason = decision.WakeReason
+		}
+	}
 	sortRows(rows)
 	return rows, nil
 }
 
 func sortRows(rows []row) {
 	sort.SliceStable(rows, func(i, j int) bool {
+		if rows[i].parked != rows[j].parked {
+			return !rows[i].parked
+		}
 		left, right := rowPriority(rows[i]), rowPriority(rows[j])
 		if left != right {
 			return left < right

@@ -116,6 +116,36 @@ func TestStateAgentUsesExactPaneAndReturnsLifecycle(t *testing.T) {
 	}
 }
 
+func TestCaptureTargetUsesExactPane(t *testing.T) {
+	var calls []string
+	b := Backend{run: func(args ...string) ([]byte, error) {
+		call := strings.Join(args, " ")
+		calls = append(calls, call)
+		switch call {
+		case "workspace get w9":
+			return response(`{"workspace":{"workspace_id":"w9"}}`), nil
+		case "tab get w9:t1":
+			return response(`{"tab":{"tab_id":"w9:t1","workspace_id":"w9"}}`), nil
+		case "pane get w9:p1":
+			return response(`{"pane":{"pane_id":"w9:p1","workspace_id":"w9","tab_id":"w9:t1"}}`), nil
+		case "agent read w9:p1 --source recent-unwrapped --lines 25":
+			return []byte("one\ntwo\n"), nil
+		default:
+			return nil, errors.New("unexpected command: " + call)
+		}
+	}}
+
+	got, err := b.CaptureTarget(mux.Target{
+		Backend: "herdr", Workspace: "w9", Tab: "w9:t1", Pane: "w9:p1",
+	}, 25)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "one\ntwo\n" || len(calls) != 4 {
+		t.Fatalf("capture=%q calls=%#v", got, calls)
+	}
+}
+
 func TestPromptAgentUsesExactPaneAndHerdrWaitSemantics(t *testing.T) {
 	var calls []string
 	b := Backend{run: func(args ...string) ([]byte, error) {

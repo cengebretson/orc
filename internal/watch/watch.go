@@ -66,6 +66,9 @@ type row struct {
 	pane            string
 	tmuxState       string
 	attention       string
+	parked          bool
+	woken           bool
+	wakeReason      string
 	context         contextpressure.Pressure
 	room            string
 	branch          string
@@ -104,17 +107,18 @@ type Model struct {
 	now      time.Time
 	mux      mux.Backend
 
-	allRows    []row
-	rows       []row
-	cursor     int
-	width      int
-	height     int
-	lastLoad   time.Time
-	loadErr    error
-	message    string
-	petFrame   int
-	petTicking bool
-	petLayout  PetLayout
+	allRows        []row
+	rows           []row
+	cursor         int
+	width          int
+	height         int
+	lastLoad       time.Time
+	loadErr        error
+	message        string
+	petFrame       int
+	petTicking     bool
+	petLayout      PetLayout
+	parkedExpanded bool
 
 	preview   bool
 	viewport  viewport.Model
@@ -335,6 +339,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.petLayout = PetLayoutResponsive
 			} else {
 				m.petLayout = PetLayoutColumn
+			}
+			return m, nil
+		case key.Matches(msg, keys.parking):
+			if m.preview || m.parkedCount() == 0 {
+				return m, nil
+			}
+			m.parkedExpanded = !m.parkedExpanded
+			m.applyFilter(false)
+			if m.cursor >= m.itemCount() {
+				m.cursor = max(0, m.itemCount()-1)
 			}
 			return m, nil
 		case key.Matches(msg, keys.down):

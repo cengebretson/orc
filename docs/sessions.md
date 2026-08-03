@@ -156,3 +156,26 @@ and provider-session identity. A matching pane is treated as already restored,
 its durable runtime target is refreshed, and the stale snapshot entry is
 removed. An unrelated session using the same tmux name remains a hard collision
 and is never adopted.
+
+## Automatic reversible parking
+
+Manual `sessions park` is a stop-and-resume stash. Automatic parking is a
+separate, display-only Live-view policy:
+
+```yaml
+settings:
+  parking:
+    auto_park: [paused]
+    wake_on: [status_change, attention, stage_change]
+```
+
+With this opt-in policy, matching tickets collapse into a `Parked (n)` row at
+the bottom of `orc watch` and the dashboard Live tab. Press `p` to expand or
+collapse them. Orc evaluates wake conditions before parking: a status change,
+new `input`/`blocked`/`review` attention, or a stage change restores the ticket
+with a visible `↟` marker. A ticket woken while still paused stays visible until
+its status leaves the original parking value, which rearms the policy.
+
+This policy never stops a multiplexer session and never changes a worktree,
+pane, focus, or scrollback. Its state is stored separately from manual parking
+snapshots under `~/.local/state/orc/parking-policy/`.

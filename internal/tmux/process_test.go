@@ -68,6 +68,26 @@ func TestAvailableUsesExecutableBoundary(t *testing.T) {
 	}
 }
 
+func TestCaptureTargetUsesExactPane(t *testing.T) {
+	calls := stubCommands(t,
+		commandResult{output: "orc\tbuild\n"},
+		commandResult{output: "one\ntwo\n"},
+	)
+
+	got, err := CaptureTarget(mux.Target{
+		Backend: "tmux", Workspace: "orc", Tab: "build", Pane: "%7",
+	}, 25)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "one\ntwo\n" {
+		t.Fatalf("capture = %q", got)
+	}
+	if len(*calls) != 2 || !reflect.DeepEqual((*calls)[1].args, []string{"capture-pane", "-p", "-J", "-t", "%7", "-S", "-25"}) {
+		t.Fatalf("calls = %#v", *calls)
+	}
+}
+
 func TestResolvePaneTarget(t *testing.T) {
 	tests := []struct {
 		name    string

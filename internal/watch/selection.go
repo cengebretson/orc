@@ -25,7 +25,7 @@ func (m *Model) applyFilter(resetCursor bool) {
 	query := m.searchBox.Value()
 	rows := make([]row, 0, len(m.allRows))
 	for _, candidate := range m.allRows {
-		if searchmatch.Match(query, candidate.search...) {
+		if searchmatch.Match(query, candidate.search...) && (!candidate.parked || m.parkedExpanded) {
 			rows = append(rows, candidate)
 		}
 	}
@@ -33,6 +33,16 @@ func (m *Model) applyFilter(resetCursor bool) {
 	if resetCursor {
 		m.cursor = 0
 	}
+}
+
+func (m Model) parkedCount() int {
+	count := 0
+	for _, candidate := range m.allRows {
+		if candidate.parked && searchmatch.Match(m.searchBox.Value(), candidate.search...) {
+			count++
+		}
+	}
+	return count
 }
 
 func (m Model) selectedWork() (row, bool) {

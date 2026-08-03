@@ -383,10 +383,11 @@ Effort: Small (timestamp display) / Medium (the derived tier).
 
 ### `orc ctl` — agent-facing control surface
 
-Status: First vertical slice implemented for Herdr: exact-ticket `agent state`,
-`agent prompt`, and `agent wait`, structured results/errors, repeatable
-lifecycle targets, timeouts, and native stall detection. Status/watch/capture
-and a tmux lifecycle provider remain future work.
+Status: Implemented. Exact-ticket `agent state`, `agent prompt`, and `agent
+wait` use Herdr's recognized lifecycle, while `status` aggregates durable/live
+sessions, `agent watch` emits transition-only JSONL, and `session capture`
+reads exact Herdr or tmux panes. A native Herdr event stream and a tmux
+lifecycle provider remain optional future optimizations.
 
 Orc has `orc mark` (an agent writes its own durable state) and `orc status
 --json` (a human or script reads it). It has nothing that lets an agent
@@ -456,6 +457,10 @@ margin).
 Effort: Large.
 
 ### Parking that reverses itself
+
+Status: Implemented. Opt-in policy state collapses matching work in Live views,
+evaluates wake rules before park rules, and flags restored tickets without
+changing the underlying multiplexer session, worktree, focus, or scrollback.
 
 `orc sessions park/unpark` is a manual snapshot-and-stop: useful, but it is a
 stash. The work still lives in the operator's head, because nothing brings it

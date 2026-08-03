@@ -6,6 +6,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Completed the structured `orc ctl` surface with aggregate session status,
+  transition-only agent lifecycle JSONL watching, and exact-target terminal
+  capture for Herdr and tmux.
+- Added opt-in reversible parking for Live views. Configured statuses collapse
+  into an expandable `Parked (n)` group without stopping any session, while
+  status, attention, or stage changes wake and visibly flag the ticket.
+
 ## [0.16.1] - 2026-08-02
 
 ### Fixed

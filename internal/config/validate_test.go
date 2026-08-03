@@ -7,6 +7,23 @@ import (
 	"github.com/cengebretson/orc/internal/config"
 )
 
+func TestValidateParkingPolicy(t *testing.T) {
+	t.Run("requires wake path", func(t *testing.T) {
+		cfg := &config.Config{Settings: config.Settings{Parking: &config.ParkingSettings{AutoPark: []string{"paused"}}}}
+		errs := config.Validate(cfg, nil)
+		if !strings.Contains(errs.Error(), "settings.parking.wake_on") {
+			t.Fatalf("errors = %v", errs)
+		}
+	})
+	t.Run("rejects unknown values", func(t *testing.T) {
+		cfg := &config.Config{Settings: config.Settings{Parking: &config.ParkingSettings{AutoPark: []string{"asleep"}, WakeOn: []string{"noise"}}}}
+		errs := config.Validate(cfg, nil)
+		if !strings.Contains(errs.Error(), "settings.parking.auto_park[0]") || !strings.Contains(errs.Error(), "settings.parking.wake_on[0]") {
+			t.Fatalf("errors = %v", errs)
+		}
+	})
+}
+
 func TestValidate_ValidConfig(t *testing.T) {
 	cfg := &config.Config{
 		Settings: config.Settings{DefaultWorkflow: "default"},

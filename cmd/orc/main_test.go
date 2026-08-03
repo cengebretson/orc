@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -16,16 +17,19 @@ import (
 	"github.com/cengebretson/orc/internal/mux"
 	"github.com/cengebretson/orc/internal/mux/muxtest"
 	orcnotify "github.com/cengebretson/orc/internal/notify"
+	"github.com/cengebretson/orc/internal/sessionlist"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/tmux"
 	"github.com/cengebretson/orc/internal/workspace"
+	"github.com/spf13/cobra"
 )
 
 type ctlTestBackend struct {
 	*muxtest.Fake
-	stateFunc  func(mux.Target) (mux.AgentControlResult, error)
-	promptFunc func(mux.Target, string, bool, mux.AgentControlOptions) (mux.AgentControlResult, error)
-	waitFunc   func(mux.Target, mux.AgentControlOptions) (mux.AgentControlResult, error)
+	stateFunc   func(mux.Target) (mux.AgentControlResult, error)
+	promptFunc  func(mux.Target, string, bool, mux.AgentControlOptions) (mux.AgentControlResult, error)
+	waitFunc    func(mux.Target, mux.AgentControlOptions) (mux.AgentControlResult, error)
+	captureFunc func(mux.Target, int) (string, error)
 }
 
 func (b *ctlTestBackend) StateAgent(target mux.Target) (mux.AgentControlResult, error) {
@@ -38,6 +42,10 @@ func (b *ctlTestBackend) PromptAgent(target mux.Target, text string, wait bool, 
 
 func (b *ctlTestBackend) WaitAgent(target mux.Target, options mux.AgentControlOptions) (mux.AgentControlResult, error) {
 	return b.waitFunc(target, options)
+}
+
+func (b *ctlTestBackend) CaptureTarget(target mux.Target, lines int) (string, error) {
+	return b.captureFunc(target, lines)
 }
 
 func TestRunStatusTicketPrintsDetail(t *testing.T) {
@@ -114,6 +122,111 @@ func TestRunCtlAgentStateTargetsRecordedHerdrPane(t *testing.T) {
 	}
 	if payload.Type != "agent_state" || payload.Ticket != "HOT-42" || payload.Agent.Lifecycle != "working" || payload.Agent.StateChangeSeq != 14 {
 		t.Fatalf("payload = %#v", payload)
+	}
+}
+
+func TestRunCtlStatusAggregatesSessionsAndAttention(t *testing.T) {
+	resetCommandGlobals(t)
+	globalWorkspace = mutableFixtureWorkspace(t)
+	collectCtlSessions = func(root string, options sessionlist.Options) ([]sessionlist.Session, error) {
+		if root != globalWorkspace || !options.IncludeUnmanaged || options.Mux != muxBackend {
+			t.Fatalf("root=%q options=%#v", root, options)
+		}
+		return []sessionlist.Session{
+			{Kind: sessionlist.KindManaged, Ticket: "HOT-42", Attention: "blocked"},
+			{Kind: sessionlist.KindManaged, Ticket: "CALM-1"},
+			{Kind: sessionlist.KindUnmanaged, Lifecycle: "working"},
+		}, nil
+	}
+
+	out, err := captureStdout(func() error { return runCtlStatus(nil, nil) })
+	if err != nil {
+		t.Fatal(err)
+	}
+	var payload struct {
+		Type     string                `json:"type"`
+		Summary  map[string]int        `json:"summary"`
+		Sessions []sessionlist.Session `json:"sessions"`
+	}
+	if err := json.Unmarshal([]byte(out), &payload); err != nil {
+		t.Fatalf("unmarshal output: %v\n%s", err, out)
+	}
+	if payload.Type != "status" || payload.Summary["total"] != 3 || payload.Summary[sessionlist.KindManaged] != 2 || payload.Summary[sessionlist.KindUnmanaged] != 1 || payload.Summary["needs_attention"] != 1 || len(payload.Sessions) != 3 {
+		t.Fatalf("payload = %#v", payload)
+	}
+}
+
+func TestRunCtlAgentWatchEmitsOnlyTransitions(t *testing.T) {
+	resetCommandGlobals(t)
+	globalWorkspace = mutableFixtureWorkspace(t)
+	featureDir := filepath.Join(globalWorkspace, "features", "HOT-42-login-500-error")
+	if err := state.Update(featureDir, func(s *state.State) error {
+		s.Runtime.Mux = &state.MuxRuntime{Backend: "herdr", Workspace: "w9", Tab: "w9:t1", Pane: "w9:p1"}
+		s.Runtime.Tmux = nil
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	calls := 0
+	muxBackend = &ctlTestBackend{
+		Fake: &muxtest.Fake{NameFunc: func() string { return "herdr" }},
+		stateFunc: func(target mux.Target) (mux.AgentControlResult, error) {
+			calls++
+			lifecycle := "working"
+			seq := uint64(1)
+			if calls >= 3 {
+				lifecycle, seq = "blocked", 2
+				cancel()
+			}
+			return mux.AgentControlResult{Backend: "herdr", Target: target, Lifecycle: lifecycle, StateChangeSeq: seq}, nil
+		},
+	}
+	ctlWatchTicket = "HOT-42"
+	ctlWatchInterval = time.Millisecond
+	var out bytes.Buffer
+	cmd := &cobra.Command{}
+	cmd.SetContext(ctx)
+	cmd.SetOut(&out)
+	if err := runCtlAgentWatch(cmd, nil); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+	if len(lines) != 2 || !strings.Contains(lines[0], `"working"`) || !strings.Contains(lines[1], `"blocked"`) {
+		t.Fatalf("watch output = %q", out.String())
+	}
+}
+
+func TestRunCtlSessionCaptureTargetsRecordedPane(t *testing.T) {
+	resetCommandGlobals(t)
+	globalWorkspace = mutableFixtureWorkspace(t)
+	featureDir := filepath.Join(globalWorkspace, "features", "HOT-42-login-500-error")
+	if err := state.Update(featureDir, func(s *state.State) error {
+		s.Runtime.Mux = &state.MuxRuntime{Backend: "herdr", Workspace: "w9", Tab: "w9:t1", Pane: "w9:p1"}
+		s.Runtime.Tmux = nil
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var gotTarget mux.Target
+	var gotLines int
+	muxBackend = &ctlTestBackend{
+		Fake: &muxtest.Fake{NameFunc: func() string { return "herdr" }},
+		captureFunc: func(target mux.Target, lines int) (string, error) {
+			gotTarget, gotLines = target, lines
+			return "one\ntwo\n", nil
+		},
+	}
+	ctlCaptureTicket = "HOT-42"
+	ctlCaptureLines = 25
+	out, err := captureStdout(func() error { return runCtlSessionCapture(nil, nil) })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotTarget.Pane != "w9:p1" || gotLines != 25 || !strings.Contains(out, `"session_capture"`) || !strings.Contains(out, `"one\ntwo\n"`) {
+		t.Fatalf("target=%#v lines=%d output=%s", gotTarget, gotLines, out)
 	}
 }
 
@@ -1463,6 +1576,8 @@ func resetCommandGlobals(t *testing.T) {
 	oldSendTransitionNotification := sendTransitionNotification
 	oldSendNativeTransitionNotification := sendNativeTransitionNotification
 	oldCtlStateTicket := ctlStateTicket
+	oldCtlWatchTicket := ctlWatchTicket
+	oldCtlWatchInterval := ctlWatchInterval
 	oldCtlPromptTicket := ctlPromptTicket
 	oldCtlPromptWait := ctlPromptWait
 	oldCtlPromptUntil := ctlPromptUntil
@@ -1470,6 +1585,9 @@ func resetCommandGlobals(t *testing.T) {
 	oldCtlWaitTicket := ctlWaitTicket
 	oldCtlWaitUntil := ctlWaitUntil
 	oldCtlWaitTimeout := ctlWaitTimeout
+	oldCtlCaptureTicket := ctlCaptureTicket
+	oldCtlCaptureLines := ctlCaptureLines
+	oldCollectCtlSessions := collectCtlSessions
 	t.Cleanup(func() {
 		globalWorkspace = oldWorkspace
 		globalMux = oldMux
@@ -1496,6 +1614,8 @@ func resetCommandGlobals(t *testing.T) {
 		sendTransitionNotification = oldSendTransitionNotification
 		sendNativeTransitionNotification = oldSendNativeTransitionNotification
 		ctlStateTicket = oldCtlStateTicket
+		ctlWatchTicket = oldCtlWatchTicket
+		ctlWatchInterval = oldCtlWatchInterval
 		ctlPromptTicket = oldCtlPromptTicket
 		ctlPromptWait = oldCtlPromptWait
 		ctlPromptUntil = oldCtlPromptUntil
@@ -1503,6 +1623,9 @@ func resetCommandGlobals(t *testing.T) {
 		ctlWaitTicket = oldCtlWaitTicket
 		ctlWaitUntil = oldCtlWaitUntil
 		ctlWaitTimeout = oldCtlWaitTimeout
+		ctlCaptureTicket = oldCtlCaptureTicket
+		ctlCaptureLines = oldCtlCaptureLines
+		collectCtlSessions = oldCollectCtlSessions
 	})
 
 	globalWorkspace = "."
@@ -1528,6 +1651,8 @@ func resetCommandGlobals(t *testing.T) {
 	artifactsJSON = false
 	packInspectJSON = false
 	ctlStateTicket = ""
+	ctlWatchTicket = ""
+	ctlWatchInterval = time.Second
 	ctlPromptTicket = ""
 	ctlPromptWait = false
 	ctlPromptUntil = nil
@@ -1535,6 +1660,9 @@ func resetCommandGlobals(t *testing.T) {
 	ctlWaitTicket = ""
 	ctlWaitUntil = nil
 	ctlWaitTimeout = 2 * time.Minute
+	ctlCaptureTicket = ""
+	ctlCaptureLines = 80
+	collectCtlSessions = sessionlist.Collect
 }
 
 func writeCommandPack(t *testing.T, name, manifest string) string {

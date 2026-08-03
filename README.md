@@ -427,6 +427,7 @@ Live rail; `orc dashboard` starts in Live. Press `?` for navigation help.
   - `i` — jump to the next live `blocked`, `input`, or `review` session
   - `v` — toggle the default rail and animated little-orc pet view
   - `l` — toggle responsive and vertical-column layouts while in pet view
+  - `p` — expand or collapse automatically parked work
   - `--view pet` — start directly in the Tamagotchi-style pet view
   - `--pet-layout column` — start with one pet card per row
   - `--tmux-toggle` — open or close the watch rail beside the current tmux pane
@@ -453,8 +454,11 @@ These are called by agents at the end of each session. They are hidden from `orc
 - `orc mark <ticket> done` — mark active, ready, or paused work as done
 - `orc mark <ticket> jit "<summary>"` — record a jit task as complete and clear `runtime.jit`
 - `orc ctl agent state --ticket <ticket>` — read the exact recorded Herdr agent's recognized lifecycle as JSON
+- `orc ctl status` — read aggregate durable/live session state and attention counts as JSON
+- `orc ctl agent watch [--ticket <ticket>]` — stream lifecycle transitions as compact JSONL until interrupted
 - `orc ctl agent prompt --ticket <ticket> "<text>" --wait --timeout 120s` — atomically prompt the exact recorded Herdr agent and wait for a settled lifecycle state
 - `orc ctl agent wait --ticket <ticket> --until blocked --timeout 120s` — wait for recognized lifecycle state without scraping terminal text
+- `orc ctl session capture --ticket <ticket> [--lines 80]` — capture text from the exact recorded Herdr or tmux pane; captured text is never treated as lifecycle state
 
 `orc mark` validates transitions before writing `STATE.yaml`: pending tickets must be started before `next`, `done` is rejected from `pending`, stage and worker overrides must exist, invalid workspace config blocks advancement, and `artifact_policy: block` blocks `next` when required artifacts are missing, empty, or unchanged from the feature template (override with `--force`). Use `orc artifacts <ticket>` when an agent or human needs the same artifact checklist without advancing the ticket.
 

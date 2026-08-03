@@ -98,6 +98,28 @@ func TestRenderRailIsCompact(t *testing.T) {
 	}
 }
 
+func TestParkingGroupIsVisibleExpandableAndWokenRowsAreFlagged(t *testing.T) {
+	searchBox := textinput.New()
+	allRows := []row{
+		{ticket: "ACTIVE-1", status: "active", tmuxState: "live", search: []string{"ACTIVE-1"}},
+		{ticket: "PARKED-1", status: "paused", tmuxState: "live", parked: true, search: []string{"PARKED-1"}},
+		{ticket: "WOKEN-1", status: "paused", tmuxState: "live", woken: true, wakeReason: "attention", search: []string{"WOKEN-1"}},
+	}
+	m := Model{width: 48, height: 24, searchBox: searchBox, allRows: allRows}
+	m.applyFilter(true)
+	view := m.renderRail()
+	if !strings.Contains(view, "Parked (1)") || strings.Contains(view, "PARKED-1") || !strings.Contains(view, "↟ WOKEN-1") {
+		t.Fatalf("collapsed parking view:\n%s", view)
+	}
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
+	m = watchModel(t, updated)
+	view = m.renderRail()
+	if !m.parkedExpanded || !strings.Contains(view, "PARKED-1") || !strings.Contains(view, "▾ Parked (1)") {
+		t.Fatalf("expanded parking view:\n%s", view)
+	}
+}
+
 func TestWatchSummaryDistinguishesRuntimePausedAndAttention(t *testing.T) {
 	rows := []row{
 		{status: "active", tmuxState: "live"},

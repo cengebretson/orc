@@ -57,6 +57,9 @@ settings:
     task_cell:
       test_command: make test
       watch: true
+  parking:
+    auto_park: [paused]
+    wake_on: [status_change, attention, stage_change]
 repos: []
 `)
 
@@ -87,6 +90,9 @@ repos: []
 	}
 	if cfg.Settings.Herdr == nil || cfg.Settings.Herdr.TaskCell == nil || cfg.Settings.Herdr.TaskCell.TestCommand != "make test" || !cfg.Settings.Herdr.TaskCell.Watch {
 		t.Errorf("herdr task cell settings = %#v", cfg.Settings.Herdr)
+	}
+	if cfg.Settings.Parking == nil || strings.Join(cfg.Settings.Parking.AutoPark, ",") != "paused" || strings.Join(cfg.Settings.Parking.WakeOn, ",") != "status_change,attention,stage_change" {
+		t.Errorf("parking settings = %#v", cfg.Settings.Parking)
 	}
 }
 

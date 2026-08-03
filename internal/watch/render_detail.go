@@ -40,6 +40,10 @@ func renderRailDetailAt(r row, width int, now time.Time) string {
 		b.WriteString("\n")
 		b.WriteString(mutedStyle.Render("  " + truncate("attention "+r.attention, max(1, width-2))))
 	}
+	if r.woken {
+		b.WriteString("\n")
+		b.WriteString(accentStyle.Render(truncate("↟ woken from parking · "+r.wakeReason, width)))
+	}
 	if r.context.Observed {
 		b.WriteString("\n")
 		b.WriteString("  " + renderContextVisual(r, max(3, min(8, width-10))))

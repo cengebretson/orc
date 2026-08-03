@@ -1,20 +1,30 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"sort"
 	"strings"
 	"time"
 
+	"github.com/cengebretson/orc/internal/featurelist"
+	"github.com/cengebretson/orc/internal/gitmeta"
 	"github.com/cengebretson/orc/internal/mux"
+	"github.com/cengebretson/orc/internal/sessionlist"
 	"github.com/cengebretson/orc/internal/ticket"
 	"github.com/spf13/cobra"
 )
 
+var collectCtlSessions = sessionlist.Collect
+
 var (
 	ctlStateTicket   string
+	ctlWatchTicket   string
+	ctlWatchInterval time.Duration
 	ctlPromptTicket  string
 	ctlPromptWait    bool
 	ctlPromptUntil   []string
@@ -22,11 +32,20 @@ var (
 	ctlWaitTicket    string
 	ctlWaitUntil     []string
 	ctlWaitTimeout   time.Duration
+	ctlCaptureTicket string
+	ctlCaptureLines  int
 )
 
 var ctlCmd = &cobra.Command{
 	Use:   "ctl",
 	Short: "Structured agent control for automation",
+}
+
+var ctlStatusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Read aggregate durable and live session state",
+	Args:  cobra.NoArgs,
+	RunE:  runCtlStatus,
 }
 
 var ctlAgentCmd = &cobra.Command{
@@ -39,6 +58,25 @@ var ctlAgentStateCmd = &cobra.Command{
 	Short: "Read recognized lifecycle state for the exact recorded agent",
 	Args:  cobra.NoArgs,
 	RunE:  runCtlAgentState,
+}
+
+var ctlAgentWatchCmd = &cobra.Command{
+	Use:   "watch",
+	Short: "Stream recognized agent lifecycle transitions as JSONL",
+	Args:  cobra.NoArgs,
+	RunE:  runCtlAgentWatch,
+}
+
+var ctlSessionCmd = &cobra.Command{
+	Use:   "session",
+	Short: "Read exact recorded terminal sessions",
+}
+
+var ctlSessionCaptureCmd = &cobra.Command{
+	Use:   "capture",
+	Short: "Capture text from an exact recorded agent pane",
+	Args:  cobra.NoArgs,
+	RunE:  runCtlSessionCapture,
 }
 
 var ctlAgentPromptCmd = &cobra.Command{
@@ -66,6 +104,29 @@ func ctlError(code, format string, args ...any) error {
 	return &ctlCommandError{code: code, message: fmt.Sprintf(format, args...)}
 }
 
+func runCtlStatus(_ *cobra.Command, _ []string) error {
+	root, err := resolveRoot(globalWorkspace)
+	if err != nil {
+		return err
+	}
+	sessions, err := collectCtlSessions(root, sessionlist.Options{
+		IncludeUnmanaged: true,
+		ResolveGit:       gitmeta.Resolve,
+		Mux:              muxBackend,
+	})
+	if err != nil {
+		return err
+	}
+	summary := map[string]int{"total": len(sessions)}
+	for _, session := range sessions {
+		summary[session.Kind]++
+		if ctlSessionNeedsAttention(session) {
+			summary["needs_attention"]++
+		}
+	}
+	return printJSON(map[string]any{"type": "status", "summary": summary, "sessions": sessions})
+}
+
 func runCtlAgentState(_ *cobra.Command, _ []string) error {
 	controller, target, ticketID, err := resolveCtlAgent(ctlStateTicket)
 	if err != nil {
@@ -76,6 +137,77 @@ func runCtlAgentState(_ *cobra.Command, _ []string) error {
 		return err
 	}
 	return printJSON(map[string]any{"type": "agent_state", "ticket": ticketID, "agent": result})
+}
+
+func runCtlAgentWatch(cmd *cobra.Command, _ []string) error {
+	if ctlWatchInterval <= 0 {
+		return ctlError("invalid_argument", "--interval must be greater than zero")
+	}
+	writer := io.Writer(os.Stdout)
+	if cmd != nil {
+		writer = cmd.OutOrStdout()
+	}
+	previous := make(map[string]mux.AgentControlResult)
+	emit := func() error {
+		states, err := collectCtlAgentStates(ctlWatchTicket)
+		if err != nil {
+			return err
+		}
+		for _, current := range states {
+			prior, seen := previous[current.Ticket]
+			if seen && prior == current.Agent {
+				continue
+			}
+			if err := json.NewEncoder(writer).Encode(map[string]any{
+				"type": "agent_state", "ticket": current.Ticket, "agent": current.Agent,
+			}); err != nil {
+				return err
+			}
+			previous[current.Ticket] = current.Agent
+		}
+		return nil
+	}
+	if err := emit(); err != nil {
+		return err
+	}
+	ticker := time.NewTicker(ctlWatchInterval)
+	defer ticker.Stop()
+	ctx := context.Background()
+	if cmd != nil {
+		ctx = cmd.Context()
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+			if err := emit(); err != nil {
+				return err
+			}
+		}
+	}
+}
+
+func runCtlSessionCapture(_ *cobra.Command, _ []string) error {
+	if ctlCaptureLines <= 0 {
+		return ctlError("invalid_argument", "--lines must be greater than zero")
+	}
+	backend, target, ticketID, err := resolveCtlTarget(ctlCaptureTicket)
+	if err != nil {
+		return err
+	}
+	capturer, ok := backend.(mux.TerminalCaptureBackend)
+	if !ok {
+		return ctlError("unsupported_backend", "%s does not provide exact terminal capture", backend.Name())
+	}
+	text, err := capturer.CaptureTarget(target, ctlCaptureLines)
+	if err != nil {
+		return err
+	}
+	return printJSON(map[string]any{
+		"type": "session_capture", "ticket": ticketID, "target": target,
+		"lines": ctlCaptureLines, "text": text,
+	})
 }
 
 func runCtlAgentPrompt(cmd *cobra.Command, args []string) error {
@@ -126,6 +258,20 @@ func runCtlAgentWait(_ *cobra.Command, _ []string) error {
 }
 
 func resolveCtlAgent(ticketArg string) (mux.AgentControlBackend, mux.Target, string, error) {
+	backend, target, ticketID, err := resolveCtlTarget(ticketArg)
+	if err != nil {
+		return nil, mux.Target{}, "", err
+	}
+	controller, ok := backend.(mux.AgentControlBackend)
+	if !ok {
+		return nil, mux.Target{}, "", ctlError(
+			"unsupported_backend", "%s does not provide recognized agent lifecycle control", backend.Name(),
+		)
+	}
+	return controller, target, ticketID, nil
+}
+
+func resolveCtlTarget(ticketArg string) (mux.Backend, mux.Target, string, error) {
 	root, err := resolveRoot(globalWorkspace)
 	if err != nil {
 		return nil, mux.Target{}, "", err
@@ -150,13 +296,80 @@ func resolveCtlAgent(ticketArg string) (mux.AgentControlBackend, mux.Target, str
 			"backend_mismatch", "ticket %s uses %s but selected backend is %s", t.State.Ticket, target.Backend, selected,
 		)
 	}
-	controller, ok := muxBackend.(mux.AgentControlBackend)
-	if !ok {
-		return nil, mux.Target{}, "", ctlError(
-			"unsupported_backend", "%s does not provide recognized agent lifecycle control", muxBackend.Name(),
-		)
+	return muxBackend, target, t.State.Ticket, nil
+}
+
+type ctlAgentSnapshot struct {
+	Ticket string
+	Agent  mux.AgentControlResult
+}
+
+func collectCtlAgentStates(ticketArg string) ([]ctlAgentSnapshot, error) {
+	tickets, err := ctlAgentTickets(ticketArg)
+	if err != nil {
+		return nil, err
 	}
-	return controller, target, t.State.Ticket, nil
+	result := make([]ctlAgentSnapshot, 0, len(tickets))
+	for _, ticketID := range tickets {
+		controller, target, resolvedTicket, err := resolveCtlAgent(ticketID)
+		if err != nil {
+			var commandErr *ctlCommandError
+			if ticketArg == "" && errors.As(err, &commandErr) && commandErr.code == "unsupported_backend" {
+				continue
+			}
+			return nil, err
+		}
+		agent, err := controller.StateAgent(target)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, ctlAgentSnapshot{Ticket: resolvedTicket, Agent: agent})
+	}
+	if len(result) == 0 {
+		return nil, ctlError("no_controllable_agents", "no tickets have a live backend with recognized agent lifecycle control")
+	}
+	return result, nil
+}
+
+func ctlAgentTickets(ticketArg string) ([]string, error) {
+	if strings.TrimSpace(ticketArg) != "" {
+		return []string{ticketArg}, nil
+	}
+	root, err := resolveRoot(globalWorkspace)
+	if err != nil {
+		return nil, err
+	}
+	features, err := featurelist.Collect(root, featurelist.Options{})
+	if err != nil {
+		return nil, err
+	}
+	var tickets []string
+	for _, feature := range features {
+		if feature == nil || feature.State == nil || feature.Archived || feature.LoadError != nil {
+			continue
+		}
+		target, ok := runtimeTarget(feature.State)
+		if !ok || target.Workspace == "" || target.Tab == "" || target.Pane == "" {
+			continue
+		}
+		tickets = append(tickets, feature.State.Ticket)
+	}
+	sort.Strings(tickets)
+	return tickets, nil
+}
+
+func ctlSessionNeedsAttention(session sessionlist.Session) bool {
+	values := []string{session.Attention, session.Lifecycle}
+	if session.Live != nil {
+		values = append(values, session.Live.State)
+	}
+	for _, value := range values {
+		switch strings.ToLower(value) {
+		case "input", "blocked", "review":
+			return true
+		}
+	}
+	return false
 }
 
 func validateCtlUntil(values []string) ([]string, error) {

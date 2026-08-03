@@ -16,6 +16,7 @@ func New() Backend { return Backend{} }
 
 var _ mux.Backend = Backend{}
 var _ mux.TargetBackend = Backend{}
+var _ mux.TerminalCaptureBackend = Backend{}
 
 // Name identifies this backend.
 func (Backend) Name() string { return "tmux" }
@@ -125,4 +126,9 @@ func (Backend) AttachTarget(target mux.Target) error {
 
 func (Backend) AttachTargetHint(target mux.Target) string {
 	return AttachHint(target.Workspace, target.Tab)
+}
+
+// CaptureTarget reads recent joined terminal text from an exact recorded pane.
+func (Backend) CaptureTarget(target mux.Target, lines int) (string, error) {
+	return CaptureTarget(target, lines)
 }

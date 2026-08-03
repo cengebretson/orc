@@ -30,6 +30,7 @@ var _ mux.WorktreeTargetBackend = Backend{}
 var _ mux.TaskCellBackend = Backend{}
 var _ mux.NotificationBackend = Backend{}
 var _ mux.AgentControlBackend = Backend{}
+var _ mux.TerminalCaptureBackend = Backend{}
 
 func (Backend) Name() string { return "herdr" }
 
@@ -41,6 +42,26 @@ func (b Backend) StateAgent(target mux.Target) (mux.AgentControlResult, error) {
 		return mux.AgentControlResult{}, err
 	}
 	return b.agentControl(target, "agent", "get", target.Pane)
+}
+
+// CaptureTarget reads recent unwrapped terminal text from the exact recorded
+// agent pane without moving focus or using that text as lifecycle state.
+func (b Backend) CaptureTarget(target mux.Target, lines int) (string, error) {
+	if lines <= 0 {
+		return "", fmt.Errorf("herdr capture lines must be greater than zero")
+	}
+	target, err := b.resolveExactAgentTarget(target)
+	if err != nil {
+		return "", err
+	}
+	out, err := b.command(
+		"agent", "read", target.Pane,
+		"--source", "recent-unwrapped", "--lines", strconv.Itoa(lines),
+	)
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
 }
 
 // ShowNotification publishes an Orc transition through Herdr's session-native

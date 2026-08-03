@@ -42,6 +42,13 @@ type Settings struct {
 	ContextPressure  *ContextPressureSettings `yaml:"context_pressure,omitempty"`
 	Notify           NotifySettings           `yaml:"notify,omitempty"`
 	Herdr            *HerdrSettings           `yaml:"herdr,omitempty"`
+	Parking          *ParkingSettings         `yaml:"parking,omitempty"`
+}
+
+// ParkingSettings enables reversible display-only parking in Live views.
+type ParkingSettings struct {
+	AutoPark []string `yaml:"auto_park,omitempty"`
+	WakeOn   []string `yaml:"wake_on,omitempty"`
 }
 
 // HerdrSettings contains opt-in UI behavior for the native Herdr backend.

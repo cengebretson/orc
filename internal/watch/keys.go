@@ -23,6 +23,7 @@ type keyMap struct {
 	attention key.Binding
 	view      key.Binding
 	petLayout key.Binding
+	parking   key.Binding
 }
 
 var keys = keyMap{
@@ -43,6 +44,7 @@ var keys = keyMap{
 	attention: key.NewBinding(key.WithKeys("i"), key.WithHelp("i", "focus attention")),
 	view:      key.NewBinding(key.WithKeys("v"), key.WithHelp("v", "rail / pets")),
 	petLayout: key.NewBinding(key.WithKeys("l"), key.WithHelp("l", "pet layout")),
+	parking:   key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "expand parked")),
 }
 
 // HelpSections returns Live guidance for both the standalone and unified help.
@@ -67,6 +69,7 @@ func HelpSections() []terminalui.HelpSection {
 		{Title: "LIVE · VIEW", Entries: []terminalui.HelpEntry{
 			terminalui.HelpEntryFor(keys.view),
 			terminalui.HelpEntryFor(keys.petLayout),
+			terminalui.HelpEntryFor(keys.parking),
 			{Keys: keys.help.Help().Key + " / " + keys.back.Help().Key, Description: "close help"},
 			terminalui.HelpEntryFor(keys.quit),
 		}},

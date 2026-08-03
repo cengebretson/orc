@@ -82,6 +82,25 @@ func Validate(cfg *Config, workerIDs []string) ValidationErrors {
 			})
 		}
 	}
+	if settings := cfg.Settings.Parking; settings != nil {
+		if len(settings.AutoPark) > 0 && len(settings.WakeOn) == 0 {
+			errs = append(errs, ValidationError{Path: "settings.parking.wake_on", Message: "at least one wake condition is required when auto_park is enabled"})
+		}
+		for i, status := range settings.AutoPark {
+			switch strings.ToLower(strings.TrimSpace(status)) {
+			case "pending", "active", "paused", "done", "archived":
+			default:
+				errs = append(errs, ValidationError{Path: fmt.Sprintf("settings.parking.auto_park[%d]", i), Message: "status must be pending, active, paused, done, or archived"})
+			}
+		}
+		for i, condition := range settings.WakeOn {
+			switch strings.ToLower(strings.TrimSpace(condition)) {
+			case "status_change", "attention", "stage_change":
+			default:
+				errs = append(errs, ValidationError{Path: fmt.Sprintf("settings.parking.wake_on[%d]", i), Message: "condition must be status_change, attention, or stage_change"})
+			}
+		}
+	}
 
 	if len(cfg.Workflows) > 0 {
 		defaultWorkflow := cfg.ResolveWorkflow(cfg.DefaultWorkflow())
