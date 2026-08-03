@@ -134,6 +134,7 @@ func TestRunCtlStatusAggregatesSessionsAndAttention(t *testing.T) {
 		}
 		return []sessionlist.Session{
 			{Kind: sessionlist.KindManaged, Ticket: "HOT-42", Attention: "blocked"},
+			{Kind: sessionlist.KindManaged, Ticket: "PAUSED-1", Status: "paused"},
 			{Kind: sessionlist.KindManaged, Ticket: "CALM-1"},
 			{Kind: sessionlist.KindUnmanaged, Lifecycle: "working"},
 		}, nil
@@ -151,8 +152,11 @@ func TestRunCtlStatusAggregatesSessionsAndAttention(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &payload); err != nil {
 		t.Fatalf("unmarshal output: %v\n%s", err, out)
 	}
-	if payload.Type != "status" || payload.Summary["total"] != 3 || payload.Summary[sessionlist.KindManaged] != 2 || payload.Summary[sessionlist.KindUnmanaged] != 1 || payload.Summary["needs_attention"] != 1 || len(payload.Sessions) != 3 {
+	if payload.Type != "status" || payload.Summary["total"] != 4 || payload.Summary[sessionlist.KindManaged] != 3 || payload.Summary[sessionlist.KindUnmanaged] != 1 || payload.Summary["needs_attention"] != 2 || len(payload.Sessions) != 4 {
 		t.Fatalf("payload = %#v", payload)
+	}
+	if _, ok := payload.Summary[sessionlist.KindOrphaned]; !ok {
+		t.Fatalf("summary omits zero-valued %q count: %#v", sessionlist.KindOrphaned, payload.Summary)
 	}
 }
 
@@ -199,6 +203,94 @@ func TestRunCtlAgentWatchEmitsOnlyTransitions(t *testing.T) {
 	}
 }
 
+func TestRunCtlAgentWatchKeepsAggregateAliveOnTicketError(t *testing.T) {
+	resetCommandGlobals(t)
+	globalWorkspace = mutableFixtureWorkspace(t)
+	targets := map[string]string{
+		"FEAT-001-dark-mode":     "w9:p1",
+		"HOT-42-login-500-error": "w9:p2",
+	}
+	for feature, pane := range targets {
+		featureDir := filepath.Join(globalWorkspace, "features", feature)
+		if err := state.Update(featureDir, func(s *state.State) error {
+			s.Runtime.Mux = &state.MuxRuntime{Backend: "herdr", Workspace: "w9", Tab: "w9:t1", Pane: pane}
+			s.Runtime.Tmux = nil
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	muxBackend = &ctlTestBackend{
+		Fake: &muxtest.Fake{NameFunc: func() string { return "herdr" }},
+		stateFunc: func(target mux.Target) (mux.AgentControlResult, error) {
+			if target.Pane == "w9:p2" {
+				cancel()
+				return mux.AgentControlResult{}, errors.New("agent disappeared")
+			}
+			return mux.AgentControlResult{Backend: "herdr", Target: target, Lifecycle: "working"}, nil
+		},
+	}
+	ctlWatchInterval = time.Millisecond
+	var out bytes.Buffer
+	cmd := &cobra.Command{}
+	cmd.SetContext(ctx)
+	cmd.SetOut(&out)
+	if err := runCtlAgentWatch(cmd, nil); err != nil {
+		t.Fatal(err)
+	}
+	text := out.String()
+	if !strings.Contains(text, `"type":"agent_state"`) || !strings.Contains(text, `"type":"agent_error"`) || !strings.Contains(text, `"code":"agent_unavailable"`) {
+		t.Fatalf("watch output = %q", text)
+	}
+}
+
+func TestRunCtlAgentWatchEmitsStoppedAndContinues(t *testing.T) {
+	resetCommandGlobals(t)
+	globalWorkspace = mutableFixtureWorkspace(t)
+	featureDir := filepath.Join(globalWorkspace, "features", "HOT-42-login-500-error")
+	if err := state.Update(featureDir, func(s *state.State) error {
+		s.Runtime.Mux = &state.MuxRuntime{Backend: "herdr", Workspace: "w9", Tab: "w9:t1", Pane: "w9:p1"}
+		s.Runtime.Tmux = nil
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	removed := false
+	muxBackend = &ctlTestBackend{
+		Fake: &muxtest.Fake{NameFunc: func() string { return "herdr" }},
+		stateFunc: func(target mux.Target) (mux.AgentControlResult, error) {
+			if !removed {
+				removed = true
+				if err := state.Update(featureDir, func(s *state.State) error {
+					s.Runtime.Mux = nil
+					s.Runtime.Tmux = nil
+					return nil
+				}); err != nil {
+					return mux.AgentControlResult{}, err
+				}
+				time.AfterFunc(20*time.Millisecond, cancel)
+			}
+			return mux.AgentControlResult{Backend: "herdr", Target: target, Lifecycle: "working"}, nil
+		},
+	}
+	ctlWatchInterval = time.Millisecond
+	var out bytes.Buffer
+	cmd := &cobra.Command{}
+	cmd.SetContext(ctx)
+	cmd.SetOut(&out)
+	if err := runCtlAgentWatch(cmd, nil); err != nil {
+		t.Fatal(err)
+	}
+	text := out.String()
+	if !strings.Contains(text, `"type":"agent_state"`) || !strings.Contains(text, `"type":"agent_stopped"`) {
+		t.Fatalf("watch output = %q", text)
+	}
+}
+
 func TestRunCtlSessionCaptureTargetsRecordedPane(t *testing.T) {
 	resetCommandGlobals(t)
 	globalWorkspace = mutableFixtureWorkspace(t)
@@ -227,6 +319,16 @@ func TestRunCtlSessionCaptureTargetsRecordedPane(t *testing.T) {
 	}
 	if gotTarget.Pane != "w9:p1" || gotLines != 25 || !strings.Contains(out, `"session_capture"`) || !strings.Contains(out, `"one\ntwo\n"`) {
 		t.Fatalf("target=%#v lines=%d output=%s", gotTarget, gotLines, out)
+	}
+}
+
+func TestRunCtlSessionCaptureRejectsExcessiveLineCount(t *testing.T) {
+	resetCommandGlobals(t)
+	ctlCaptureLines = mux.MaxCaptureLines + 1
+	err := runCtlSessionCapture(nil, nil)
+	var commandErr *ctlCommandError
+	if !errors.As(err, &commandErr) || commandErr.code != "invalid_argument" || !strings.Contains(err.Error(), "must not exceed") {
+		t.Fatalf("error = %#v", err)
 	}
 }
 

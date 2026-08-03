@@ -50,6 +50,9 @@ func (b Backend) CaptureTarget(target mux.Target, lines int) (string, error) {
 	if lines <= 0 {
 		return "", fmt.Errorf("herdr capture lines must be greater than zero")
 	}
+	if lines > mux.MaxCaptureLines {
+		return "", fmt.Errorf("herdr capture lines must not exceed %d", mux.MaxCaptureLines)
+	}
 	target, err := b.resolveExactAgentTarget(target)
 	if err != nil {
 		return "", err

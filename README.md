@@ -439,9 +439,9 @@ Live rail; `orc dashboard` starts in Live. Press `?` for navigation help.
 - `orc dashboard` — open the unified dashboard in Live; `[`/`]` cycles Live,
   Workflows, Workers, Repositories, and Health, while `1`–`5` jumps directly
 
-### Agent commands
+### Agent state transitions
 
-These are called by agents at the end of each session. They are hidden from `orc --help` but visible via `orc help-all`.
+Agents call these commands when their durable work state changes. They are hidden from `orc --help` but visible via `orc help-all`.
 
 - `orc mark <ticket> start` — begin a fresh session; allowed from `pending` or `ready`
 - `orc mark <ticket> resume` — continue a paused session; allowed from `paused` only; clears the human-directed next action
@@ -453,12 +453,17 @@ These are called by agents at the end of each session. They are hidden from `orc
 - `orc mark <ticket> pause "<reason>"` — pause for human input, approval, or an external blocker
 - `orc mark <ticket> done` — mark active, ready, or paused work as done
 - `orc mark <ticket> jit "<summary>"` — record a jit task as complete and clear `runtime.jit`
+
+### Structured control
+
+These backend-neutral JSON commands are intended for supervisors, integrations, and diagnostics. Lifecycle state comes from native backend APIs; terminal capture remains diagnostic text only.
+
 - `orc ctl agent state --ticket <ticket>` — read the exact recorded Herdr agent's recognized lifecycle as JSON
-- `orc ctl status` — read aggregate durable/live session state and attention counts as JSON
-- `orc ctl agent watch [--ticket <ticket>]` — stream lifecycle transitions as compact JSONL until interrupted
+- `orc ctl status` — read aggregate durable/live session state and stable attention counts as JSON; durable paused work needs attention
+- `orc ctl agent watch [--ticket <ticket>]` — stream per-ticket `agent_state`, `agent_error`, and `agent_stopped` transitions as compact JSONL until interrupted
 - `orc ctl agent prompt --ticket <ticket> "<text>" --wait --timeout 120s` — atomically prompt the exact recorded Herdr agent and wait for a settled lifecycle state
 - `orc ctl agent wait --ticket <ticket> --until blocked --timeout 120s` — wait for recognized lifecycle state without scraping terminal text
-- `orc ctl session capture --ticket <ticket> [--lines 80]` — capture text from the exact recorded Herdr or tmux pane; captured text is never treated as lifecycle state
+- `orc ctl session capture --ticket <ticket> [--lines 80]` — capture up to 5,000 recent lines from the exact recorded Herdr or tmux pane; captured text is never treated as lifecycle state
 
 `orc mark` validates transitions before writing `STATE.yaml`: pending tickets must be started before `next`, `done` is rejected from `pending`, stage and worker overrides must exist, invalid workspace config blocks advancement, and `artifact_policy: block` blocks `next` when required artifacts are missing, empty, or unchanged from the feature template (override with `--force`). Use `orc artifacts <ticket>` when an agent or human needs the same artifact checklist without advancing the ticket.
 

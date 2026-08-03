@@ -22,6 +22,9 @@ func loadDataWithMux(root, ticket string, demo bool, backend mux.Backend) tea.Cm
 			return dataMsg{rows: demoRows(ticket)}
 		}
 		rows, err := collectRowsWithMux(root, ticket, backend)
+		if err != nil && rows != nil {
+			return dataMsg{rows: rows, warning: err}
+		}
 		return dataMsg{rows: rows, err: err}
 	}
 }
@@ -49,33 +52,49 @@ func collectRowsWithMux(root, ticket string, backend mux.Backend) ([]row, error)
 				r.engine = live.Engine
 			}
 		}
-		if ticket != "" && !strings.EqualFold(r.ticket, ticket) {
-			continue
-		}
 		rows = append(rows, r)
 	}
 	if settings := snapshot.Config.Settings.Parking; settings != nil && len(settings.AutoPark) > 0 {
 		path, pathErr := parking.PolicyPath(root, "")
 		if pathErr != nil {
-			return nil, pathErr
+			return filterRowsByTicket(rows, ticket), pathErr
 		}
 		observations := make([]parking.Observation, 0, len(rows))
 		for _, r := range rows {
 			observations = append(observations, parking.Observation{Ticket: r.ticket, Status: r.status, Stage: r.stageName, Attention: r.attention})
 		}
-		decisions, policyErr := parking.ApplyPolicy(path, root, parking.Policy{AutoPark: settings.AutoPark, WakeOn: settings.WakeOn}, observations, time.Now().UTC())
+		policyErr := applyParkingToRows(rows, path, root, parking.Policy{AutoPark: settings.AutoPark, WakeOn: settings.WakeOn}, observations, time.Now().UTC())
 		if policyErr != nil {
-			return nil, policyErr
-		}
-		for i := range rows {
-			decision := decisions[rows[i].ticket]
-			rows[i].parked = decision.Parked
-			rows[i].woken = decision.Woken
-			rows[i].wakeReason = decision.WakeReason
+			sortRows(rows)
+			return filterRowsByTicket(rows, ticket), policyErr
 		}
 	}
 	sortRows(rows)
-	return rows, nil
+	return filterRowsByTicket(rows, ticket), nil
+}
+
+func applyParkingToRows(rows []row, path, root string, policy parking.Policy, observations []parking.Observation, now time.Time) error {
+	decisions, err := parking.ApplyPolicy(path, root, policy, observations, now)
+	for i := range rows {
+		decision := decisions[rows[i].ticket]
+		rows[i].parked = decision.Parked
+		rows[i].woken = decision.Woken
+		rows[i].wakeReason = decision.WakeReason
+	}
+	return err
+}
+
+func filterRowsByTicket(rows []row, ticket string) []row {
+	if ticket == "" {
+		return rows
+	}
+	filtered := make([]row, 0, 1)
+	for _, r := range rows {
+		if strings.EqualFold(r.ticket, ticket) {
+			filtered = append(filtered, r)
+		}
+	}
+	return filtered
 }
 
 func sortRows(rows []row) {

@@ -344,6 +344,8 @@ type AgentControlBackend interface {
 // TerminalCaptureBackend is an optional capability for reading terminal text
 // from an exact recorded target. Captured text is diagnostic content only; it
 // must never be interpreted as agent lifecycle state.
+const MaxCaptureLines = 5000
+
 type TerminalCaptureBackend interface {
 	Backend
 

@@ -29,6 +29,12 @@ func (m Model) renderRail() string {
 		b.WriteString(mutedStyle.Render(truncate(m.loadErr.Error(), inner)))
 		return b.String()
 	}
+	if m.loadWarning != nil {
+		b.WriteString(blockedStyle.Render("! parking warning"))
+		b.WriteString("\n")
+		b.WriteString(mutedStyle.Render(truncate(m.loadWarning.Error(), inner)))
+		b.WriteString("\n\n")
+	}
 
 	if len(m.rows) == 0 {
 		if m.parkedCount() == 0 {
@@ -207,6 +213,11 @@ func (m Model) renderWide() string {
 		b.WriteString(blockedStyle.Render("load error: "))
 		b.WriteString(m.loadErr.Error())
 		return b.String()
+	}
+	if m.loadWarning != nil {
+		b.WriteString(blockedStyle.Render("parking warning: "))
+		b.WriteString(m.loadWarning.Error())
+		b.WriteString("\n\n")
 	}
 	if len(m.rows) == 0 {
 		b.WriteString(mutedStyle.Render("No active work found."))

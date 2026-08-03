@@ -178,4 +178,9 @@ its status leaves the original parking value, which rearms the policy.
 
 This policy never stops a multiplexer session and never changes a worktree,
 pane, focus, or scrollback. Its state is stored separately from manual parking
-snapshots under `~/.local/state/orc/parking-policy/`.
+snapshots under `~/.local/state/orc/parking-policy/`. Policy evaluation always
+uses the complete workspace snapshot, even in a ticket-scoped Watch. State
+writes are serialized and skipped when nothing changes; changing the policy
+invalidates obsolete decisions. If policy state cannot be read or saved, Live
+keeps every ticket visible and shows a warning. Invalid state is quarantined and
+recreated.

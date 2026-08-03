@@ -117,14 +117,29 @@ func runCtlStatus(_ *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
-	summary := map[string]int{"total": len(sessions)}
+	summary := ctlStatusSummary{Total: len(sessions)}
 	for _, session := range sessions {
-		summary[session.Kind]++
+		switch session.Kind {
+		case sessionlist.KindManaged:
+			summary.Managed++
+		case sessionlist.KindOrphaned:
+			summary.Orphaned++
+		case sessionlist.KindUnmanaged:
+			summary.Unmanaged++
+		}
 		if ctlSessionNeedsAttention(session) {
-			summary["needs_attention"]++
+			summary.NeedsAttention++
 		}
 	}
 	return printJSON(map[string]any{"type": "status", "summary": summary, "sessions": sessions})
+}
+
+type ctlStatusSummary struct {
+	Total          int `json:"total"`
+	Managed        int `json:"managed"`
+	Orphaned       int `json:"orphaned"`
+	Unmanaged      int `json:"unmanaged"`
+	NeedsAttention int `json:"needs_attention"`
 }
 
 func runCtlAgentState(_ *cobra.Command, _ []string) error {
@@ -147,23 +162,47 @@ func runCtlAgentWatch(cmd *cobra.Command, _ []string) error {
 	if cmd != nil {
 		writer = cmd.OutOrStdout()
 	}
-	previous := make(map[string]mux.AgentControlResult)
+	previous := make(map[string]ctlAgentSnapshot)
+	started := false
 	emit := func() error {
 		states, err := collectCtlAgentStates(ctlWatchTicket)
 		if err != nil {
 			return err
 		}
+		if ctlWatchTicket == "" && len(states) == 0 && !started {
+			return ctlError("no_controllable_agents", "no tickets have a live backend with recognized agent lifecycle control")
+		}
+		started = true
+		seenTickets := make(map[string]bool, len(states))
 		for _, current := range states {
+			seenTickets[current.Ticket] = true
 			prior, seen := previous[current.Ticket]
-			if seen && prior == current.Agent {
+			if seen && ctlAgentSnapshotsEqual(prior, current) {
 				continue
 			}
+			payload := map[string]any{"type": "agent_state", "ticket": current.Ticket, "agent": current.Agent}
+			if current.Error != nil {
+				payload = map[string]any{"type": "agent_error", "ticket": current.Ticket, "error": current.Error}
+			}
+			if err := json.NewEncoder(writer).Encode(payload); err != nil {
+				return err
+			}
+			previous[current.Ticket] = current
+		}
+		stopped := make([]string, 0)
+		for ticketID := range previous {
+			if !seenTickets[ticketID] {
+				stopped = append(stopped, ticketID)
+			}
+		}
+		sort.Strings(stopped)
+		for _, ticketID := range stopped {
 			if err := json.NewEncoder(writer).Encode(map[string]any{
-				"type": "agent_state", "ticket": current.Ticket, "agent": current.Agent,
+				"type": "agent_stopped", "ticket": ticketID,
 			}); err != nil {
 				return err
 			}
-			previous[current.Ticket] = current.Agent
+			delete(previous, ticketID)
 		}
 		return nil
 	}
@@ -191,6 +230,9 @@ func runCtlAgentWatch(cmd *cobra.Command, _ []string) error {
 func runCtlSessionCapture(_ *cobra.Command, _ []string) error {
 	if ctlCaptureLines <= 0 {
 		return ctlError("invalid_argument", "--lines must be greater than zero")
+	}
+	if ctlCaptureLines > mux.MaxCaptureLines {
+		return ctlError("invalid_argument", "--lines must not exceed %d", mux.MaxCaptureLines)
 	}
 	backend, target, ticketID, err := resolveCtlTarget(ctlCaptureTicket)
 	if err != nil {
@@ -302,6 +344,22 @@ func resolveCtlTarget(ticketArg string) (mux.Backend, mux.Target, string, error)
 type ctlAgentSnapshot struct {
 	Ticket string
 	Agent  mux.AgentControlResult
+	Error  *ctlAgentWatchError
+}
+
+type ctlAgentWatchError struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+func ctlAgentSnapshotsEqual(left, right ctlAgentSnapshot) bool {
+	if left.Ticket != right.Ticket || left.Agent != right.Agent {
+		return false
+	}
+	if left.Error == nil || right.Error == nil {
+		return left.Error == nil && right.Error == nil
+	}
+	return *left.Error == *right.Error
 }
 
 func collectCtlAgentStates(ticketArg string) ([]ctlAgentSnapshot, error) {
@@ -317,18 +375,35 @@ func collectCtlAgentStates(ticketArg string) ([]ctlAgentSnapshot, error) {
 			if ticketArg == "" && errors.As(err, &commandErr) && commandErr.code == "unsupported_backend" {
 				continue
 			}
+			if ticketArg == "" {
+				result = append(result, ctlAgentSnapshot{Ticket: ticketID, Error: ctlAgentError(err)})
+				continue
+			}
 			return nil, err
 		}
 		agent, err := controller.StateAgent(target)
 		if err != nil {
+			if ticketArg == "" {
+				result = append(result, ctlAgentSnapshot{Ticket: resolvedTicket, Error: ctlAgentError(err)})
+				continue
+			}
 			return nil, err
 		}
 		result = append(result, ctlAgentSnapshot{Ticket: resolvedTicket, Agent: agent})
 	}
-	if len(result) == 0 {
+	if len(result) == 0 && ticketArg != "" {
 		return nil, ctlError("no_controllable_agents", "no tickets have a live backend with recognized agent lifecycle control")
 	}
 	return result, nil
+}
+
+func ctlAgentError(err error) *ctlAgentWatchError {
+	code := "agent_unavailable"
+	var commandErr *ctlCommandError
+	if errors.As(err, &commandErr) {
+		code = commandErr.code
+	}
+	return &ctlAgentWatchError{Code: code, Message: err.Error()}
 }
 
 func ctlAgentTickets(ticketArg string) ([]string, error) {
@@ -359,13 +434,13 @@ func ctlAgentTickets(ticketArg string) ([]string, error) {
 }
 
 func ctlSessionNeedsAttention(session sessionlist.Session) bool {
-	values := []string{session.Attention, session.Lifecycle}
+	values := []string{session.Status, session.Attention, session.Lifecycle}
 	if session.Live != nil {
 		values = append(values, session.Live.State)
 	}
 	for _, value := range values {
 		switch strings.ToLower(value) {
-		case "input", "blocked", "review":
+		case "input", "blocked", "review", "paused":
 			return true
 		}
 	}

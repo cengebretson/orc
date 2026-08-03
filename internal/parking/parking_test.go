@@ -3,6 +3,8 @@ package parking
 import (
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -85,6 +87,114 @@ func TestApplyPolicyLeavesAttentionVisibleOnFirstObservation(t *testing.T) {
 	}
 	if got := decisions["ORC-2"]; !got.Woken || got.Parked || got.WakeReason != "attention" {
 		t.Fatalf("decision = %#v, want visible attention wake", got)
+	}
+}
+
+func TestApplyPolicyReconcilesChangedConfiguration(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "policy.json")
+	now := time.Now().UTC()
+	observation := []Observation{{Ticket: "ORC-3", Status: "paused", Stage: "develop"}}
+	decisions, err := ApplyPolicy(path, "/workspace", Policy{AutoPark: []string{"paused"}, WakeOn: []string{"status_change"}}, observation, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !decisions["ORC-3"].Parked {
+		t.Fatalf("initial decision = %#v, want parked", decisions["ORC-3"])
+	}
+	decisions, err = ApplyPolicy(path, "/workspace", Policy{AutoPark: []string{"done"}, WakeOn: []string{"status_change"}}, observation, now.Add(time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if decisions["ORC-3"].Parked || decisions["ORC-3"].Woken {
+		t.Fatalf("changed-policy decision = %#v, want visible", decisions["ORC-3"])
+	}
+}
+
+func TestApplyPolicyQuarantinesInvalidStateAndReturnsDecisions(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "policy.json")
+	if err := os.WriteFile(path, []byte("{"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	decisions, err := ApplyPolicy(path, "/workspace", Policy{AutoPark: []string{"paused"}}, []Observation{{Ticket: "ORC-4", Status: "paused"}}, time.Now().UTC())
+	if err == nil || !strings.Contains(err.Error(), "was reset") {
+		t.Fatalf("error = %v, want reset warning", err)
+	}
+	if !decisions["ORC-4"].Parked {
+		t.Fatalf("decision = %#v, want parked despite warning", decisions["ORC-4"])
+	}
+	quarantined, globErr := filepath.Glob(path + ".corrupt-*")
+	if globErr != nil || len(quarantined) != 1 {
+		t.Fatalf("quarantined=%v err=%v", quarantined, globErr)
+	}
+	if _, loadErr := loadPolicyState(path); loadErr != nil {
+		t.Fatalf("replacement state: %v", loadErr)
+	}
+}
+
+func TestApplyPolicyReturnsDecisionsWhenSaveFails(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "policy.json")
+	if err := os.Mkdir(path, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	decisions, err := ApplyPolicy(path, "/workspace", Policy{AutoPark: []string{"paused"}}, []Observation{{Ticket: "ORC-9", Status: "paused"}}, time.Now().UTC())
+	if err == nil || !strings.Contains(err.Error(), "save parking policy state") {
+		t.Fatalf("error = %v, want save warning", err)
+	}
+	if !decisions["ORC-9"].Parked {
+		t.Fatalf("decision = %#v, want parked despite save failure", decisions["ORC-9"])
+	}
+}
+
+func TestApplyPolicyDoesNotRewriteUnchangedState(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "policy.json")
+	policy := Policy{AutoPark: []string{"paused"}}
+	observations := []Observation{{Ticket: "ORC-5", Status: "paused"}}
+	if _, err := ApplyPolicy(path, "/workspace", policy, observations, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ApplyPolicy(path, "/workspace", policy, observations, time.Now().UTC().Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	after, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !os.SameFile(before, after) {
+		t.Fatal("unchanged policy state was rewritten")
+	}
+}
+
+func TestApplyPolicySerializesConcurrentWriters(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "policy.json")
+	policy := Policy{AutoPark: []string{"paused"}, WakeOn: []string{"stage_change"}}
+	observations := []Observation{{Ticket: "ORC-6", Status: "paused", Stage: "develop"}, {Ticket: "ORC-7", Status: "active", Stage: "review"}}
+	var wg sync.WaitGroup
+	errs := make(chan error, 16)
+	for i := 0; i < cap(errs); i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := ApplyPolicy(path, "/workspace", policy, observations, time.Now().UTC())
+			errs <- err
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	state, err := loadPolicyState(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(state.Tickets) != 1 || !state.Tickets["ORC-6"].Parked {
+		t.Fatalf("state = %#v", state)
 	}
 }
 

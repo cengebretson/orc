@@ -26,8 +26,9 @@ type watchAnimationMsg struct {
 }
 
 type dataMsg struct {
-	rows []row
-	err  error
+	rows    []row
+	err     error
+	warning error
 }
 
 type attachDoneMsg struct {
@@ -114,6 +115,7 @@ type Model struct {
 	height         int
 	lastLoad       time.Time
 	loadErr        error
+	loadWarning    error
 	message        string
 	petFrame       int
 	petTicking     bool
@@ -237,6 +239,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.allRows = mergeLiveVisuals(m.allRows, msg.rows, now)
 		m.applyFilter(false)
 		m.loadErr = msg.err
+		m.loadWarning = msg.warning
 		m.lastLoad = now
 		m.now = now
 		if selectedTicket != "" {

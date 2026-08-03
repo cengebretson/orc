@@ -1,10 +1,14 @@
 package parking
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
+	"sort"
 	"strings"
 	"time"
 )
@@ -43,6 +47,7 @@ type PolicyRecord struct {
 type PolicyState struct {
 	Version   int                     `json:"version"`
 	Workspace string                  `json:"workspace"`
+	PolicyKey string                  `json:"policy_key,omitempty"`
 	Tickets   map[string]PolicyRecord `json:"tickets"`
 }
 
@@ -57,13 +62,43 @@ func PolicyPath(root, home string) (string, error) {
 // ApplyPolicy evaluates wake rules before park rules and persists the small
 // display-policy state needed to make parking reversible across refreshes.
 func ApplyPolicy(path, workspace string, policy Policy, observations []Observation, now time.Time) (map[string]Decision, error) {
-	state, err := loadPolicyState(path)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return nil, err
+	var decisions map[string]Decision
+	var warning error
+	err := withPolicyLock(path, func() error {
+		state, loadErr := loadPolicyState(path)
+		missing := errors.Is(loadErr, os.ErrNotExist)
+		if loadErr != nil && !missing {
+			warning = fmt.Errorf("parking policy state was reset: %w", loadErr)
+			var invalid *invalidPolicyStateError
+			if errors.As(loadErr, &invalid) {
+				if quarantineErr := quarantinePolicyState(path, now); quarantineErr != nil {
+					warning = errors.Join(warning, fmt.Errorf("quarantine invalid parking state: %w", quarantineErr))
+				}
+			}
+		}
+		key := policyKey(policy)
+		if loadErr != nil || state.Tickets == nil || state.Workspace != workspace || state.PolicyKey != key {
+			state = PolicyState{
+				Version: PolicyVersion, Workspace: workspace, PolicyKey: key,
+				Tickets: make(map[string]PolicyRecord),
+			}
+		}
+		before := clonePolicyState(state)
+		decisions = evaluatePolicy(&state, policy, observations, now)
+		if missing || loadErr != nil || !reflect.DeepEqual(before, state) {
+			if saveErr := savePolicyState(path, state); saveErr != nil {
+				warning = errors.Join(warning, fmt.Errorf("save parking policy state: %w", saveErr))
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		warning = errors.Join(warning, err)
 	}
-	if state.Tickets == nil || state.Workspace != workspace {
-		state = PolicyState{Version: PolicyVersion, Workspace: workspace, Tickets: make(map[string]PolicyRecord)}
-	}
+	return decisions, warning
+}
+
+func evaluatePolicy(state *PolicyState, policy Policy, observations []Observation, now time.Time) map[string]Decision {
 	autoPark := stringSet(policy.AutoPark)
 	wakeOn := stringSet(policy.WakeOn)
 	decisions := make(map[string]Decision, len(observations))
@@ -71,6 +106,12 @@ func ApplyPolicy(path, workspace string, policy Policy, observations []Observati
 	for _, observation := range observations {
 		seen[observation.Ticket] = true
 		record, exists := state.Tickets[observation.Ticket]
+		parkable := autoPark[normalize(observation.Status)]
+		if exists && record.Parked && !parkable {
+			delete(state.Tickets, observation.Ticket)
+			exists = false
+			record = PolicyRecord{}
+		}
 		if exists && record.Parked {
 			if reason := wakeReason(record, observation, wakeOn); reason != "" {
 				record.Parked = false
@@ -90,7 +131,7 @@ func ApplyPolicy(path, workspace string, policy Policy, observations []Observati
 			decisions[observation.Ticket] = Decision{Woken: true, WakeReason: record.WakeReason}
 			continue
 		}
-		if autoPark[normalize(observation.Status)] && wakeOn["attention"] && attentionNeeded(observation.Attention) {
+		if parkable && wakeOn["attention"] && attentionNeeded(observation.Attention) {
 			record = PolicyRecord{
 				Ticket: observation.Ticket, ParkedStatus: observation.Status, ParkedStage: observation.Stage,
 				ParkedAttention: observation.Attention, WakeReason: "attention", WokenAt: now,
@@ -99,7 +140,7 @@ func ApplyPolicy(path, workspace string, policy Policy, observations []Observati
 			decisions[observation.Ticket] = Decision{Woken: true, WakeReason: "attention"}
 			continue
 		}
-		if autoPark[normalize(observation.Status)] {
+		if parkable {
 			record = PolicyRecord{
 				Ticket: observation.Ticket, Parked: true, ParkedStatus: observation.Status,
 				ParkedStage: observation.Stage, ParkedAttention: observation.Attention, ParkedAt: now,
@@ -115,10 +156,7 @@ func ApplyPolicy(path, workspace string, policy Policy, observations []Observati
 			delete(state.Tickets, ticket)
 		}
 	}
-	if err := savePolicyState(path, state); err != nil {
-		return nil, err
-	}
-	return decisions, nil
+	return decisions
 }
 
 func wakeReason(record PolicyRecord, observation Observation, wakeOn map[string]bool) string {
@@ -155,6 +193,34 @@ func stringSet(values []string) map[string]bool {
 
 func normalize(value string) string { return strings.ToLower(strings.TrimSpace(value)) }
 
+func policyKey(policy Policy) string {
+	normalized := func(values []string) []string {
+		set := stringSet(values)
+		result := make([]string, 0, len(set))
+		for value := range set {
+			result = append(result, value)
+		}
+		sort.Strings(result)
+		return result
+	}
+	sum := sha256.Sum256([]byte(strings.Join(normalized(policy.AutoPark), "\x00") + "\x01" + strings.Join(normalized(policy.WakeOn), "\x00")))
+	return fmt.Sprintf("%x", sum)
+}
+
+func clonePolicyState(state PolicyState) PolicyState {
+	clone := state
+	clone.Tickets = make(map[string]PolicyRecord, len(state.Tickets))
+	for ticket, record := range state.Tickets {
+		clone.Tickets[ticket] = record
+	}
+	return clone
+}
+
+type invalidPolicyStateError struct{ err error }
+
+func (e *invalidPolicyStateError) Error() string { return e.err.Error() }
+func (e *invalidPolicyStateError) Unwrap() error { return e.err }
+
 func loadPolicyState(path string) (PolicyState, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -162,12 +228,17 @@ func loadPolicyState(path string) (PolicyState, error) {
 	}
 	var state PolicyState
 	if err := json.Unmarshal(data, &state); err != nil {
-		return PolicyState{}, err
+		return PolicyState{}, &invalidPolicyStateError{err: fmt.Errorf("decode parking policy state: %w", err)}
 	}
 	if state.Version != PolicyVersion {
-		return PolicyState{}, errors.New("unsupported parking policy state version")
+		return PolicyState{}, &invalidPolicyStateError{err: errors.New("unsupported parking policy state version")}
 	}
 	return state, nil
+}
+
+func quarantinePolicyState(path string, now time.Time) error {
+	quarantine := fmt.Sprintf("%s.corrupt-%s", path, now.UTC().Format("20060102T150405.000000000Z"))
+	return os.Rename(path, quarantine)
 }
 
 func savePolicyState(path string, state PolicyState) error {

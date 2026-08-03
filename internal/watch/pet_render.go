@@ -171,6 +171,9 @@ func (m Model) renderPets() string {
 		b.WriteString("\n" + blockedStyle.Render("load error: ") + m.loadErr.Error())
 		return b.String()
 	}
+	if m.loadWarning != nil {
+		b.WriteString("\n" + blockedStyle.Render("parking warning: ") + m.loadWarning.Error())
+	}
 	if len(m.rows) == 0 {
 		b.WriteString("\n" + mutedStyle.Render("No creatures are awake."))
 		b.WriteString("\n\n" + mutedStyle.Render("v rail  l layout  / filter  r refresh  q quit"))

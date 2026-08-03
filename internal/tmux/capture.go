@@ -20,6 +20,9 @@ func CaptureTarget(target mux.Target, lines int) (string, error) {
 	if lines <= 0 {
 		return "", fmt.Errorf("tmux capture lines must be greater than zero")
 	}
+	if lines > mux.MaxCaptureLines {
+		return "", fmt.Errorf("tmux capture lines must not exceed %d", mux.MaxCaptureLines)
+	}
 	pane, err := ValidatePaneTarget(target.Workspace, target.Tab, target.Pane)
 	if err != nil {
 		return "", err
@@ -31,5 +34,19 @@ func CaptureTarget(target mux.Target, lines int) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("capture tmux pane %s: %s: %w", pane, strings.TrimSpace(string(out)), err)
 	}
-	return string(out), nil
+	return recentLines(string(out), lines), nil
+}
+
+func recentLines(text string, limit int) string {
+	trailingNewline := strings.HasSuffix(text, "\n")
+	trimmed := strings.TrimSuffix(text, "\n")
+	lines := strings.Split(trimmed, "\n")
+	if len(lines) > limit {
+		lines = lines[len(lines)-limit:]
+	}
+	result := strings.Join(lines, "\n")
+	if trailingNewline {
+		result += "\n"
+	}
+	return result
 }
