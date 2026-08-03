@@ -111,7 +111,7 @@ existing data-refresh cadence.
 
 ## Narrow rail view
 
-The default view should assume a narrow vertical split. Avoid tables, headers,
+The default view assumes a narrow vertical split. It avoids tables, headers,
 long labels, and dense detail.
 
 Example multi-session rail:
@@ -167,7 +167,7 @@ NEEDS YOU
 ╰──────────────────╯
 ```
 
-The renderer should truncate cleanly to the available width. The primary signal
+The renderer truncates cleanly to the available width. The primary signal
 is the state icon/label; the selected session uses a full-width highlighted row
 and a bordered details card so it remains obvious even without terminal color.
 The compact overview card mirrors the Workspace dashboard header, separates
@@ -207,9 +207,9 @@ memory and do not modify durable state.
 
 ## State model
 
-`orc watch` should be driven primarily by the durable Orc workflow contract.
+`orc watch` is driven primarily by the durable Orc workflow contract.
 `STATE.yaml` is authoritative for whether work needs a human, is done, is
-pending, or is active. Live runtime checks should only refine that durable view.
+pending, or is active. Live runtime checks only refine that durable view.
 
 The important contract point is that an agent needing human input is not just a
 terminal condition. The agent must run:
@@ -219,7 +219,7 @@ orc mark <ticket> pause "<what you need>"
 ```
 
 before asking the human. That makes `STATE.yaml` show `paused`, and `orc watch`
-should display that as blocked/human-needed without requiring any tmux marker.
+displays that as blocked/human-needed without requiring any tmux marker.
 
 `orc watch` combines these sources:
 
@@ -313,7 +313,7 @@ authoritative:
 
 This integration is optional and is a no-op when `tmux-attention` is not installed.
 
-When `STATE.yaml` says `paused`, watch should show `blocked` even if
+When `STATE.yaml` says `paused`, watch shows `blocked` even if
 `@agent_attention` is empty or stale. When `STATE.yaml` says `active`,
 `@agent_attention=input|blocked|review|done` can refine the live display.
 
@@ -381,87 +381,41 @@ Keybindings:
 | `q` | quit watch pane |
 | `?` | toggle the compact key help overlay |
 
-Prompt sending must be explicit. Selecting a ticket or pressing `enter` should
+Prompt sending must be explicit. Selecting a ticket or pressing `enter` does
 not paste into an agent pane by itself.
 
 ## Attach/focus
 
-Pressing `a` should focus the selected ticket's tmux target:
+Pressing `a` focuses the selected ticket's exact recorded runtime target:
 
-- Target session comes from `STATE.yaml runtime.tmux.session`.
-- Target window comes from the current `STATE.yaml stage.name`.
-- Inside tmux, use `tmux switch-client -t <session>:<window>`.
-- Outside tmux, use `tmux attach-session -t <session>:<window>`.
-- If no tmux runtime is recorded, or the session is known stopped, show a short
-  in-watch status message instead of silently doing nothing.
+- Target identity comes from `STATE.yaml runtime.mux`, with legacy tmux state
+  retained only as a compatibility fallback.
+- The selected backend validates the exact workspace, tab, and pane before
+  attaching; focus is never inferred from a label or active pane.
+- If no runtime is recorded, the backend is unavailable, or the target is
+  stopped, the rail shows a short status message instead of guessing.
 
 Pressing `i` cycles to the next live `blocked`, `input`, or `review` row and
-attaches to its exact session/window target. `orc focus` performs the same
+attaches to its exact runtime target. `orc focus` performs the same
 attention-first action non-interactively, choosing the highest-priority target.
 
 ## Prompt actions
 
-There are two prompt-related behaviors:
-
-1. Preview or print the prompt for the selected ticket.
-2. Send the prompt to the agent's tmux window/pane.
-
-The rail should show a short selected-session detail block without requiring a
+The rail shows a short selected-session detail block without requiring a
 key press. Preview/details can still expand the selected story when the user
-wants more context; this expanded page should include recent history. Send-to-agent
-can follow after the target window logic is reliable.
+wants more context; this expanded page includes recent history.
 
 When a ticket is blocked because `STATE.yaml` is `paused`, label the prompt text
 as `Blocker`. For non-blocked states, label it as `Next`.
 
-When sending, `orc` should route through shared Go tmux helpers rather than
-constructing shell snippets in the dashboard layer. This avoids quoting problems and
-keeps behavior testable.
-
-## Future structured human responses
-
-For v1, blocked tickets should rely on freeform human-readable blocker text in
-`STATE.yaml next_action.prompt`. `orc watch` should display that text, but it
-should not guess the correct reply for yes/no, approval, or choice prompts.
-
-A future `STATE.yaml` contract could add optional structured response hints under
-`next_action`:
-
-```yaml
-next_action:
-  worker: human
-  prompt: "Approve opening the PR?"
-  response:
-    type: choice
-    options:
-      - value: "yes"
-        label: "Approve"
-      - value: "no"
-        label: "Do not approve"
-```
-
-Other possible response types:
-
-```yaml
-response:
-  type: text
-  placeholder: "Enter the target refresh token TTL"
-```
-
-```yaml
-response:
-  type: confirm
-  yes: "yes"
-  no: "no"
-```
-
-With structured response hints, `orc watch` could render a compact reply screen
-and send the exact configured value to the agent. Without those hints, reply/send
-should remain manual and explicit.
+Watch does not send text. `orc next`, `orc jit`, and structured `orc ctl`
+commands are the canonical launch/control surfaces. Prompt sending from Watch
+is roadmap work and must be explicit, confirmed, exact-targeted, and covered
+for quoting and ambiguous targets.
 
 ## tmux toggle
 
-Users should be able to open and close the dashboard with one tmux binding.
+Users can open and close the dashboard with one tmux binding.
 
 Example binding:
 
@@ -476,139 +430,18 @@ Toggle behavior:
 3. Run `orc watch`.
 4. Mark the pane so future toggles can find it.
 
-Implementation approach:
-
-- Set a pane marker such as `@orc_watch=1`, or use a stable pane title.
-- Find existing panes with `tmux list-panes`.
-- Open with a command similar to:
+Orc marks the owned pane, finds it with tmux pane inventory, and opens a split
+equivalent to:
 
 ```sh
 tmux split-window -h -l 32 "orc watch"      # default right-side pane
 tmux split-window -v -l 25% "orc watch"     # bottom pane
 ```
 
-The exact command should live in Go so it can respect workspace root, current
-ticket context, and future flags. When `--workspace` is not explicitly provided,
-Orc should find the workspace by walking upward to `orc.yaml`; if it cannot find
-one, it should return a clear error. The spawned watch pane should receive the
-resolved workspace path explicitly, for example `orc --workspace <root> watch`,
-so tmux pane CWD does not matter.
+When `--workspace` is not explicit, Orc walks upward to `orc.yaml` and passes
+the resolved workspace to the spawned pane so its initial CWD does not matter.
 
-## Future tmux control modes
-
-`orc watch` can eventually support three tmux control modes:
-
-1. Side pane mode: `orc watch --tmux-toggle` runs inside tmux and opens/closes
-   the watch rail next to the active work.
-2. Standalone attach mode: `orc watch` runs in its own terminal, and an attach
-   action takes over that terminal with `tmux attach -t <session>:<window>`.
-3. Remote controller mode: `orc watch` runs in its own terminal and asks an
-   already-attached tmux client in another terminal to switch focus with
-   `tmux switch-client -c <client> -t <session>:<window>`.
-
-For remote controller mode, `<client>` is a tmux client identifier. In practice
-this is usually the client TTY path reported by:
-
-```sh
-tmux list-clients -F "#{client_tty}\t#{session_name}"
-```
-
-Example values look like `/dev/ttys003`, `/dev/pts/4`, or whatever terminal
-device tmux reports for the attached client. If exactly one tmux client is
-attached, `orc watch` could infer it. If multiple clients are attached, the user
-should choose one or pass a future flag such as `--tmux-client /dev/ttys003`.
-
-## Implementation outline
-
-Add a new command and package:
-
-```text
-cmd/orc/watch_cmd.go
-internal/watch/
-  model.go
-  data.go
-  render.go
-```
-
-Reuse existing packages where possible:
-
-- `internal/featurelist` for session rows.
-- `internal/ticket` and `internal/ticketview` for focused details.
-- `internal/tmux` for session/window lookup, optional attention markers,
-  attach, split, close, and send.
-- Existing next/runner logic for prompt generation.
-
-Add tmux helpers as needed:
-
-- Check session/window liveness.
-- Read window attention marker when `tmux-attention` state is available.
-- Split a watch pane.
-- Mark/find/close a watch pane.
-- Send prompt text safely to an agent target.
-
-## Delivery status
-
-### Phase 1: passive watch rail — completed
-
-The compact multi-session and single-ticket views refresh on an interval, keep
-durable `STATE.yaml` state primary, layer tmux liveness and attention on top, and
-provide selected-session details plus clean `q`/Ctrl-C exit behavior.
-
-### Phase 2: tmux toggle — completed
-
-`orc watch --tmux-toggle` uses exact pane markers to open or close one watch pane
-with configurable right/bottom layout and size. Repeated toggles do not create
-duplicate watch panes, and the user-owned binding is documented in
-[`docs/tmux.md`](tmux.md).
-
-### Phase 3: prompt preview and attach — completed
-
-Selection, expandable prompt/history details, exact-pane attach, next-attention
-focus, shared filtering, and immediate refresh are implemented and covered by
-rendering and tmux-target tests.
-
-### Phase 4: optional little-orc pet view — completed
-
-`v` toggles between the default rail and an animated Tamagotchi-style view;
-`--view pet` selects it at startup and is forwarded through `--tmux-toggle`.
-`l` / `--pet-layout column` force a vertical card stack; startup choices are
-also forwarded through `--tmux-toggle`.
-Both modes share data, selection, filtering, preview, attach, focus, refresh,
-and exit behavior. Animation runs only while the pet view is active.
-
-Sprites were later redrawn as true-color half-block pixel art. An optional
-three-row micro sprite size shipped alongside the original ASCII sprites but
-was removed once pixel art replaced them — a detailed creature (ears, tusks,
-mohawk) doesn't hold up at that resolution, so there is now a single sprite
-size.
-
-### Post-v1: direct prompt sending
-
-Directly sending previewed prompt text to an agent pane is intentionally outside
-the v1 boundary. `orc next` and `orc jit` remain the canonical launch surfaces;
-watch selection, preview, or attach never sends text by itself. A future send
-action must be explicit, confirmed, routed through the shared exact-pane helper,
-and covered for shell quoting and ambiguous targets.
-
-### Later: notification emission
-
-Configurable completion and blocker hooks are tracked in [`plan.md`](../plan.md).
-They may optionally mirror tmux-attention markers after durable state is written,
-but notifications do not block v1.
-
-### Post-v1: remote tmux controller
-
-Remote attached-client discovery and `--tmux-client <client>` selection remain
-deferred. Standalone watch/focus processes do not guess which other tmux client
-to move.
-
-### Post-v1: structured human replies
-
-Choice, confirmation, and text response schemas may eventually extend
-`STATE.yaml next_action`. Any value sent to an agent must require explicit human
-confirmation.
-
-## Resolved v1 behavior
+## Behavior
 
 - `orc watch` without a ticket shows all active work; an optional ticket scopes
   the rail explicitly.
@@ -623,5 +456,5 @@ confirmation.
   versus column card placement.
 - `STATE.yaml` remains authoritative. `@agent_attention` is a live urgency hint,
   never durable workflow state.
-- Attach and focus target the current tmux context only. Remote-client movement
-  remains explicit post-v1 work.
+- Attach and focus target the selected ticket's recorded runtime. They never
+  guess which unrelated remote tmux client to move.

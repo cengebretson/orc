@@ -44,7 +44,7 @@ orc/
     reference.md                  deep reference — layout, files, orc.yaml, STATE.yaml, workers
   go.mod
   Makefile
-  plan.md                         roadmap — up-next work, future ideas, cleanup, done record
+  plan.md                         roadmap — unshipped work only
 ```
 
 ## Dev Workflow
