@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-08-03
+
 **Breaking:** five `orc watch` flags are gone. Replace `--tmux-toggle`,
 `--tmux-layout`, and `--tmux-size` with `orc rail toggle [--layout] [--size]`;
 `--view` and `--pet-layout` have no replacement. Check tmux keybindings that
@@ -73,12 +75,8 @@ invoke `orc watch` — an unknown flag now fails the command.
   incremental cursors. Their coverage moved onto the live code paths. No
   user-facing behavior changed.
 - Context-pressure colouring and the trend sparkline now come from one
-  implementation in `internal/ui`, shared by the Live rail, the pet view, and
-  the Workspace tabs, instead of five copies of the level switch and two of the
-  sparkline. The pet view previously coloured a below-green-threshold reading
-  green while every other view drew it muted; it now matches. That divergence
-  was unreachable with the default thresholds (`green: 0`) and only visible in
-  workspaces configuring a non-zero green boundary.
+  implementation in `internal/ui`, shared by the Live rail and the Workspace
+  tabs, instead of five copies of the level switch and two of the sparkline.
 - Consolidated duplicated internal helpers so the copies can no longer drift
   apart. Shell quoting moved to `internal/shellquote`, which now distinguishes
   always-quote (`Quote`, required where hook commands are matched against
@@ -621,7 +619,8 @@ invoke `orc watch` — an unknown flag now fails the command.
 - Bubble Tea TUI dashboard with health, workflow, stage, and portrait views.
 - `orc doctor --fix` to clear stale state locks.
 
-[Unreleased]: https://github.com/cengebretson/orc/compare/v0.16.1...HEAD
+[Unreleased]: https://github.com/cengebretson/orc/compare/v0.17.0...HEAD
+[0.17.0]: https://github.com/cengebretson/orc/compare/v0.16.1...v0.17.0
 [0.16.1]: https://github.com/cengebretson/orc/compare/v0.16.0...v0.16.1
 [0.16.0]: https://github.com/cengebretson/orc/compare/v0.15.1...v0.16.0
 [0.15.1]: https://github.com/cengebretson/orc/compare/v0.15.0...v0.15.1
