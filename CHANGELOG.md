@@ -15,6 +15,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   notes were restored by hand. `make release-check` could not have caught this,
   because snapshot mode skips the same pipe and never renders a release body.
 
+### Changed
+
+- Hook installation moved from `orc doctor --install-agent-hooks` to
+  `orc hooks install [--dry-run]`. It writes into Codex and Claude
+  configuration rather than the workspace, so it was never a repair of anything
+  `doctor` diagnoses — it rejected doctor's ticket argument, `--fix`, and
+  `--system`, and needed three guard clauses to stay separated from them.
+  `orc doctor` still reports whether the hooks are installed and now names the
+  new command; `--fix` stays on `doctor`, where repairing a stale workspace lock
+  is exactly what a doctor should do.
+
 ### Added
 
 - Added two guards for release notes. `scripts/release-contract` now rejects a

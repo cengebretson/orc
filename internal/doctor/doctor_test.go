@@ -142,7 +142,7 @@ func TestAppendAgentHookChecksReportsReadinessAndSupportedStates(t *testing.T) {
 	if check := findCheck(report, "agent hooks", "codex"); check == nil || check.Status != doctor.OK || !strings.Contains(check.Detail, "idle, working, blocked") {
 		t.Fatalf("codex hook check = %#v", check)
 	}
-	if check := findCheck(report, "agent hooks", "claude"); check == nil || check.Status != doctor.Warning || !strings.Contains(check.Detail, "--install-agent-hooks") {
+	if check := findCheck(report, "agent hooks", "claude"); check == nil || check.Status != doctor.Warning || !strings.Contains(check.Detail, "orc hooks install") {
 		t.Fatalf("claude hook check = %#v", check)
 	}
 }

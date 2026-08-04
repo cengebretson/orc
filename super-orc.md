@@ -249,8 +249,8 @@ optional for control correctness.
 Add the planned idempotent command surface:
 
 ```text
-orc doctor --install-agent-hooks
-orc doctor --install-agent-hooks --dry-run
+orc hooks install
+orc hooks install --dry-run
 ```
 
 Each engine integration reports:

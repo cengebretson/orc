@@ -151,7 +151,7 @@ func AppendAgentHookChecks(report *Report, plan *agenthooks.Plan, lookPath func(
 				status = OK
 			}
 		} else if integration.Err == nil {
-			detail += "; run orc doctor --install-agent-hooks"
+			detail += "; run orc hooks install"
 		}
 		report.Checks = append(report.Checks, Check{
 			Group: "agent hooks", Name: integration.Engine, Status: status, Detail: detail,

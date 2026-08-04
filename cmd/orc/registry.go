@@ -13,8 +13,7 @@ func init() {
 
 	doctorCmd.Flags().BoolVar(&doctorFix, "fix", false, "Remove provably-stale state locks (dead PID or old without a valid PID); live locks are never touched")
 	doctorCmd.Flags().BoolVar(&doctorSystem, "system", false, "Check Orc install readiness outside a workspace")
-	doctorCmd.Flags().BoolVar(&doctorInstallAgentHooks, "install-agent-hooks", false, "Install Orc lifecycle hooks for Codex and Claude")
-	doctorCmd.Flags().BoolVar(&doctorDryRun, "dry-run", false, "Preview agent hook installation without writing")
+	hooksInstallCmd.Flags().BoolVar(&hooksInstallDryRun, "dry-run", false, "Preview hook installation without writing")
 	nextCmd.Flags().BoolVar(&nextJSON, "json", false, "Output as JSON")
 	nextCmd.Flags().BoolVar(&nextDry, "dry", false, "Print the launch command without executing it")
 	nextCmd.Flags().StringVar(&nextWorker, "worker", "", "Override the workflow's default worker (worker ID)")
@@ -100,6 +99,8 @@ func init() {
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(packCmd)
 	rootCmd.AddCommand(doctorCmd)
+	hooksCmd.AddCommand(hooksInstallCmd)
+	rootCmd.AddCommand(hooksCmd)
 	rootCmd.AddCommand(nextCmd)
 	rootCmd.AddCommand(statusCmd)
 	sessionsCmd.AddCommand(sessionsResumeCmd)

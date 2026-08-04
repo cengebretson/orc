@@ -173,8 +173,8 @@ not need to copy configuration snippets or work through a field-by-field wizard.
 ```bash
 orc doctor
 orc doctor --system
-orc doctor --install-agent-hooks --dry-run
-orc doctor --install-agent-hooks
+orc hooks install --dry-run
+orc hooks install
 ```
 
 `orc doctor` checks workspace files plus local readiness: configured worker
@@ -186,11 +186,13 @@ are never touched.
 `orc doctor --system` checks install-level readiness outside a workspace:
 `orc` on `PATH`, the build version, tmux, chafa, and the supported agent CLIs.
 
-The optional agent-hook installer merges Orc-owned lifecycle handlers into
-Codex's `hooks.json` and Claude's `settings.json`. Preview the exact file
-operations with `--dry-run` first. Codex requires explicit review and trust
-through `/hooks`; Orc never approves hook hashes on your behalf. Restart active
-Claude sessions after installation.
+`orc hooks install` merges Orc-owned lifecycle handlers into Codex's
+`hooks.json` and Claude's `settings.json`. It is a separate command rather than
+a `doctor` flag because it writes into your agent configuration rather than the
+workspace — `orc doctor` reports whether the hooks are installed, and this
+installs them. Preview the exact file operations with `--dry-run` first. Codex
+requires explicit review and trust through `/hooks`; Orc never approves hook
+hashes on your behalf. Restart active Claude sessions after installation.
 
 ### 4. Start working on a ticket
 
@@ -403,7 +405,11 @@ Available on every command:
 - `orc doctor --system` — check install readiness outside a workspace
   - `orc doctor <ticket>` — validate a ticket's `STATE.yaml`: workflow, stage, worker, next action, repos, worktrees, and feature artifacts
   - `--fix` — remove provably-stale state locks (dead PID or old without a valid PID); live locks are never touched
-  - `--install-agent-hooks [--dry-run]` — preview or install Orc-owned Codex and Claude lifecycle hooks
+  - reports whether the agent lifecycle hooks are installed; `orc hooks install` installs them
+- `orc hooks install` — install Orc-owned Codex and Claude lifecycle hooks
+  - `--dry-run` — print the exact file operations without writing
+  - Writes into your Codex and Claude configuration (`~/.codex`, `~/.claude`), not the workspace,
+    which is why it is its own command rather than a `doctor` flag.
 - `orc status` — show all features and their current workflow/stage
   - `orc status <ticket>` — show full details for a specific ticket
   - `--json` — output durable state as JSON for scripting; a matched running provider adds an optional `live` overlay
@@ -472,7 +478,7 @@ Agents call these commands when their durable work state changes. They are hidde
 - `orc mark <ticket> jit "<summary>"` — record a jit task as complete and clear `runtime.jit`
 
 `orc agent-event` is also hidden. It is called by the Orc-owned Codex and Claude lifecycle
-hooks (installed via `orc doctor --install-agent-hooks`), not by agents directly, and records
+hooks (installed via `orc hooks install`), not by agents directly, and records
 an authoritative lifecycle transition for an exact agent instance. See
 **[docs/agent-detection.md](docs/agent-detection.md)**.
 
