@@ -118,122 +118,19 @@ The stage subfolder names match the stage names in `orc.yaml` — provenance is 
 
 ## orc.yaml
 
-`orc.yaml` is the workspace config. It declares repos, named workflows, loop
-stages, and optional settings. See [workflows.md](workflows.md) for the full
-configuration reference.
+`orc.yaml` declares workspace settings, repositories, routing, workflows,
+stages, loops, and artifact policy. The canonical schema, complete example, and
+validation rules live in [Workflow configuration](workflows.md).
 
-```yaml
-settings:
-  default_workflow: default:standard
-  artifact_policy: warn
-  auto_archive: false
-  auto_tmux: false       # wrap every orc next launch in a tmux session automatically
-  auto_next: false       # orc work immediately launches the first stage (same as --next)
-  workspace_refresh: 60  # Workspace auto-refresh interval in seconds
-  theme: catppuccin-mocha
-  context_pressure:      # optional; defaults shown
-    green: 0
-    yellow: 70
-    red: 90
-  notify:                # optional transition notification command
-    on: [blocked, complete]
-    command: "notify-send 'orc' '{{ticket}} {{event}}'"
-  rail:
-    stuck_after: 15m     # positive duration before working is rendered as stuck
-  herdr:                 # optional native Herdr layout
-    task_cell:
-      test_command: "make test"
-      watch: true
+Use these focused sections when looking up a field:
 
-repos:
-  - name: my-app
-    path: /Users/example/workspace/my-app
-    purpose: Application code, APIs, tests
-    worktree_setup: "{{repo_path}}/scripts/setup-worktree.sh -b {{branch}} --path {{worktree_path}}"
-    agent_hints:
-      - Use the repo Makefile before direct tool commands.
-
-routing:
-  - labels: [application]
-    components: [web]
-    repos: [my-app]
-  - labels: [full-stack]
-    repos: [my-app, shared-api]
-
-workflows:
-  default:standard:
-    description: General feature workflow — intake → develop → PR → QA
-    stages:
-      - name: default:intake
-        worker: default:fred
-        advance: auto
-      - name: default:develop
-        worker: default:bob
-        advance: manual
-        required_artifacts:
-          - PLAN.md
-          - develop/HANDOFF.md
-        loop:
-          via: default:code-review
-          worker: default:zach
-          max: 3
-          on_max: pause
-      - name: default:pr-open
-        worker: default:bob
-        advance: manual
-        loop:
-          via: default:pr-repair
-          worker: default:bob
-          max: 3
-          on_max: pause
-      - name: default:qa-automation
-        worker: default:brian
-        advance: auto
-```
-
-`settings.herdr.task_cell` applies only to `--mux herdr` launches. A non-empty
-`test_command` creates a test pane and runs the configured shell command from
-the agent's resolved worktree cwd. `watch: true` creates an `orc watch` pane for
-the ticket. With both enabled, the agent occupies the left side while tests and
-watch share a 35% utility column on the right. Orc stamps the utility panes with
-ownership metadata tied to the exact feature directory and reuses them on later
-launches; it never identifies them from display labels alone. Task-cell setup
-failures are warnings and do not prevent the agent from launching.
-
-`default_workflow` is used by `orc work <ticket>` when `--workflow` is omitted.
-If it is not set, `orc work` returns an error. `advance: auto` tells agents to
-run `orc mark <ticket> next` when a stage is complete; `advance: manual` tells agents to
-run `orc mark <ticket> pause` so a human can review before continuing.
-
-Routing rules map exact ticket labels or components to one or more configured
-repository names. Ticket prefixes are intentionally not repository selectors:
-one ticket namespace may span many repos. Intake records the resolved selection
-in `STATE.yaml.repos`. Multiple matching rules are ambiguous and must pause;
-intentional cross-repo work is expressed by one rule naming multiple repos.
-Repository purpose is the fallback when no rule matches.
-
-Repos may define `worktree_setup` when raw `git worktree add` is not enough.
-`orc next` resolves supported placeholders and prints the command for the agent
-when the target worktree is missing. `orc` does not execute the command itself.
-Repos may also define `agent_hints`; `orc next` includes those hints when the
-current feature references that repo.
-
-Stages may define `required_artifacts` as feature-folder relative paths. `orc
-next` reminds agents to keep those files current, and `orc validate` warns when
-they are missing or empty. Loop stages can declare their own
-`required_artifacts` under `loop`.
-Set `settings.artifact_policy: block` to make `orc mark <ticket> next` refuse
-to advance when core docs are missing or empty, or when current-stage
-`required_artifacts` are missing, empty, or still byte-identical to the feature
-template (reported as `unchanged from template` — nobody has written the doc
-yet). Pass `orc mark <ticket> next --force` to override the block for human
-review; the skipped artifacts are recorded in the stage result and history. The
-default is `warn`.
-
-`settings.context_pressure` controls the percentage boundaries used to color
-live provider context usage in `orc watch` and `orc dashboard`. The values must obey
-`0 <= green < yellow < red <= 100`. If the provider does not report a context
-limit, Orc displays `n/a`; this live overlay never changes workflow state.
+- [Settings](workflows.md#settings), including notifications, rail presentation,
+  context pressure, and Herdr task cells
+- [Repositories](workflows.md#repos) and [routing](workflows.md#routing)
+- [Workflows](workflows.md#workflows), [advance modes](workflows.md#advance-modes),
+  and [loops](workflows.md#loops)
+- [Validation expectations](workflows.md#validation-expectations) and
+  [state transitions](workflows.md#state-transitions)
 
 ## Packs
 
@@ -416,3 +313,17 @@ This means no agent ever starts cold. The prompt is a complete handoff: what the
 3. `worker:` for the current stage in `orc.yaml`
 
 If no worker is found at any step, `orc next` exits with a clear error pointing to `orc.yaml`. Use `--dry` to preview the full launch command before running it.
+
+## Historical design divergences
+
+Orc intentionally differs from its original design in these areas:
+
+| Original | Current design | Reason |
+|----------|----------------|--------|
+| `JIRA.md` in feature templates | `TICKET.md` | Tracker-agnostic: works with GitHub Issues, Linear, local files, or manual intake |
+| `django/` or `backend/` feature subfolders | Per-stage folders such as `develop/` and `code-review/` | Preserves stage provenance without coupling layout to a stack |
+| `orc workon` | `orc work` | Shorter command name |
+| `orc done` | `orc archive` with `_archive/` | Preserves history and keeps archival reversible |
+| No first-run configuration flow | Agent-driven `SETUP.md` | Avoids requiring users to hand-edit every setting |
+| Intake bundled into the main workflow | Separate `intake` stage | Keeps ticket normalization separate from implementation |
+| Worker `stages:` / `workflows:` fields | Routing in `orc.yaml` | Maintains one routing source of truth and explicit missing-worker errors |

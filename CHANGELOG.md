@@ -6,6 +6,25 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-08-04
+
+### Changed
+
+- Made `AGENTS.md` the concise, tool-neutral source of repository agent
+  guidance and changed `CLAUDE.md` to import it, keeping Codex and Claude on the
+  same behavioral contract without duplicating instructions.
+- Streamlined the documentation set: the README now uses a compact command map,
+  `docs/workflows.md` is the canonical complete `orc.yaml` reference, and the
+  reference and watch documents avoid duplicated schema and spec-like prose.
+- Added focused links for version, watch, rail, workflow configuration, and
+  backend behavior so detailed guidance remains discoverable after the cleanup.
+
+### Fixed
+
+- Updated the isolated agent-hook verification script to use the current
+  `orc hooks install` command and corrected the watch-to-tmux documentation
+  anchor.
+
 ## [0.20.0] - 2026-08-04
 
 ### Added
@@ -709,7 +728,8 @@ invoke `orc watch` — an unknown flag now fails the command.
 - Bubble Tea TUI dashboard with health, workflow, stage, and portrait views.
 - `orc doctor --fix` to clear stale state locks.
 
-[Unreleased]: https://github.com/cengebretson/orc/compare/v0.20.0...HEAD
+[Unreleased]: https://github.com/cengebretson/orc/compare/v0.21.0...HEAD
+[0.21.0]: https://github.com/cengebretson/orc/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/cengebretson/orc/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/cengebretson/orc/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/cengebretson/orc/compare/v0.17.0...v0.18.0

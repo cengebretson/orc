@@ -25,6 +25,15 @@ settings:
   notify:
     on: [blocked, complete]
     command: "notify-send 'orc' '{{ticket}} {{event}}'"
+  parking:
+    auto_park: [paused]
+    wake_on: [status_change, attention, stage_change]
+  rail:
+    stuck_after: 15m
+  herdr:
+    task_cell:
+      test_command: "make test"
+      watch: true
 
 repos:
   - name: my-app
@@ -40,6 +49,14 @@ routing:
     repos: [my-app]
   - labels: [full-stack]
     repos: [my-app, shared-api]
+
+aliases:
+  workflows:
+    default: default:standard
+  stages:
+    develop: default:develop
+  workers:
+    bob: default:bob
 
 workflows:
   default:standard:
@@ -88,6 +105,9 @@ a repository.
 | `quotes` | No | Optional dashboard status quotes. |
 | `context_pressure` | No | Green, yellow, and red percentage boundaries for live provider context usage in `orc watch` and `orc dashboard`. Defaults to `0`, `70`, and `90`; values must satisfy `0 <= green < yellow < red <= 100`. |
 | `notify` | No | Best-effort command run after selected `blocked` or `complete` transitions. See below. |
+| `parking` | No | Reversible display-only parking for Live views. `auto_park` selects statuses to hide; `wake_on` selects events that restore them. |
+| `rail` | No | Presentation settings for the compact live rail. `stuck_after` is a positive duration after which working sessions render as stuck. |
+| `herdr` | No | Native Herdr layout settings. `task_cell` can add test and watch panes beside a launched agent. |
 
 ### Transition notifications
 
@@ -106,6 +126,32 @@ handling.
 Notification failures print a warning but do not roll back or fail the state
 transition. An empty command or an event absent from `on` is a no-op.
 
+### Automatic parking
+
+`settings.parking.auto_park` accepts `pending`, `active`, `paused`, `done`, and
+`archived`. When it is non-empty, `wake_on` must contain at least one of
+`status_change`, `attention`, or `stage_change`. Parking affects Live views only;
+it does not stop sessions, remove worktrees, or change workflow state. See
+[Automatic reversible parking](sessions.md#automatic-reversible-parking) for
+the operating behavior.
+
+### Live rail
+
+`settings.rail.stuck_after` controls when a continuously working session is
+presented as stuck in `orc watch`, `orc rail`, and the dashboard. It affects
+presentation only and never changes durable workflow state.
+
+### Herdr task cells
+
+`settings.herdr.task_cell` applies only to `--mux herdr` launches. A non-empty
+`test_command` creates a test pane and runs the command from the resolved
+worktree. `watch: true` creates an `orc watch` pane for the ticket. With both
+enabled, tests and watch share a utility column beside the agent.
+
+Orc records ownership metadata for utility panes and reuses exact owned panes;
+it does not identify them from display labels. Task-cell setup failures warn but
+do not prevent the agent from launching.
+
 ## Repos
 
 `repos` describes source repositories available to the workspace.
@@ -123,6 +169,34 @@ transition. An empty command or an event absent from `on` is a no-op.
 `{{workspace}}`. Include `{{worktree_path}}` so the command creates the checkout
 where `STATE.yaml` expects it. If omitted, `orc doctor` warns because the command
 may create an untracked worktree.
+
+## Routing
+
+`routing` maps exact, case-insensitive ticket labels or components to configured
+repository names. Ticket prefixes are not repository selectors. Multiple
+matching rules are ambiguous and pause rather than merge; express intentional
+cross-repository work as one rule naming every repository.
+
+| Field | Required | Meaning |
+|-------|----------|---------|
+| `labels` | No | Ticket labels that select the route. |
+| `components` | No | Ticket components that select the route. |
+| `repos` | Yes | One or more repository names from `repos`. |
+
+Intake persists the resolved selection in `STATE.yaml.repos`. When no route
+matches, repository `purpose` descriptions provide the fallback context for
+agent-driven selection.
+
+## Aliases
+
+`aliases` maps short display names to canonical pack-qualified IDs. It has
+separate `workflows`, `stages`, and `workers` maps. Workflow and stage aliases
+are also accepted by configuration and stage lookup paths that resolve those
+IDs; worker aliases are used for display.
+
+Within each map, only one alias may point to a given canonical ID. Keeping the
+canonical IDs on the right preserves pack ownership while allowing concise UI
+labels such as `default`, `develop`, and `bob`.
 
 ## Workflows
 
@@ -187,6 +261,8 @@ Loop fields:
 Workspace configuration should satisfy these rules:
 
 - `settings.default_workflow` names an existing workflow when workflows are configured.
+- Every alias target is used by at most one alias within its workflow, stage, or worker map.
+- `settings.parking.auto_park` contains valid statuses and has at least one valid `wake_on` condition when enabled.
 - Every stage has a non-empty `name`.
 - Stage names are unique within a workflow, including loop stage names.
 - Every stage `worker` and loop `worker` names an existing file in `workers/`.

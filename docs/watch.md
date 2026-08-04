@@ -1,27 +1,16 @@
-# orc watch spec
+# Watch and rail
 
 `orc watch` is Orc's dedicated Live entry point. It is meant to run as a compact
 tmux-side rail in a narrow split and uses its richer table layout when rendered
 wide; workspace exploration lives in `orc dashboard`.
 
-## Goals
+It shows live sessions and work needing attention without replacing the durable
+state in `STATE.yaml`. Selection and previews are read-only; prompting always
+requires an explicit compose, review, and confirmation flow. The optional
+`tmux-attention` integration refines active-session presentation but is never
+required.
 
-- Show active sessions and their current state at a glance in a 24-32 column pane.
-- Let a user quickly select a ticket and act on its prompt.
-- Keep `STATE.yaml` as the durable source of truth.
-- Optionally consume `tmux-attention` as a transient backup signal.
-- Keep the dashboard's Features tab as the durable work browser while sharing
-  Live session state, attention, tmux, and context telemetry.
-
-## Non-goals
-
-- Do not build a full terminal multiplexer.
-- Do not require `tmux-attention`.
-- Do not infer complex semantic agent state from terminal output in v1.
-- Do not make prompt sending automatic on selection.
-- Do not force the Workspace layout into the narrow rail.
-
-## Command shape
+## Commands
 
 ```sh
 orc watch
@@ -43,7 +32,7 @@ session view, with worker shown as a column in the session list
 rather than as a separate list. Pressing `enter` opens the selected story
 details page in both compact and wide layouts, including recent story history.
 To run the rail beside your work as a tmux pane, use `orc rail` rather than
-`orc watch` — see [Tmux integration](tmux.md#the-managed-rail).
+`orc watch` — see [Tmux integration](tmux.md#managed-rail).
 
 `--demo` replaces live workspace rows with four read-only synthetic tickets so
 the complete visual language can be reviewed without manufacturing provider or
@@ -68,10 +57,11 @@ filter; Escape clears it.
 
 ## Narrow rail view
 
-The default view assumes a narrow vertical split. It avoids tables, headers,
-long labels, and dense detail.
+The default view is designed for a narrow vertical split. It prioritizes state,
+ticket identity, the selected blocker or next action, and enough runtime detail
+to act safely.
 
-Example multi-session rail:
+Example:
 
 ```text
 ╭─ orc  workspace ─────────╮
@@ -99,70 +89,21 @@ NEEDS YOU
 
 ```
 
-Example focused ticket view:
+The selected row and bordered details card remain identifiable without color.
+Press `enter` for workflow progress, runtime metadata, next action, and recent
+history. Details scroll with `j`/`k`, arrows, Page Up/Down, `Ctrl-U`/`Ctrl-D`,
+and `g`/`G`; `?` opens the complete key reference.
 
-```text
-╭─ orc  workspace ─────────╮
-│ ● 1 RUNNING  ◐ 1 PAUSED │
-│ ! 1 NEEDS YOU           │
-│ ↺ 3s ago                 │
-╰──────────────────────────╯
+Watch refreshes durable and live data every five seconds by default. Use
+`--interval` to change the cadence or `r` to refresh immediately. Presentation
+animation and context trends stay in memory and never alter workflow state.
 
-PROJ-123
+## Implementation contract
 
-▌ ! PROJ-123
+Day-to-day users can skip this section and continue to [Interactions](#interactions).
+These rules define how the UI derives trustworthy state and targets exact agents.
 
-NEEDS YOU
-╭──────────────────╮
-│  ! BLOCKED       │
-│   develop        │
-│   bob-dev        │
-│   tmux live      │
-│                  │
-│ Blocker          │
-│ fix tests        │
-╰──────────────────╯
-```
-
-The renderer truncates cleanly to the available width. The primary signal
-is the state icon/label; the selected session uses a full-width highlighted row
-and a bordered details card so it remains obvious even without terminal color.
-The compact overview card mirrors the Workspace dashboard header, separates
-live sessions from work needing attention, and shows the age of the latest
-refresh. It replaces the former full-width title banner.
-Within the details block, keep status on the first line, combine non-workspace
-repository room and stage when both are available, indent worker/tmux/context
-metadata, and render `Blocker` or `Next` as its own section heading before the
-prompt text. Activity age prefers matched provider telemetry and falls back to
-the latest durable story history entry; it is not inferred from terminal output.
-Persistent control legends are intentionally omitted from watch layouts; `?`
-opens the complete navigation reference without consuming dashboard space.
-Inside expanded details, `j`/`k` and the arrow keys scroll by line,
-Page Up/Down and `Ctrl-U`/`Ctrl-D` scroll by half-page, and `g`/`G` jump to the
-top or bottom. This keeps long workflow histories fully reachable.
-
-The selected card and expanded details page render the configured workflow as a
-progress route, for example `✓ intake → ● develop → ○ review → ○ ship`. Stage
-order and aliases come from `orc.yaml`; current-stage labels use those aliases
-too, while loop stages are shown at their configured owner when active. The
-expanded page uses the feature name and ticket as the
-first panel title, consolidates provider and live runtime metadata into that
-panel, then embeds Workflow, Next Action, and History titles into their
-respective panel borders without a separate page header.
-It includes the current workflow position, next stage and automatic/manual
-advance mode, time in the current stage and visit count, repository room/branch,
-provider/model, exact tmux target, attention, context trend, and last activity
-when available. History uses a connected event timeline and shows up to the 12
-most recent entries.
-
-The rail uses a lightweight presentation tick for a live-work pulse, two-second
-state-change highlight, and four-second completion treatment. This does not
-reload workspace or provider data. Durable/live data still refreshes every five
-seconds by default, `--interval` changes that cadence, and `r` refreshes
-immediately. Context sparklines retain the ten most recent refresh samples in
-memory and do not modify durable state.
-
-## State model
+### State model
 
 `orc watch` is driven primarily by the durable Orc workflow contract.
 `STATE.yaml` is authoritative for whether work needs a human, is done, is
@@ -209,7 +150,7 @@ Rows are ordered by urgency, with load errors and blocked work first, followed
 by input, review, stopped, ready, pending, active, and done work. Tickets with
 the same urgency remain alphabetically ordered.
 
-## Context pressure
+### Context pressure
 
 The wide session table and selected-session details display live provider
 context usage as a percentage. The Workspace section uses the same classifier in its
@@ -229,7 +170,7 @@ is matched but the provider does not report its context limit, the display says
 matched. Context pressure is presentation-only: it does not change priority,
 workflow state, stage advancement, or session lifecycle.
 
-## tmux-attention integration
+### tmux-attention integration
 
 `tmux-attention` can provide a low-level tmux notification primitive:
 
@@ -274,7 +215,7 @@ When `STATE.yaml` says `paused`, watch shows `blocked` even if
 `@agent_attention` is empty or stale. When `STATE.yaml` says `active`,
 `@agent_attention=input|blocked|review|done` can refine the live display.
 
-### Windows with more than one agent
+### Multi-agent tmux windows
 
 A window can host more than one agent — an `orc jit --tmux` task sent into a
 stage's existing session, or a split you made yourself — and each reports
@@ -293,7 +234,7 @@ independently. `orc` reads every pane in the window and rolls them up:
 
 A single-pane window behaves exactly as it always has.
 
-## Tmux metadata
+### Tmux metadata
 
 After a successful tmux launch, `orc` stamps the target window with user options
 that identify the work without replacing the durable state contract:
@@ -372,7 +313,7 @@ contract as `orc ctl` and waits briefly for an authoritative lifecycle
 acknowledgement; an unavailable, stopped, stalled, replaced, or legacy target
 is reported without guessing or falling back to the selected pane.
 
-## tmux toggle
+## Rail pane management
 
 Users can open and close the dashboard with one tmux binding.
 

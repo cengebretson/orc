@@ -387,141 +387,38 @@ Live rail; `orc dashboard` starts in Live. Press `?` for navigation help.
 
 ## Commands
 
-### Global flags
+`orc --help` is the authoritative top-level command list. Use
+`orc <command> --help` for flags and subcommands, and `orc help-all` to include
+agent-only commands.
 
-Available on every command:
+Available globally:
 
 - `--workspace <path>` — workspace root (default: current directory)
-- `--mux <tmux|herdr>` — terminal multiplexer backend (default: the runtime recorded in `STATE.yaml`, then tmux).
-  See **[docs/herdr.md](docs/herdr.md)**.
+- `--mux <tmux|herdr>` — backend selected from recorded runtime, then tmux
 
-### Human commands
+| Area | Commands | Purpose |
+|------|----------|---------|
+| Setup | `init`, `pack`, `doctor`, `hooks install`, `completion`, `version` | Create and validate workspaces, manage packs, install lifecycle hooks, and inspect the build. |
+| Workflow | `work`, `next`, `status`, `artifacts`, `label`, `answer` | Create, launch, inspect, and update durable ticket work. |
+| History | `report`, `archive`, `delete` | Report time in stage and retire completed work. `delete` only accepts `done` or `archived` tickets. |
+| Live work | `sessions`, `attach`, `focus`, `watch`, `rail`, `dashboard` | Inventory, resume, monitor, and navigate exact live sessions. |
+| One-off work | `jit` | Run a task outside the configured stage pipeline. |
+| Integrations | `ctl` | Read and control exact recorded agents through backend-neutral JSON commands. |
+| Discovery | `help`, `help-all` | Show human commands or the complete human-plus-agent surface. |
 
-- `orc init` — scaffold a new workspace
-  - `--workspace <path>` — scaffold at a specific path
-  - `--skip-default-pack` — create the base workspace without installing the default pack
-  - `--dry-run` — preview without writing
-  - `--force` — overwrite existing files
-- `orc pack` — inspect and manage workflow packs
-  - `orc pack available` — show built-in packs available for install
-  - `orc pack inspect <path>` — validate and preview a local pack without installing it
-  - `orc pack install <pack>` — install a built-in pack name or local pack path into the current workspace
-  - `orc pack list` — show installed packs, install source, and active workflows
-  - `orc pack show <pack>` — show one installed pack snapshot
-- `orc doctor` — check workspace health plus `orc.yaml`, local tools, worker engines, tmux, and state locks
-- `orc doctor --system` — check install readiness outside a workspace
-  - `orc doctor <ticket>` — validate a ticket's `STATE.yaml`: workflow, stage, worker, next action, repos, worktrees, and feature artifacts
-  - `--fix` — remove provably-stale state locks (dead PID or old without a valid PID); live locks are never touched
-  - reports whether the agent lifecycle hooks are installed; `orc hooks install` installs them
-- `orc hooks install` — install Orc-owned Codex and Claude lifecycle hooks
-  - `--dry-run` — print the exact file operations without writing
-  - Writes into your Codex and Claude configuration (`~/.codex`, `~/.claude`), not the workspace,
-    which is why it is its own command rather than a `doctor` flag.
-- `orc status` — show all features and their current workflow/stage
-  - `orc status <ticket>` — show full details for a specific ticket
-  - `--json` — output durable state as JSON for scripting; a matched running provider adds an optional `live` overlay
-  - `--label <key>` or `--label <key>=<value>` — only show features carrying it; repeat to require several
-- `orc sessions` — list managed and orphaned agent sessions with tmux targets and optional provider telemetry
-  - `--all` — include recent Claude and Codex sessions not managed by Orc
-  - `--label <key>[=<value>]` — only show sessions whose feature carries it (cannot be combined with `--all`)
-  - `--json` — emit the inventory as JSON
-  - groups rows by repository and branch; managed rows use `STATE.yaml.repos`, while unmanaged rows use cached Git metadata
-  - `orc sessions resume` — search recent sessions interactively by provider, model, repository, branch, CWD, and activity
-  - `orc sessions resume <provider-session-id> --dry` — validate and preview an exact provider resume
-  - `orc sessions park --dry` — preview resumable managed sessions; `--yes` snapshots and stops only those sessions
-  - `orc sessions unpark --dry` — preview the saved snapshot; `--yes` recreates and resumes it
-- `orc report` — time-in-stage across all tickets (avg/median active time, visit counts), derived from history
-  - `orc report <ticket>` — per-stage breakdown for one ticket with total cycle time
-  - `--by-worker` — attribute time to workers instead of stages, ordered by total active time
-  - `--archived` — include archived tickets in the aggregate (no-arg) report
-  - `--json` — output as JSON for scripting
-- `orc artifacts <ticket>` — check required feature artifacts for the current stage
-  - `--all` — check required artifacts across the whole workflow
-  - `--json` — output as JSON for scripting
-- `orc work <ticket>` — create the feature folder for a ticket
-  - `--workflow <name>` — use a named workflow instead of the configured default
-  - `--tmux` — also enable a tmux session for this ticket
-  - `--next` — create the feature folder and immediately launch the first stage
-- `orc next <ticket>` — launch the next agent for a ticket
-  - `--dry` — preview the launch command without running it
-  - `--json` — next action as JSON for CI or scripting
-  - `--worker <id>` — override the selected worker for one launch
-- `orc jit <ticket> --worker <id> "<instruction>"` — run a one-off agent task outside the pipeline
-  - `--dry` — preview the resolved worker and prompt without launching
-  - `--tmux` — send to the ticket's existing tmux session instead of foreground
-- `orc attach <ticket>` — attach to the ticket's tmux session
-  - A convenience over `tmux attach`: reads the real session name from `STATE.yaml`
-    (named after the slug, and overridable), drops you on the *current stage's*
-    window, and picks `switch-client` vs `attach-session` so it works whether or
-    not you're already inside tmux. The dashboard Workspace section's `t` key does the same.
-- `orc focus` — attach to the highest-priority live session that needs human attention
-- `orc watch [ticket]` — open the compact, attention-aware tmux session rail
-  - `--demo` — preview workflow, attention, context-trend, and completion visuals using read-only synthetic work
-  - `/` — filter by ticket, slug, stage, worker, repository, branch, workflow/status, or attention state
-  - `i` — jump to the next live `blocked`, `input`, or `review` session
-  - `s` — answer the selected ticket's question, or compose a free-text prompt when it has none;
-    a confirm question offers `y`/`n`, a choice question a pick-list, and a text question a box
-  - `p` — expand or collapse automatically parked work
-  - to open the rail beside your current tmux pane, use `orc rail toggle` (see below)
-  - `--wide` — render the wider table layout
-- `orc rail open|close|toggle` — manage one proven Orc-owned `orc watch` pane in the current tmux window; defaults to a focus-preserving 64-column right split
-- `orc rail collapse|expand|toggle-collapsed` — resize that live pane between a five-column state strip and its previous mouse-adjusted size
-- Tmux Live views use hook state first, then versioned title and bounded-screen fallback rules for presentation only; local overrides live under `agent-detection/v1/`
-- Both `orc watch` and the merged Live dashboard tab display matched provider context pressure using configurable
-  green/yellow/red percentage boundaries; unknown provider limits display `n/a`.
-- `orc label <ticket> [key=value ...]` — set, remove, or list a ticket's durable labels
-  - `--remove <key>` — delete a label; repeat for several
-  - with no pairs, prints the ticket's current labels
-  - Orc assigns labels no meaning and no transition reads them; they exist for
-    filtering and grouping in your own vocabulary (`area`, `priority`, `owner`)
-- `orc answer <ticket> [value]` — answer the question a paused ticket is waiting on
-  - with no value, prints the question and the answers it will accept
-  - the answer is recorded in `STATE.yaml` first, then delivered to the live agent
-    as a best-effort nudge — so it survives the agent exiting, being replaced, or
-    the work being parked overnight
-- `orc archive <ticket>` — archive a completed feature, remove worktrees
-- `orc delete <ticket>` — permanently delete a feature folder (only allowed when status is `done` or `archived`)
-- `orc dashboard` — open the unified dashboard in Live; `[`/`]` cycles Live,
-  Workflows, Workers, Repositories, and Health, while `1`–`5` jumps directly
+High-value references:
 
-### Agent state transitions
+- [Workflow configuration](docs/workflows.md) covers validation, artifact policy,
+  and the `orc mark` state transitions agents use instead of editing `STATE.yaml`.
+- [Sessions](docs/sessions.md) covers inventory, exact resume, and park/unpark.
+- [Watch and rail](docs/watch.md) covers live filtering, prompts, attach/focus, and
+  tmux presentation.
+- [Tmux](docs/tmux.md), [Herdr](docs/herdr.md), and
+  [agent detection](docs/agent-detection.md) document backend behavior.
 
-Agents call these commands when their durable work state changes. They are hidden from `orc --help` but visible via `orc help-all`.
-
-- `orc mark <ticket> start` — begin a fresh session; allowed from `pending` or `ready`
-- `orc mark <ticket> resume` — continue a paused session; allowed from `paused` only; clears the human-directed next action
-- `orc mark <ticket> next` — mark the current stage complete and advance (`done` if no stages remain)
-  - `--stage <name>` — jump to a specific stage (e.g. send back to develop after review)
-  - `--worker <id>` — override the worker for the next stage
-  - `--result "<summary>"` — record what was accomplished in history
-  - `--force` — with `artifact_policy: block`, advance even when required artifacts are not ready; the skipped artifacts are recorded in history
-- `orc mark <ticket> pause "<reason>"` — pause for human input, approval, or an external blocker
-  - `--confirm` — the reason is a yes/no question
-  - `--choice <key>=<label>` — the reason is a pick-one question; repeat for each option
-  - `--text` — the reason needs a free-text answer
-  - With one of these, Orc records the *shape* of the answer it needs, rejects
-    anything that isn't offered, and hands the answer to the next agent in its
-    launch prompt. Without one, the pause is a free-text reason as before.
-- `orc mark <ticket> done` — mark active, ready, or paused work as done
-- `orc mark <ticket> jit "<summary>"` — record a jit task as complete and clear `runtime.jit`
-
-`orc agent-event` is also hidden. It is called by the Orc-owned Codex and Claude lifecycle
-hooks (installed via `orc hooks install`), not by agents directly, and records
-an authoritative lifecycle transition for an exact agent instance. See
-**[docs/agent-detection.md](docs/agent-detection.md)**.
-
-### Structured control
-
-These backend-neutral JSON commands are intended for supervisors, integrations, and diagnostics. Lifecycle state comes from native backend APIs; terminal capture remains diagnostic text only.
-
-- `orc ctl agent state --ticket <ticket>` — read the exact recorded Herdr or tmux agent's recognized lifecycle as JSON; tmux state comes only from installed provider hooks
-- `orc ctl status` — read aggregate durable/live session state and stable attention counts as JSON; durable paused work needs attention
-- `orc ctl agent watch [--ticket <ticket>]` — stream per-ticket `agent_state`, `agent_error`, and `agent_stopped` transitions as compact JSONL until interrupted
-- `orc ctl agent prompt --ticket <ticket> "<text>" --wait --timeout 120s` — safely prompt the exact recorded Herdr or tmux agent and optionally wait for a settled lifecycle; tmux accepts up to 64 KiB of UTF-8 text, requires bracketed paste, and reports `agent_prompt_stalled` unless hooks observe a new lifecycle sequence
-- `orc ctl agent wait --ticket <ticket> --until blocked --timeout 120s` — wait for recognized Herdr or hook-published tmux lifecycle state without scraping terminal text
-- `orc ctl session capture --ticket <ticket> [--lines 80]` — capture up to 5,000 recent lines from the exact recorded Herdr or tmux pane; captured text is never treated as lifecycle state
-
-`orc mark` validates transitions before writing `STATE.yaml`: pending tickets must be started before `next`, `done` is rejected from `pending`, stage and worker overrides must exist, invalid workspace config blocks advancement, and `artifact_policy: block` blocks `next` when required artifacts are missing, empty, or unchanged from the feature template (override with `--force`). Use `orc artifacts <ticket>` when an agent or human needs the same artifact checklist without advancing the ticket.
+`orc agent-event` is intentionally hidden and called only by installed lifecycle
+hooks. Structured control keeps lifecycle state authoritative; terminal capture
+is diagnostic text, not agent state.
 
 ## Reference
 
@@ -535,6 +432,7 @@ Deep reference lives in **[docs/reference.md](docs/reference.md)**:
 - **[orc.yaml](docs/reference.md#orcyaml)** — repos, workflows, loop stages, and settings (configuration deep-dive in **[docs/workflows.md](docs/workflows.md)**)
 - **[STATE.yaml](docs/reference.md#stateyaml)** — the per-ticket state machine, status values, and runtime/lock semantics
 - **[Sessions](docs/sessions.md)** — live telemetry, managed/orphan classification, exact resume, and park/unpark safety
+- **[Live watch and rail](docs/watch.md)** — attention-aware session monitoring, filtering, interaction, and tmux presentation
 - **[Tmux integration](docs/tmux.md)** — optional popup, split-pane, resume, and focus bindings
 - **[Tmux fallback detection](docs/agent-detection.md)** — versioned title/screen rules, local overrides, precedence, and safety boundaries
 - **[Herdr integration](docs/herdr.md)** — native workspace/agent launch, exact attach, lifecycle inventory, and sidebar tokens

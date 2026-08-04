@@ -22,7 +22,7 @@ claude_home="$verify_dir/claude"
 mkdir -p "$codex_home" "$claude_home"
 go build -o "$orc_bin" ./cmd/orc/...
 HOME="$verify_dir" CODEX_HOME="$codex_home" CLAUDE_CONFIG_DIR="$claude_home" \
-  "$orc_bin" doctor --install-agent-hooks >/dev/null
+  "$orc_bin" hooks install >/dev/null
 
 tmux -L "$tmux_server" -f /dev/null new-session -d -s verify
 pane="$(tmux -L "$tmux_server" display-message -p -t verify '#{pane_id}')"
