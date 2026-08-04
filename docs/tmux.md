@@ -53,7 +53,7 @@ directory for `orc.yaml`.
 current tmux window. Opening reuses an existing rail, preserves focus, and
 stamps `@orc_rail=1` plus `@orc_role=rail`; closing refuses to kill a pane when
 ownership is absent or ambiguous. The pane remains a normal mouse-resizable
-tmux pane. The older `orc watch --tmux-toggle` flag remains compatible.
+tmux pane.
 
 Collapse resizes the live pane instead of restarting it:
 

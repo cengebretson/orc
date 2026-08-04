@@ -19,12 +19,6 @@ type claudeProcessSession struct {
 	StatusUpdatedAt string `json:"statusUpdatedAt"`
 }
 
-// DiscoverClaude returns recent Claude sessions and marks sessions backed by
-// Claude's live PID map with their current process state.
-func DiscoverClaude(home string) ([]Live, error) {
-	return defaultDiscoverer.DiscoverClaude(home)
-}
-
 func (d *Discoverer) discoverClaude(home string, budget *refreshBudget) ([]Live, error) {
 	processFiles, err := recentFiles(filepath.Join(home, ".claude", "sessions"), "*.json", 500)
 	if err != nil {
@@ -115,12 +109,6 @@ func isUUIDLike(value string) bool {
 
 func isHexDigit(char rune) bool {
 	return (char >= '0' && char <= '9') || (char >= 'a' && char <= 'f') || (char >= 'A' && char <= 'F')
-}
-
-func readClaudeJSONL(path string, live *Live) {
-	_ = scanJSONL(path, func(line []byte) {
-		parseClaudeLine(line, live)
-	})
 }
 
 func parseClaudeLine(line []byte, live *Live) bool {

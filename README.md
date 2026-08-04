@@ -448,8 +448,7 @@ Available on every command:
   - `p` — expand or collapse automatically parked work
   - `--view pet` — start directly in the Tamagotchi-style pet view
   - `--pet-layout column` — start with one pet card per row
-  - `--tmux-toggle` — legacy alias for `orc rail toggle`; delegates to the same managed rail
-    (`--tmux-layout` and `--tmux-size` map to the rail's `--layout` and `--size`). Prefer `orc rail`.
+  - to open the rail beside your current tmux pane, use `orc rail toggle` (see below)
   - `--wide` — render the wider table layout
 - `orc rail open|close|toggle` — manage one proven Orc-owned `orc watch` pane in the current tmux window; defaults to a focus-preserving 64-column right split
 - `orc rail collapse|expand|toggle-collapsed` — resize that live pane between a five-column state strip and its previous mouse-adjusted size

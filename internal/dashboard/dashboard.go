@@ -21,7 +21,14 @@ import (
 type Section int
 
 const (
-	SectionLive Section = iota
+	// SectionWatch is the standalone `orc watch` view: the compact rail, or its
+	// wide table. It is deliberately absent from sections below — it is not a
+	// tab, it is what the dashboard collapses to when the terminal is too
+	// narrow for the shell, and what `orc watch` opens directly.
+	SectionWatch Section = iota
+	// SectionFeatures is the first navigable tab. It is labelled LIVE because
+	// it absorbed the old separate Live tab; the durable work browser and the
+	// live session view are now one surface.
 	SectionFeatures
 	SectionWorkflows
 	SectionWorkers
@@ -134,13 +141,13 @@ func New(root string, opts Options) (Model, error) {
 		return Model{}, err
 	}
 	workspace := workspaceui.NewEmbeddedWithMux(root, opts.Mux).SetDestination(workspaceDestination(opts.Start))
-	live = live.SetActive(opts.Start == SectionLive)
-	workspace = workspace.SetActive(opts.Start != SectionLive && opts.Start != SectionOrc)
+	live = live.SetActive(opts.Start == SectionWatch)
+	workspace = workspace.SetActive(opts.Start != SectionWatch && opts.Start != SectionOrc)
 	return Model{
 		section:     opts.Start,
 		wideSection: initialWideSection(opts.Start),
 		adaptive:    opts.Adaptive,
-		watchOnly:   opts.Adaptive && opts.Start == SectionLive,
+		watchOnly:   opts.Adaptive && opts.Start == SectionWatch,
 		quote:       chooseLegacyQuote(quotes),
 		quotes:      quotes,
 		root:        root,
@@ -173,11 +180,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		var sectionCmd tea.Cmd
-		if m.adaptive && !m.watchOnly && m.width < 56 && m.section != SectionLive {
+		if m.adaptive && !m.watchOnly && m.width < 56 && m.section != SectionWatch {
 			m.wideSection = m.section
-			sectionCmd = m.switchSection(SectionLive)
+			sectionCmd = m.switchSection(SectionWatch)
 			m.help = false
-		} else if m.adaptive && !m.watchOnly && m.width >= 56 && m.section == SectionLive {
+		} else if m.adaptive && !m.watchOnly && m.width >= 56 && m.section == SectionWatch {
 			sectionCmd = m.switchSection(initialWideSection(m.wideSection))
 			m.help = false
 		}
@@ -251,7 +258,7 @@ func (m *Model) switchSection(section Section) tea.Cmd {
 		m.quote = chooseNextLegacyQuote(m.quotes, m.quote)
 		m.orcAnimationStep = terminalui.RainbowSteps
 		return orcTick()
-	case SectionLive:
+	case SectionWatch:
 		m.orcAnimationStep = 0
 		m.workspace = m.workspace.SetActive(false)
 		m.live = m.live.SetActive(true)
@@ -282,7 +289,7 @@ func (m Model) View() string {
 	body := m.live.View()
 	if m.section == SectionOrc {
 		body = m.renderOrc()
-	} else if m.section != SectionLive {
+	} else if m.section != SectionWatch {
 		body = m.workspace.View()
 	}
 	return m.renderHeader() + "\n" + body
@@ -299,7 +306,7 @@ func (m Model) canSwitchSection() bool {
 	if m.section == SectionOrc {
 		return true
 	}
-	if m.section != SectionLive {
+	if m.section != SectionWatch {
 		return m.workspace.CanSwitchSection()
 	}
 	return m.live.CanSwitchSection()
@@ -314,7 +321,7 @@ func (m Model) childSizeMsg() tea.WindowSizeMsg {
 }
 
 func (m Model) updateActive(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if m.section != SectionLive {
+	if m.section != SectionWatch {
 		updated, cmd := m.workspace.Update(msg)
 		if next, ok := updated.(workspaceui.Model); ok {
 			m.workspace = next
@@ -435,18 +442,18 @@ func (m Model) navRegions() []navRegion {
 // row (row 0).
 func (m Model) navSectionAt(x, y int) (Section, bool) {
 	if y != 0 {
-		return SectionLive, false
+		return SectionWatch, false
 	}
 	for _, r := range m.navRegions() {
 		if x >= r.start && x < r.end {
 			return r.section, true
 		}
 	}
-	return SectionLive, false
+	return SectionWatch, false
 }
 
 func initialWideSection(section Section) Section {
-	if section == SectionLive {
+	if section == SectionWatch {
 		return SectionFeatures
 	}
 	return section
@@ -485,16 +492,19 @@ func sectionForShortcut(shortcut string) (Section, bool) {
 		return SectionOrc, true
 	}
 	if len(shortcut) != 1 || shortcut[0] < '1' || shortcut[0] > '5' {
-		return SectionLive, false
+		return SectionWatch, false
 	}
 	return sections[int(shortcut[0]-'1')], true
 }
 
+// sectionLabel is the user-facing name of a section. SectionWatch and
+// SectionFeatures share one label on purpose: to a user they are the same
+// destination — live work — reached either as a standalone rail or as the
+// dashboard's first tab. They stay distinct internally because only one of
+// them is a tab and only one of them survives a narrow terminal.
 func sectionLabel(section Section) string {
 	switch section {
-	case SectionLive:
-		return "LIVE"
-	case SectionFeatures:
+	case SectionWatch, SectionFeatures:
 		return "LIVE"
 	case SectionWorkflows:
 		return "WORKFLOWS"

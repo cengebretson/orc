@@ -245,14 +245,11 @@ var watchCmd = &cobra.Command{
 }
 
 var (
-	watchInterval   string
-	watchWide       bool
-	watchView       string
-	watchPetLayout  string
-	watchDemo       bool
-	watchTmuxToggle bool
-	watchTmuxLayout string
-	watchTmuxSize   string
+	watchInterval  string
+	watchWide      bool
+	watchView      string
+	watchPetLayout string
+	watchDemo      bool
 )
 
 var helpAllCmd = &cobra.Command{

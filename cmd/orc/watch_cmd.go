@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/cengebretson/orc/internal/dashboard"
-	"github.com/cengebretson/orc/internal/tmux"
 	"github.com/cengebretson/orc/internal/watch"
 	"github.com/spf13/cobra"
 )
@@ -35,20 +34,6 @@ func runWatch(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if watchTmuxToggle {
-		return tmux.ToggleWatchPane(tmux.WatchToggleOptions{
-			Root:      root,
-			Ticket:    ticket,
-			Interval:  watchInterval,
-			Wide:      watchWide,
-			View:      string(mode),
-			PetLayout: string(petLayout),
-			Demo:      watchDemo,
-			Layout:    watchTmuxLayout,
-			Size:      watchTmuxSize,
-		})
-	}
-
 	interval, err := time.ParseDuration(watchInterval)
 	if err != nil {
 		return err
@@ -64,7 +49,7 @@ func runWatch(cmd *cobra.Command, args []string) error {
 		Mux:       muxBackend,
 	}
 	return dashboard.Run(root, dashboard.Options{
-		Start:     dashboard.SectionLive,
+		Start:     dashboard.SectionWatch,
 		Adaptive:  true,
 		Version:   version,
 		BuildDate: buildDate,

@@ -7,12 +7,6 @@ import (
 	"time"
 )
 
-// DiscoverCodex returns recent Codex sessions. Liveness is refined later by
-// tmux pane matching because Codex does not expose Claude's PID map.
-func DiscoverCodex(home string) ([]Live, error) {
-	return defaultDiscoverer.DiscoverCodex(home)
-}
-
 func (d *Discoverer) discoverCodex(home string, budget *refreshBudget) ([]Live, error) {
 	files, err := recentFiles(filepath.Join(home, ".codex", "sessions"), "*.jsonl", 200)
 	if err != nil {
@@ -42,16 +36,6 @@ func (d *Discoverer) discoverCodex(home string, budget *refreshBudget) ([]Live, 
 	}
 	d.prune(filepath.Join(home, ".codex", "sessions"), seen)
 	return out, nil
-}
-
-func readCodexJSONL(path string, live *Live) {
-	working := false
-	_ = scanJSONL(path, func(line []byte) {
-		parseCodexLine(line, live, &working)
-	})
-	if working {
-		live.State = "working"
-	}
 }
 
 func parseCodexLine(line []byte, live *Live, working *bool) bool {

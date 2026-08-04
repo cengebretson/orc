@@ -32,14 +32,6 @@ type WatchToggleOptions struct {
 	ExecPath  string
 }
 
-// ToggleWatchPane preserves the legacy watch flag while using the managed rail.
-func ToggleWatchPane(opts WatchToggleOptions) error {
-	if opts.Size == "" {
-		opts.Size = "32"
-	}
-	return ToggleRail(opts)
-}
-
 // OpenRail opens one owned watch rail in the current tmux window. Existing
 // owned rails are reused and the invoking pane keeps focus.
 func OpenRail(opts WatchToggleOptions) error {

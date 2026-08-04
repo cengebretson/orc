@@ -63,17 +63,28 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   cannot start a server or spawn a shell in a temp directory — the case in
   sandboxed and containerized environments.
 
+### Removed
+
+- Removed `orc watch --tmux-toggle`, `--tmux-layout`, and `--tmux-size`. They
+  were aliases that already delegated to the managed rail; use
+  `orc rail toggle [--layout <right|bottom>] [--size <n>]` instead. Note the
+  default size changes from 32 to the rail's 64 columns.
+
 ### Changed
 
-- Documented the global `--workspace` and `--mux` flags, the hook-invoked
-  `orc agent-event` command, and `orc watch --tmux-toggle`'s status as a legacy
-  alias for `orc rail toggle` in `README.md`.
+- Documented the global `--workspace` and `--mux` flags and the hook-invoked
+  `orc agent-event` command in `README.md`.
 - Removed unreferenced internal helpers left behind by the `mux.Backend`
   refactor (`sessionlist.ManagedTelemetry`, `watch.Focus`,
   `workspacesnapshot.LoadItems`, `tmux.SendCommand`, `runner.ResolveWorkflow`,
   `ticket.ResolveWithArchive`, and `health.Print`), along with the remaining
   nil-backend wrappers and superseded renderers that only tests still reached.
-  No user-facing behavior changed.
+  Also removed `tmux.ValidateAgentTarget`, a third copy of the agent-identity
+  check `readAgentState` already performs on every control call, and the
+  superseded whole-file telemetry readers (`readClaudeJSONL`,
+  `readCodexJSONL`, `scanJSONL`) left behind when discovery moved to
+  incremental cursors. Their coverage moved onto the live code paths. No
+  user-facing behavior changed.
 - Consolidated duplicated internal helpers so the copies can no longer drift
   apart. Shell quoting moved to `internal/shellquote`, which now distinguishes
   always-quote (`Quote`, required where hook commands are matched against

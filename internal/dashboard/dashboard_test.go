@@ -57,7 +57,7 @@ func TestDashboardCyclesUnifiedSections(t *testing.T) {
 }
 
 func TestAdaptiveWatchKeepsNarrowLayoutUnwrapped(t *testing.T) {
-	m, err := New(t.TempDir(), Options{Start: SectionLive, Adaptive: true})
+	m, err := New(t.TempDir(), Options{Start: SectionWatch, Adaptive: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestResponsiveDashboardUsesLiveNarrowAndRestoresWideSection(t *testing.T) {
 
 	updated, _ = m.Update(tea.WindowSizeMsg{Width: 40, Height: 30})
 	m = dashboardModel(t, updated)
-	if m.section != SectionLive || m.shellVisible() || !m.live.IsActive() || m.workspace.IsActive() {
+	if m.section != SectionWatch || m.shellVisible() || !m.live.IsActive() || m.workspace.IsActive() {
 		t.Fatalf("narrow dashboard should use Live: section=%v shell=%v live=%v workspace=%v",
 			m.section, m.shellVisible(), m.live.IsActive(), m.workspace.IsActive())
 	}
@@ -340,7 +340,7 @@ func TestDashboardHelpFitsNarrowTerminal(t *testing.T) {
 }
 
 func TestDashboardDoesNotStealSectionKeyFromLiveSearch(t *testing.T) {
-	m, err := New(t.TempDir(), Options{Start: SectionLive, Adaptive: true})
+	m, err := New(t.TempDir(), Options{Start: SectionWatch, Adaptive: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -350,7 +350,7 @@ func TestDashboardDoesNotStealSectionKeyFromLiveSearch(t *testing.T) {
 	m = dashboardModel(t, updated)
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{']'}})
 	m = dashboardModel(t, updated)
-	if m.section != SectionLive {
+	if m.section != SectionWatch {
 		t.Fatalf("search input ] switched section to %v", m.section)
 	}
 }
@@ -363,7 +363,7 @@ func TestDashboardOnlyRunsTheActiveSection(t *testing.T) {
 	if m.live.IsActive() || !m.workspace.IsActive() || m.live.Init() != nil {
 		t.Fatalf("initial lifecycle: live=%v workspace=%v", m.live.IsActive(), m.workspace.IsActive())
 	}
-	if cmd := m.switchSection(SectionLive); cmd == nil {
+	if cmd := m.switchSection(SectionWatch); cmd == nil {
 		t.Fatal("switching to Live should start its refresh lifecycle")
 	}
 	if !m.live.IsActive() || m.workspace.IsActive() || m.workspace.Init() != nil {
@@ -377,11 +377,11 @@ func TestDashboardTerminalSizeMatrix(t *testing.T) {
 		width, height int
 		start         Section
 	}{
-		{name: "narrow", width: 24, height: 18, start: SectionLive},
-		{name: "adaptive boundary", width: 56, height: 18, start: SectionLive},
+		{name: "narrow", width: 24, height: 18, start: SectionWatch},
+		{name: "adaptive boundary", width: 56, height: 18, start: SectionWatch},
 		{name: "narrow responsive dashboard", width: 40, height: 30, start: SectionFeatures},
 		{name: "short features", width: 80, height: 10, start: SectionFeatures},
-		{name: "wide live", width: 120, height: 40, start: SectionLive},
+		{name: "wide live", width: 120, height: 40, start: SectionWatch},
 		{name: "wide workspace", width: 120, height: 40, start: SectionWorkflows},
 	}
 

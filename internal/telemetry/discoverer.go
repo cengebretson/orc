@@ -84,7 +84,8 @@ func (d *Discoverer) Discover(home string) ([]Live, error) {
 	return all, nil
 }
 
-// DiscoverClaude reads Claude telemetry with this discoverer's cache.
+// DiscoverClaude reads only Claude telemetry with this discoverer's cache, so
+// one provider's incremental cursor can be exercised in isolation.
 func (d *Discoverer) DiscoverClaude(home string) ([]Live, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -98,7 +99,7 @@ func (d *Discoverer) DiscoverClaude(home string) ([]Live, error) {
 	return out, err
 }
 
-// DiscoverCodex reads Codex telemetry with this discoverer's cache.
+// DiscoverCodex reads only Codex telemetry with this discoverer's cache.
 func (d *Discoverer) DiscoverCodex(home string) ([]Live, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()

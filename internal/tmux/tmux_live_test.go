@@ -80,12 +80,19 @@ func TestLiveTmuxWindowMetadataAttentionAndExactSend(t *testing.T) {
 	if err := SetPaneMetadata(pane, metadata); err != nil {
 		t.Fatalf("SetPaneMetadata: %v", err)
 	}
-	if resolved, err := ValidateAgentTarget(
-		mux.Target{Backend: "tmux", Workspace: session, Tab: "review", Pane: pane},
-		metadata.AgentID,
-		metadata.AgentInstance,
-	); err != nil || resolved != pane {
-		t.Fatalf("ValidateAgentTarget = %q, %v; want %q", resolved, err, pane)
+	// The identity check runs against a real tmux pane here, not a stubbed
+	// command, so the metadata written above has to survive the round trip.
+	agentTarget := mux.Target{
+		Backend: "tmux", Workspace: session, Tab: "review", Pane: pane,
+		AgentID: metadata.AgentID, AgentInstance: metadata.AgentInstance,
+	}
+	if _, err := readAgentState(agentTarget); err != nil {
+		t.Fatalf("readAgentState on the recorded instance: %v", err)
+	}
+	replaced := agentTarget
+	replaced.AgentInstance = "instance-somebody-else"
+	if _, err := readAgentState(replaced); err == nil {
+		t.Fatal("readAgentState accepted a pane hosting a different agent instance")
 	}
 	eventResult, err := applyAgentEventAt(pane, mux.AgentEvent{
 		AgentID: metadata.AgentID, AgentInstance: metadata.AgentInstance, Engine: metadata.Engine,

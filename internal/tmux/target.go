@@ -3,39 +3,7 @@ package tmux
 import (
 	"fmt"
 	"strings"
-
-	"github.com/cengebretson/orc/internal/mux"
 )
-
-// ValidateAgentTarget proves that an exact pane still hosts the recorded Orc
-// agent instance. Unlike ValidatePaneTarget it never falls back to another
-// pane: an identity mismatch means the recorded process was replaced.
-func ValidateAgentTarget(target mux.Target, agentID, instance string) (string, error) {
-	if target.Backend != "" && target.Backend != "tmux" {
-		return "", fmt.Errorf("tmux cannot validate %s agent target", target.Backend)
-	}
-	if target.Workspace == "" || target.Tab == "" || target.Pane == "" {
-		return "", fmt.Errorf("tmux agent validation requires exact session, window, and pane ids")
-	}
-	if agentID == "" || instance == "" {
-		return "", fmt.Errorf("tmux agent validation requires agent and instance ids")
-	}
-	out, err := newCommand(
-		"tmux", "display-message", "-p", "-t", target.Pane,
-		"#{session_name}\t#{window_name}\t#{@orc_agent_id}\t#{@orc_agent_instance}",
-	).Output()
-	if err != nil {
-		return "", fmt.Errorf("validate tmux agent pane %s: %w", target.Pane, err)
-	}
-	fields := strings.Split(strings.TrimRight(string(out), "\r\n"), "\t")
-	if len(fields) != 4 || fields[0] != target.Workspace || fields[1] != target.Tab {
-		return "", fmt.Errorf("tmux agent pane %s no longer belongs to %s:%s", target.Pane, target.Workspace, target.Tab)
-	}
-	if fields[2] != agentID || fields[3] != instance {
-		return "", fmt.Errorf("tmux agent pane %s hosts a different agent instance", target.Pane)
-	}
-	return target.Pane, nil
-}
 
 // ValidatePaneTarget verifies that a durable pane id still belongs to the
 // expected session/window. Stale ids are safely re-resolved within that window.

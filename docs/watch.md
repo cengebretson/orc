@@ -32,9 +32,8 @@ orc watch --demo
 orc watch --demo --wide
 orc watch --view pet
 orc watch --view pet --pet-layout column
-orc watch --tmux-toggle
-orc watch --view pet --tmux-toggle
-orc watch --tmux-toggle --tmux-layout bottom --tmux-size 25%
+orc rail toggle
+orc rail toggle --layout bottom --size 25%
 orc dashboard
 orc focus
 ```
@@ -48,9 +47,9 @@ details page in both compact and wide layouts, including recent story history.
 Pressing `v` toggles the same rows and controls into an
 animated little-orc pet view; `--view pet` starts there directly. In pet mode,
 `l` toggles the responsive grid and a vertical column; the matching startup
-flag is `--pet-layout column`. `--tmux-toggle` is a helper for tmux keybindings.
-By default it opens a 32-column right-side pane; `--tmux-layout bottom` and
-`--tmux-size <size>` can override the split.
+flag is `--pet-layout column`. To run the rail beside your work as a tmux pane,
+use `orc rail` rather than `orc watch` — see
+[Tmux integration](tmux.md#the-managed-rail).
 
 `--demo` replaces live workspace rows with four read-only synthetic tickets so
 the complete visual language can be reviewed without manufacturing provider or
@@ -424,13 +423,13 @@ Users can open and close the dashboard with one tmux binding.
 Example binding:
 
 ```tmux
-bind-key O run-shell "orc watch --tmux-toggle"
+bind-key O run-shell "orc rail toggle"
 ```
 
 Toggle behavior:
 
 1. If an `orc watch` pane exists in the current tmux window, close it.
-2. Otherwise split a pane using `--tmux-layout` and `--tmux-size`.
+2. Otherwise split a pane using `--layout` and `--size`.
 3. Run `orc watch`.
 4. Mark the pane so future toggles can find it.
 
@@ -449,7 +448,7 @@ the resolved workspace to the spawned pane so its initial CWD does not matter.
 
 - `orc watch` without a ticket shows all active work; an optional ticket scopes
   the rail explicitly.
-- `q` exits the watch process. A pane created by `--tmux-toggle` closes naturally
+- `q` exits the watch process. A pane created by `orc rail` closes naturally
   when that process exits.
 - Prompt preview expands inside the rail and returns with `Esc` or `enter`.
 - The compact/wide layout responds to terminal width; `--wide` forces the wider
