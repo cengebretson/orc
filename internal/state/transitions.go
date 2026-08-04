@@ -14,7 +14,10 @@ func Start(featureDir string) error {
 }
 
 // Resume marks a paused feature as active again and records the continuation.
-// It clears the human-directed NextAction that Pause sets so the agent can write fresh context.
+// It clears the human-directed NextAction that Pause sets, and any question
+// asked with it, so the agent can write fresh context. The launch prompt has
+// already carried the answer to the agent by this point, which is the same
+// contract runtime.jit follows.
 func Resume(featureDir string) error {
 	return Update(featureDir, func(s *State) error {
 		s.History = append(s.History, HistoryEntry{
@@ -25,12 +28,21 @@ func Resume(featureDir string) error {
 		})
 		s.Status = "active"
 		s.NextAction = NextAction{}
+		s.Runtime.Question = nil
 		return nil
 	})
 }
 
-// Pause marks the feature as paused (waiting for human input or external blocker).
-func Pause(featureDir, reason string) error {
+// Pause marks the feature as paused (waiting for human input or external
+// blocker). A non-nil question records the shape of answer the agent needs, so
+// Orc can offer the matching control and reject anything else; pass nil to
+// pause on a free-text reason alone.
+func Pause(featureDir, reason string, question *QuestionRuntime) error {
+	if question != nil {
+		if err := question.Validate(); err != nil {
+			return err
+		}
+	}
 	return Update(featureDir, func(s *State) error {
 		s.History = append(s.History, HistoryEntry{
 			At:     timeNow(),
@@ -42,6 +54,15 @@ func Pause(featureDir, reason string) error {
 		s.Status = "paused"
 		s.NextAction.Worker = "human"
 		s.NextAction.Prompt = reason
+		if question != nil {
+			asked := *question
+			asked.Answer = ""
+			asked.AnsweredAt = ""
+			if asked.AskedAt == "" {
+				asked.AskedAt = timeNow()
+			}
+			s.Runtime.Question = &asked
+		}
 		return nil
 	})
 }

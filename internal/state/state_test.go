@@ -622,7 +622,7 @@ func TestLifecycleMutators(t *testing.T) {
 
 	t.Run("pause", func(t *testing.T) {
 		dir := newFeature(t)
-		if err := state.Pause(dir, "needs approval"); err != nil {
+		if err := state.Pause(dir, "needs approval", nil); err != nil {
 			t.Fatal(err)
 		}
 		got, _ := state.Load(dir)

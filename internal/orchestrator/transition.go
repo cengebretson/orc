@@ -202,7 +202,7 @@ func handleLoopLimit(opts AdvanceOptions, cfg *config.Config, workflow, prevStag
 			Reason:   reason,
 		}, nil
 	}
-	if err := state.Pause(opts.FeatureDir, reason); err != nil {
+	if err := state.Pause(opts.FeatureDir, reason, nil); err != nil {
 		return nil, err
 	}
 	return &AdvanceResult{

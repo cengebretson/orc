@@ -506,3 +506,88 @@ func writeRunnerFile(t *testing.T, path, content string) {
 		t.Fatal(err)
 	}
 }
+
+// The launch prompt is how an answer actually reaches the next agent. An answer
+// recorded in STATE.yaml but absent from the prompt would leave the agent
+// asking the same question again, which is the failure this feature exists to
+// prevent.
+//
+// This test mutates state, so it runs against a copy: the fixture workspace is
+// shared by every other test in the package and is committed to the repo.
+func TestCompute_PromptCarriesAnsweredQuestion(t *testing.T) {
+	ws := copyFixtureWorkspace(t)
+	featureDir := fixtureFeatureDir(ws, "STORY-123")
+	if featureDir == "" {
+		t.Fatal("fixture STORY-123 not found")
+	}
+
+	question := &state.QuestionRuntime{
+		Kind: state.QuestionKindChoice, Prompt: "Which parser approach?",
+		Choices: []state.QuestionChoice{
+			{Key: "rewrite", Label: "Rewrite from scratch"},
+			{Key: "patch", Label: "Patch in place"},
+		},
+	}
+	if err := state.Pause(featureDir, question.Prompt, question); err != nil {
+		t.Fatal(err)
+	}
+
+	// While the question is unanswered the prompt must not present it as an
+	// instruction -- nobody has decided anything yet.
+	plan, err := runner.Compute(ws, featureDir, "")
+	if err != nil {
+		t.Fatalf("Compute: %v", err)
+	}
+	if strings.Contains(plan.Prompt, "answered your question") {
+		t.Fatalf("unanswered question was rendered as an answer:\n%s", plan.Prompt)
+	}
+
+	if _, err := state.AnswerQuestion(featureDir, "patch"); err != nil {
+		t.Fatal(err)
+	}
+	plan, err = runner.Compute(ws, featureDir, "")
+	if err != nil {
+		t.Fatalf("Compute: %v", err)
+	}
+	for _, want := range []string{"answered your question", "Which parser approach?", "Patch in place"} {
+		if !strings.Contains(plan.Prompt, want) {
+			t.Fatalf("prompt missing %q:\n%s", want, plan.Prompt)
+		}
+	}
+	// It has to lead: the previous agent stopped because it could not proceed.
+	// Only meaningful when the fixture actually renders an artifact preamble.
+	answerAt := strings.Index(plan.Prompt, "answered your question")
+	artifactsAt := strings.Index(plan.Prompt, "Required artifacts")
+	if artifactsAt >= 0 && answerAt > artifactsAt {
+		t.Fatalf("answer must precede artifact preamble:\n%s", plan.Prompt)
+	}
+}
+
+// copyFixtureWorkspace clones the shared fixture into a temp dir so a test may
+// write to it without disturbing the committed copy or its sibling tests.
+func copyFixtureWorkspace(t *testing.T) string {
+	t.Helper()
+	src := fixtureWorkspace()
+	dst := t.TempDir()
+	if err := filepath.WalkDir(src, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(dst, rel)
+		if d.IsDir() {
+			return os.MkdirAll(target, 0o755)
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(target, data, 0o644)
+	}); err != nil {
+		t.Fatalf("copy fixture workspace: %v", err)
+	}
+	return dst
+}

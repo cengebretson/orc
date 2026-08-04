@@ -6,6 +6,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added structured human responses. `orc mark <ticket> pause` now takes
+  `--confirm`, `--choice <key>=<label>`, or `--text` to declare the shape of
+  answer it needs, and `orc answer <ticket> [value]` answers it — printing the
+  question and its accepted answers when no value is given.
+- The answer is recorded in `STATE.yaml` under `runtime.question` before any
+  attempt to reach the live agent, and the next launch prompt leads with it.
+  Previously the only reply channel was typing into the agent's pane, so an
+  answer was lost whenever that process exited, was replaced, or the work was
+  parked — and the next agent asked the same question again.
+- Orc validates that an answer is one the question offered and refuses anything
+  else, leaving the question pending. It never interprets what an option means:
+  that stays with the agent that asked.
+
 ## [0.18.0] - 2026-08-04
 
 **Breaking:** `orc doctor --install-agent-hooks` is now `orc hooks install`

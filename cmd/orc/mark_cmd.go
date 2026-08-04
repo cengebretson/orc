@@ -78,7 +78,11 @@ func runMark(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		reason := strings.Join(args[2:], " ")
-		if err := state.Pause(featureDir, reason); err != nil {
+		question, err := pauseQuestion(reason)
+		if err != nil {
+			return err
+		}
+		if err := state.Pause(featureDir, reason, question); err != nil {
 			return err
 		}
 		notifyTransition(root, featureDir, "blocked")
@@ -232,4 +236,43 @@ func printAdvanceResult(result *orchestrator.AdvanceResult) {
 	if result.Reason != "" {
 		fmt.Printf("Note:     %s\n", result.Reason)
 	}
+}
+
+// pauseQuestion builds the structured question a pause declares, from the
+// mutually exclusive --confirm, --choice, and --text flags. It returns nil when
+// none are given, which pauses on the free-text reason alone.
+func pauseQuestion(reason string) (*state.QuestionRuntime, error) {
+	kinds := 0
+	kind := ""
+	if markConfirm {
+		kinds, kind = kinds+1, state.QuestionKindConfirm
+	}
+	if len(markChoices) > 0 {
+		kinds, kind = kinds+1, state.QuestionKindChoice
+	}
+	if markText {
+		kinds, kind = kinds+1, state.QuestionKindText
+	}
+	switch {
+	case kinds == 0:
+		return nil, nil
+	case kinds > 1:
+		return nil, fmt.Errorf("pause accepts only one of --confirm, --choice, or --text")
+	}
+
+	question := &state.QuestionRuntime{Kind: kind, Prompt: reason}
+	for _, raw := range markChoices {
+		key, label, found := strings.Cut(raw, "=")
+		key = strings.TrimSpace(key)
+		if !found || key == "" {
+			return nil, fmt.Errorf("choice %q must be key=label", raw)
+		}
+		question.Choices = append(question.Choices, state.QuestionChoice{
+			Key: key, Label: strings.TrimSpace(label),
+		})
+	}
+	if err := question.Validate(); err != nil {
+		return nil, err
+	}
+	return question, nil
 }

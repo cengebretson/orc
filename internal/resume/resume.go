@@ -60,6 +60,19 @@ func buildPrompt(root, featureDir string, s *state.State, ctx *Context) string {
 	fmt.Fprintf(&b, "## Resuming %s — stage: %s\n\n", s.Ticket, s.Stage.Name)
 	fmt.Fprintf(&b, "This session was interrupted. Status was `%s` when it stopped.\n\n", s.Status)
 
+	// An answered question is the most actionable thing in the prompt: the agent
+	// paused to ask, and a human has already replied. It goes above history so
+	// it cannot be missed, and it is stated as the human's words rather than an
+	// instruction Orc invented.
+	if q := s.Runtime.Question; q != nil && q.Answered() {
+		b.WriteString("### The human answered your question\n\n")
+		fmt.Fprintf(&b, "You asked: %s\n\n", q.Prompt)
+		fmt.Fprintf(&b, "They answered: **%s**\n\n", q.Label(q.Answer))
+		b.WriteString("Act on that answer before doing anything else.\n\n")
+	} else if q != nil {
+		fmt.Fprintf(&b, "### Waiting on a human\n\nYou asked: %s\n\nNo answer has been recorded yet.\n\n", q.Prompt)
+	}
+
 	// Last few history entries for context.
 	b.WriteString("### Recent history\n\n")
 	entries := s.History

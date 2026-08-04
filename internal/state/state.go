@@ -56,10 +56,11 @@ type State struct {
 }
 
 type Runtime struct {
-	Mux   *MuxRuntime   `yaml:"mux,omitempty"`
-	Tmux  *TmuxRuntime  `yaml:"tmux,omitempty"`
-	Agent *AgentRuntime `yaml:"agent,omitempty"`
-	JIT   *JITRuntime   `yaml:"jit,omitempty"`
+	Mux      *MuxRuntime      `yaml:"mux,omitempty"`
+	Tmux     *TmuxRuntime     `yaml:"tmux,omitempty"`
+	Agent    *AgentRuntime    `yaml:"agent,omitempty"`
+	JIT      *JITRuntime      `yaml:"jit,omitempty"`
+	Question *QuestionRuntime `yaml:"question,omitempty"`
 }
 
 // MuxRuntime records the exact target created by a terminal multiplexer.

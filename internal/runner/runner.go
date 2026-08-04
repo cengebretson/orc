@@ -161,6 +161,12 @@ func buildPrompt(s *state.State, nextStage, advanceMode string, loopDef *config.
 	if repoHints != "" {
 		prompt = repoHints + prompt
 	}
+	// An answer the human already gave outranks everything else in the prompt:
+	// the previous agent stopped precisely because it could not proceed without
+	// it. It leads so it cannot be missed behind setup and artifact preamble.
+	if answer := answeredQuestionPrompt(s); answer != "" {
+		prompt = answer + prompt
+	}
 
 	return preamble + prompt + endInstruction(s.Ticket, nextStage, advanceMode, loopDef, isLoopStage)
 }
@@ -237,5 +243,21 @@ func endInstruction(ticket, nextStage, advanceMode string, loopDef *config.LoopD
 	return fmt.Sprintf(
 		"\n\nWhen this stage is complete, run:\n  orc mark %s next --result \"<summary>\"",
 		ticket,
+	)
+}
+
+// answeredQuestionPrompt renders the human's answer to a question the previous
+// agent paused on. It returns "" when nothing was asked, or when a question is
+// still waiting — an unanswered question is a reason the work is paused, not
+// something to hand the next agent as if it were an instruction.
+func answeredQuestionPrompt(s *state.State) string {
+	q := s.Runtime.Question
+	if q == nil || !q.Answered() {
+		return ""
+	}
+	return fmt.Sprintf(
+		"## The human answered your question\n\nYou asked: %s\n\nThey answered: %s\n\n"+
+			"Act on that answer before anything else. Running `orc mark %s resume` clears it.\n\n",
+		q.Prompt, q.Label(q.Answer), s.Ticket,
 	)
 }

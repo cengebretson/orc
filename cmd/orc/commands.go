@@ -181,10 +181,13 @@ var markCmd = &cobra.Command{
 }
 
 var (
-	markWorker string
-	markResult string
-	markStage  string
-	markForce  bool
+	markWorker  string
+	markResult  string
+	markStage   string
+	markForce   bool
+	markConfirm bool
+	markText    bool
+	markChoices []string
 )
 
 var archiveCmd = &cobra.Command{

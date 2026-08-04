@@ -457,6 +457,11 @@ Available on every command:
 - Tmux Live views use hook state first, then versioned title and bounded-screen fallback rules for presentation only; local overrides live under `agent-detection/v1/`
 - Both `orc watch` and the merged Live dashboard tab display matched provider context pressure using configurable
   green/yellow/red percentage boundaries; unknown provider limits display `n/a`.
+- `orc answer <ticket> [value]` — answer the question a paused ticket is waiting on
+  - with no value, prints the question and the answers it will accept
+  - the answer is recorded in `STATE.yaml` first, then delivered to the live agent
+    as a best-effort nudge — so it survives the agent exiting, being replaced, or
+    the work being parked overnight
 - `orc archive <ticket>` — archive a completed feature, remove worktrees
 - `orc delete <ticket>` — permanently delete a feature folder (only allowed when status is `done` or `archived`)
 - `orc dashboard` — open the unified dashboard in Live; `[`/`]` cycles Live,
@@ -474,6 +479,12 @@ Agents call these commands when their durable work state changes. They are hidde
   - `--result "<summary>"` — record what was accomplished in history
   - `--force` — with `artifact_policy: block`, advance even when required artifacts are not ready; the skipped artifacts are recorded in history
 - `orc mark <ticket> pause "<reason>"` — pause for human input, approval, or an external blocker
+  - `--confirm` — the reason is a yes/no question
+  - `--choice <key>=<label>` — the reason is a pick-one question; repeat for each option
+  - `--text` — the reason needs a free-text answer
+  - With one of these, Orc records the *shape* of the answer it needs, rejects
+    anything that isn't offered, and hands the answer to the next agent in its
+    launch prompt. Without one, the pause is a free-text reason as before.
 - `orc mark <ticket> done` — mark active, ready, or paused work as done
 - `orc mark <ticket> jit "<summary>"` — record a jit task as complete and clear `runtime.jit`
 
