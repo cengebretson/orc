@@ -85,6 +85,7 @@ var statusCmd = &cobra.Command{
 }
 
 var statusJSON bool
+var statusLabels []string
 
 var sessionsCmd = &cobra.Command{
 	Use:   "sessions",
@@ -94,8 +95,9 @@ var sessionsCmd = &cobra.Command{
 }
 
 var (
-	sessionsJSON bool
-	sessionsAll  bool
+	sessionsJSON   bool
+	sessionsAll    bool
+	sessionsLabels []string
 )
 
 var sessionsResumeCmd = &cobra.Command{

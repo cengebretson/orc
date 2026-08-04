@@ -103,6 +103,10 @@ type Options struct {
 	Mux        mux.Backend
 	Discover   func(string) ([]telemetry.Live, error)
 	ResolveGit func(string) (gitmeta.Metadata, bool)
+	// Labels narrows to features carrying every selector. Unmanaged sessions
+	// have no feature and so no labels: filtering by label excludes them, which
+	// is the only honest answer to "show me sessions labelled X".
+	Labels []state.LabelSelector
 }
 
 // CollectManagedRuntimeWithMux is the strict runtime projection used by live
@@ -146,7 +150,7 @@ func Collect(root string, opts Options) ([]Session, error) {
 			load = featurelist.Collect
 		}
 		var err error
-		features, err = load(root, featurelist.Options{})
+		features, err = load(root, featurelist.Options{Labels: opts.Labels})
 		if err != nil {
 			return nil, err
 		}

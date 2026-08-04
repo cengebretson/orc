@@ -6,6 +6,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added durable labels. `orc label <ticket> key=value` sets them,
+  `--remove <key>` deletes them, and a bare `orc label <ticket>` lists them.
+  Orc assigns no meaning to any key and no transition reads them, so a label
+  can never change what a stage does — only which features a view shows.
+- `orc status --label` and `orc sessions --label` filter by `key` or
+  `key=value`. Repeating the flag intersects, so `--label area=api --label
+  priority=high` requires both. Key and value comparison is case-insensitive,
+  matching how the interactive filters already behave.
+- `orc watch`'s `/` filter searches labels too, so `/area=api` narrows the rail
+  without a separate label syntax, and `orc status <ticket>` lists them.
+
 ## [0.19.0] - 2026-08-04
 
 ### Added

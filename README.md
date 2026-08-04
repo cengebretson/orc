@@ -413,8 +413,10 @@ Available on every command:
 - `orc status` — show all features and their current workflow/stage
   - `orc status <ticket>` — show full details for a specific ticket
   - `--json` — output durable state as JSON for scripting; a matched running provider adds an optional `live` overlay
+  - `--label <key>` or `--label <key>=<value>` — only show features carrying it; repeat to require several
 - `orc sessions` — list managed and orphaned agent sessions with tmux targets and optional provider telemetry
   - `--all` — include recent Claude and Codex sessions not managed by Orc
+  - `--label <key>[=<value>]` — only show sessions whose feature carries it (cannot be combined with `--all`)
   - `--json` — emit the inventory as JSON
   - groups rows by repository and branch; managed rows use `STATE.yaml.repos`, while unmanaged rows use cached Git metadata
   - `orc sessions resume` — search recent sessions interactively by provider, model, repository, branch, CWD, and activity
@@ -459,6 +461,11 @@ Available on every command:
 - Tmux Live views use hook state first, then versioned title and bounded-screen fallback rules for presentation only; local overrides live under `agent-detection/v1/`
 - Both `orc watch` and the merged Live dashboard tab display matched provider context pressure using configurable
   green/yellow/red percentage boundaries; unknown provider limits display `n/a`.
+- `orc label <ticket> [key=value ...]` — set, remove, or list a ticket's durable labels
+  - `--remove <key>` — delete a label; repeat for several
+  - with no pairs, prints the ticket's current labels
+  - Orc assigns labels no meaning and no transition reads them; they exist for
+    filtering and grouping in your own vocabulary (`area`, `priority`, `owner`)
 - `orc answer <ticket> [value]` — answer the question a paused ticket is waiting on
   - with no value, prints the question and the answers it will accept
   - the answer is recorded in `STATE.yaml` first, then delivered to the live agent

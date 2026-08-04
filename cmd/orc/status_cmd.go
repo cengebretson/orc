@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/cengebretson/orc/internal/featurelist"
@@ -70,9 +71,14 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	// deciding whether the printed table carries a tmux column.
 	showTmux := muxBackend.Available()
 
+	selectors, err := parseLabelSelectors(statusLabels)
+	if err != nil {
+		return err
+	}
 	features, err := featurelist.Collect(root, featurelist.Options{
 		IncludeArchived: true,
 		Mux:             muxBackend,
+		Labels:          selectors,
 	})
 	if err != nil {
 		return err
@@ -208,6 +214,9 @@ func printShow(root, featureDir string, s *state.State) error {
 	fmt.Println()
 	fmt.Println("Stage")
 	fmt.Printf("  Stage:     %s · %s%s\n", summary.Workflow, summary.Stage, summary.StageLoopLabel)
+	if labels := s.LabelPairs(); len(labels) > 0 {
+		fmt.Printf("  Labels:    %s\n", strings.Join(labels, "  "))
+	}
 	fmt.Printf("  Worker:    %s\n", summary.WorkerID)
 	if summary.NextStage != "" {
 		fmt.Printf("  Next:      %s  (%s)\n", summary.NextStage, summary.NextAdvance)

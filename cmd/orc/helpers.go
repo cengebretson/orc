@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/cengebretson/orc/internal/config"
 	"github.com/cengebretson/orc/internal/runner"
+	"github.com/cengebretson/orc/internal/state"
 	"os"
 	"path/filepath"
 	"strings"
@@ -93,4 +94,19 @@ func findWorkspaceRoot(start string) (string, error) {
 		}
 		dir = parent
 	}
+}
+
+// parseLabelSelectors turns repeated --label flags into selectors. One helper
+// so every command that filters by label agrees on what "key" and "key=value"
+// mean.
+func parseLabelSelectors(raw []string) ([]state.LabelSelector, error) {
+	selectors := make([]state.LabelSelector, 0, len(raw))
+	for _, item := range raw {
+		selector, err := state.ParseSelector(item)
+		if err != nil {
+			return nil, err
+		}
+		selectors = append(selectors, selector)
+	}
+	return selectors, nil
 }

@@ -43,6 +43,10 @@ type State struct {
 
 	StageCounts map[string]int `yaml:"stage_counts,omitempty"`
 
+	// Labels are durable arbitrary key=value tags. Orc assigns them no meaning
+	// and no transition reads them; they exist for filtering and grouping.
+	Labels map[string]string `yaml:"labels,omitempty"`
+
 	Runtime Runtime `yaml:"runtime,omitempty"`
 
 	Repos map[string]Repo `yaml:"repos"`

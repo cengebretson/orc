@@ -39,6 +39,10 @@ type Options struct {
 	Workers []*workers.Worker
 	// Mux supplies live session and attention state. Defaults to tmux.
 	Mux mux.Backend
+	// Labels narrows the result to features carrying every selector. Empty
+	// means no filtering; features that failed to load are always kept so a
+	// broken STATE.yaml cannot be hidden by a filter.
+	Labels []state.LabelSelector
 }
 
 func Collect(root string, opts Options) ([]*Feature, error) {
@@ -65,18 +69,18 @@ func Collect(root string, opts Options) ([]*Feature, error) {
 
 	featuresDir := filepath.Join(root, "features")
 	var out []*Feature
-	if err := collectDir(root, featuresDir, false, cfg, allWorkers, activeSessions, opts.Mux.Attention, &out); err != nil {
+	if err := collectDir(root, featuresDir, false, cfg, allWorkers, activeSessions, opts.Mux.Attention, opts.Labels, &out); err != nil {
 		return nil, err
 	}
 	if opts.IncludeArchived {
-		if err := collectDir(root, filepath.Join(featuresDir, "_archive"), true, cfg, allWorkers, activeSessions, opts.Mux.Attention, &out); err != nil {
+		if err := collectDir(root, filepath.Join(featuresDir, "_archive"), true, cfg, allWorkers, activeSessions, opts.Mux.Attention, opts.Labels, &out); err != nil {
 			return nil, err
 		}
 	}
 	return out, nil
 }
 
-func collectDir(root, dir string, archived bool, cfg *config.Config, allWorkers []*workers.Worker, activeSessions map[string]bool, windowAttention func(session, window string) string, out *[]*Feature) error {
+func collectDir(root, dir string, archived bool, cfg *config.Config, allWorkers []*workers.Worker, activeSessions map[string]bool, windowAttention func(session, window string) string, labels []state.LabelSelector, out *[]*Feature) error {
 	entries, err := os.ReadDir(dir)
 	if os.IsNotExist(err) {
 		return nil
@@ -98,6 +102,10 @@ func collectDir(root, dir string, archived bool, cfg *config.Config, allWorkers 
 				HasIssues:  true,
 				LoadError:  err,
 			})
+			continue
+		}
+
+		if !state.MatchesAll(s.Labels, labels) {
 			continue
 		}
 

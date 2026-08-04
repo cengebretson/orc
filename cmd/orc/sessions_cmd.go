@@ -30,7 +30,14 @@ func runSessions(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	sessions, err := sessionlist.Collect(root, sessionlist.Options{IncludeUnmanaged: sessionsAll, ResolveGit: gitmeta.Resolve, Mux: muxBackend})
+	selectors, err := parseLabelSelectors(sessionsLabels)
+	if err != nil {
+		return err
+	}
+	if len(selectors) > 0 && sessionsAll {
+		return fmt.Errorf("--label cannot be combined with --all: unmanaged sessions have no feature to carry labels")
+	}
+	sessions, err := sessionlist.Collect(root, sessionlist.Options{IncludeUnmanaged: sessionsAll, ResolveGit: gitmeta.Resolve, Mux: muxBackend, Labels: selectors})
 	if err != nil {
 		return err
 	}

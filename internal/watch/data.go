@@ -272,6 +272,9 @@ func rowFromFeature(f *featurelist.Feature, cfg *config.Config) row {
 	for name, repo := range s.Repos {
 		searchFields = append(searchFields, name, repo.Main, repo.Worktree, repo.Branch)
 	}
+	// Labels join the shared matcher, so `/area=api` filters the rail without a
+	// separate label syntax.
+	searchFields = append(searchFields, s.LabelPairs()...)
 	return row{
 		ticket:        s.Ticket,
 		featureDir:    f.FeatureDir,
