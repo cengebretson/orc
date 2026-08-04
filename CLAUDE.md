@@ -68,13 +68,19 @@ orc/
     ui/                           terminal presentation primitives shared by the above
     searchmatch/                  shared presentation-only filter matching
     notify/                       optional user-configured command run after transitions
+    shellquote/                   shell word quoting — Quote (stable) vs Word (minimal)
   scripts/
     pre-commit                    tidy → fmt → lint → test (symlink to .git/hooks/pre-commit)
-    release-check                 non-publishing release validation (make release-check)
+    release-check                 disposable-workspace release smoke test
+    release-contract              VERSION/tag/changelog/goreleaser coherence gate
+    verify-release-snapshot       asserts four platform archives plus checksums
+    verify-release-published      asserts a published release carries its changelog notes
+    verify-agent-hooks            agent lifecycle hook installer checks (make verify-agents)
   docs/
     workflows.md                  workspace workflow configuration reference
     reference.md                  deep reference — layout, files, orc.yaml, STATE.yaml, workers
     sessions.md, tmux.md, herdr.md, watch.md, agent-detection.md, release.md
+    adr/                          decision records for load-bearing architectural choices
   CONTEXT.md                      authoritative glossary for Orc's domain vocabulary
   go.mod
   Makefile
@@ -92,6 +98,9 @@ make fmt     # gofmt -w
 make tidy    # go mod tidy
 make install # go install ./cmd/orc/... (with version LDFLAGS)
 make clean   # rm -f orc
+
+make verify-agents  # agent lifecycle hook installer checks
+make release-check  # full non-publishing release validation (also run by CI)
 ```
 
 Install the pre-commit hook once after cloning:
