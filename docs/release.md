@@ -37,6 +37,7 @@ go mod tidy -diff
 git diff --check
 make build
 ./orc version
+make release-check
 ```
 
 All commands must exit zero. The following formatting check must print nothing,
@@ -54,7 +55,14 @@ go test -count=1 ./internal/workspace/... \
   -run 'TestInit_Golden(DefaultPack|SkipDefaultPack)' -v
 ```
 
-## 2. Fresh-workspace core QA
+`make release-check` uses the GoReleaser version pinned in `.tool-versions`,
+which is also consumed by both GitHub workflows. Locally, `mise` installs that
+exact binary when needed. The target runs `goreleaser check` followed by a
+snapshot release; snapshot mode evaluates builds, linker and archive templates,
+release notes, archives, and checksums while explicitly skipping publication.
+Generated artifacts remain under ignored `dist/` for inspection.
+
+## 2. Fresh-workspace and artifact QA
 
 Run the deterministic, noninteractive release smoke test:
 
@@ -62,8 +70,10 @@ Run the deterministic, noninteractive release smoke test:
 make release-check
 ```
 
-The target builds the candidate, creates disposable workspaces and a disposable
-Git repository under the system temporary directory, and verifies:
+The target first verifies that `VERSION` has a non-empty matching changelog
+section and comparison links. It then builds the candidate, creates disposable
+workspaces and a disposable Git repository under the system temporary
+directory, and verifies:
 
 - Default initialization reports exactly 40 created files and includes
   `SETUP.md`.
@@ -79,6 +89,9 @@ Git repository under the system temporary directory, and verifies:
 - Archive moves the completed feature under `features/_archive/`.
 - `--skip-default-pack` reports exactly 15 created files, retains `SETUP.md`,
   and does not install the default workflow.
+- GoReleaser accepts the complete configuration and supplied release notes.
+- Snapshot builds produce exactly one archive for macOS and Linux on amd64 and
+  arm64, plus `checksums.txt`, without publishing a GitHub release.
 
 The target intentionally does not launch Claude or Codex. When `SETUP.md`,
 `AGENTS.md`, `RULES.md`, `TOOLS.md`, or the setup flow changes materially,
@@ -153,7 +166,8 @@ Verify the workflow contract before tagging:
 
 ```sh
 version="$(cat VERSION)"
-rg -n "^## \\[${version}\\]" CHANGELOG.md
+make release-check
+RELEASE_TAG="v${version}" ./scripts/release-contract
 git status --short --branch
 git log -1 --oneline
 ```
@@ -163,8 +177,9 @@ created.
 
 ## 5. Tag and verify artifacts
 
-The release workflow runs for `v*` tags and rejects a tag that does not exactly
-match `VERSION` or lacks a matching changelog section.
+The release workflow runs for `v*` tags, installs the exact GoReleaser version
+from `.tool-versions`, and rejects a tag that does not exactly match `VERSION`
+or lacks a matching, non-empty changelog section and comparison links.
 
 ```sh
 version="$(cat VERSION)"

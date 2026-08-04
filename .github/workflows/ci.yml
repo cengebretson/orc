@@ -10,11 +10,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
       - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.12.2
+      - uses: goreleaser/goreleaser-action@v7
+        with:
+          version-file: .tool-versions
+          install-only: true
       - run: make test
-      - run: make release-check
+      - run: make release-check GORELEASER=goreleaser

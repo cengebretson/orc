@@ -9,6 +9,8 @@ GOMODCACHE ?= $(CURDIR)/.cache/go-mod
 GOLANGCI_LINT_CACHE ?= $(CURDIR)/.cache/golangci-lint
 GO_ENV = MISE_CACHE_DIR=$(MISE_CACHE_DIR) GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE)
 LINT_ENV = $(GO_ENV) GOLANGCI_LINT_CACHE=$(GOLANGCI_LINT_CACHE)
+GORELEASER ?= mise x -- goreleaser
+RELEASE_NOTES ?= $(CURDIR)/.cache/release-notes.md
 
 build:
 	$(GO_ENV) go build $(LDFLAGS) -o orc ./cmd/orc/...
@@ -37,4 +39,8 @@ verify-agents:
 	$(GO_ENV) ./scripts/verify-agent-hooks
 
 release-check: build
+	./scripts/release-contract "$(RELEASE_NOTES)"
 	ORC_BIN="$(CURDIR)/orc" ./scripts/release-check
+	MISE_CACHE_DIR=$(MISE_CACHE_DIR) $(GORELEASER) check
+	MISE_CACHE_DIR=$(MISE_CACHE_DIR) $(GORELEASER) release --snapshot --skip=publish --clean --release-notes="$(RELEASE_NOTES)"
+	./scripts/verify-release-snapshot "$(CURDIR)/dist"

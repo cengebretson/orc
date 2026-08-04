@@ -8,6 +8,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Hardened `make release-check` with a shared `VERSION`/tag/changelog contract,
+  GoReleaser `v2.17.1` pin, non-publishing four-platform snapshot build,
+  artifact-name and checksum verification, and the same gate in CI. The tag
+  workflow now consumes the shared contract and exact GoReleaser pin.
 - Added `CONTEXT.md` as the concise developer glossary for Orc's domain terms,
   durable/live state boundaries, and stable architectural vocabulary.
 - Added conservative tmux fallback detection through embedded versioned Codex

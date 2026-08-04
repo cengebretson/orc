@@ -494,7 +494,7 @@ Deep reference lives in **[docs/reference.md](docs/reference.md)**:
 - **[Tmux integration](docs/tmux.md)** — optional popup, split-pane, resume, and focus bindings
 - **[Tmux fallback detection](docs/agent-detection.md)** — versioned title/screen rules, local overrides, precedence, and safety boundaries
 - **[Herdr integration](docs/herdr.md)** — native workspace/agent launch, exact attach, lifecycle inventory, and sidebar tokens
-- **[Release readiness](docs/release.md)** — v1 scope, automated gates, disposable-workspace manual QA, and tag verification
+- **[Release readiness](docs/release.md)** — pinned non-publishing snapshot validation, disposable-workspace QA, and tag verification
 - **[Workers](docs/reference.md#workers)** — worker definition files, prompt construction, and resolution order
 
 ---

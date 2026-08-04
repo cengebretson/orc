@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+project_root="$(cd "$script_dir/.." && pwd)"
+version_file="${VERSION_FILE:-$project_root/VERSION}"
+changelog_file="${CHANGELOG_FILE:-$project_root/CHANGELOG.md}"
+notes_file="${1:-$project_root/.cache/release-notes.md}"
+release_tag="${RELEASE_TAG:-}"
+
+fail() {
+	printf 'release-contract: %s\n' "$*" >&2
+	exit 1
+}
+
+[[ -f "$version_file" ]] || fail "VERSION file not found: $version_file"
+[[ -f "$changelog_file" ]] || fail "changelog not found: $changelog_file"
+
+version="$(tr -d '[:space:]' <"$version_file")"
+[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]] || \
+	fail "VERSION must contain one semantic version without a v prefix: $version"
+
+if [[ -n "$release_tag" && "$release_tag" != "v$version" ]]; then
+	fail "tag $release_tag does not match VERSION ($version)"
+fi
+
+mkdir -p "$(dirname "$notes_file")"
+awk -v version="$version" '
+	$0 == "## [" version "]" || index($0, "## [" version "] - ") == 1 {
+		found = 1
+		next
+	}
+	found && /^## \[/ { exit }
+	found { print }
+	END { if (!found) exit 2 }
+' "$changelog_file" >"$notes_file" || fail "CHANGELOG has no section for $version"
+
+grep -Eq '[^[:space:]]' "$notes_file" || fail "CHANGELOG section for $version is empty"
+grep -Fqx "[Unreleased]: https://github.com/cengebretson/orc/compare/v${version}...HEAD" "$changelog_file" || \
+	fail "[Unreleased] comparison does not start at v$version"
+grep -Fq "[$version]: https://github.com/cengebretson/orc/" "$changelog_file" || \
+	fail "CHANGELOG has no comparison link for $version"
+
+printf '✓ release contract matches VERSION %s%s\n' "$version" "${release_tag:+ and tag $release_tag}"

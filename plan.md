@@ -25,37 +25,17 @@ backend-neutral inventory.
 `CONTEXT.md` now provides the project glossary and durable terminology
 boundaries for contributors and coding agents.
 
+Release validation is pinned and non-publishing: `make release-check` verifies
+the version/changelog contract, runs disposable workspace QA, and evaluates all
+four GoReleaser platform archives plus checksums before a tag can be pushed.
+
 Release `v0.16.1` successfully published macOS and Linux archives plus
 checksums. See `CHANGELOG.md` for the complete shipped history.
 
 ## Missing parts
 
-Work in this order:
-
-1. Harden release validation so GoReleaser template failures are caught before
-   a tag is pushed.
-
-## 1. Harden release validation
-
-The `v0.16.0` tag reached GitHub before GoReleaser rejected the build-date
-template. `v0.16.1` fixed the template and released successfully, but the same
-class of error should be caught before another tag is published.
-
-Deliverables:
-
-- Run the same supported GoReleaser major/minor used by GitHub Actions in a
-  non-publishing snapshot validation.
-- Make the check evaluate archive names, linker templates, release notes, and
-  all platform builds rather than merely parsing YAML.
-- Add it to `make release-check` and document it in `docs/release.md` before the
-  tag-push step.
-- Keep publishing tag-driven and require `VERSION` plus the changelog section
-  to match the tag.
-
-Acceptance:
-
-- A broken GoReleaser template fails locally and in CI before a tag is created.
-- Snapshot validation cannot create or modify a GitHub release.
+No active non-Herdr specification items remain. Choose a future-backlog item
+when work resumes; the additive Herdr plugin remains intentionally deferred.
 
 ## Deferred: Herdr plugin
 

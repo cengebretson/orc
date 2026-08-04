@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+dist_dir="${1:-dist}"
+
+fail() {
+	printf 'release-snapshot: %s\n' "$*" >&2
+	exit 1
+}
+
+[[ -d "$dist_dir" ]] || fail "artifact directory not found: $dist_dir"
+[[ -s "$dist_dir/checksums.txt" ]] || fail "checksums.txt was not generated"
+
+archive_count=0
+for os in darwin linux; do
+	for arch in amd64 arm64; do
+		matches=()
+		while IFS= read -r path; do
+			matches+=("$path")
+		done < <(find "$dist_dir" -maxdepth 1 -type f -name "orc_*_${os}_${arch}.tar.gz" -print)
+		if [[ ${#matches[@]} -ne 1 ]]; then
+			fail "expected one ${os}/${arch} archive, found ${#matches[@]}"
+		fi
+		archive_count=$((archive_count + 1))
+	done
+done
+
+total_archives="$(find "$dist_dir" -maxdepth 1 -type f -name 'orc_*.tar.gz' -print | wc -l | tr -d '[:space:]')"
+[[ "$total_archives" == "$archive_count" ]] || \
+	fail "expected exactly $archive_count release archives, found $total_archives"
+
+if find "$dist_dir" -maxdepth 1 -type f \( -name '*{{*' -o -name '*}}*' \) -print -quit | grep -q .; then
+	fail "an artifact name contains an unevaluated template"
+fi
+
+printf '✓ release snapshot contains four platform archives and checksums\n'

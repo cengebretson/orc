@@ -19,35 +19,17 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Verify VERSION matches tag
-        run: |
-          tag="${GITHUB_REF_NAME#v}"
-          file="$(cat VERSION)"
-          if [ "${tag}" != "${file}" ]; then
-            echo "Tag ${GITHUB_REF_NAME} does not match VERSION (${file})" >&2
-            exit 1
-          fi
-
       - name: Run tests
         run: go test ./...
 
-      - name: Extract changelog notes
-        run: |
-          notes="${RUNNER_TEMP}/release-notes.md"
-          awk -v ver="${GITHUB_REF_NAME#v}" '
-            $0 ~ ("^## \\[" ver "\\]") { flag = 1; next }
-            /^## \[/ && flag { flag = 0 }
-            flag { print }
-          ' CHANGELOG.md > "${notes}"
-          if [ ! -s "${notes}" ]; then
-            echo "No changelog section found for ${GITHUB_REF_NAME}" >&2
-            exit 1
-          fi
-          cat "${notes}"
+      - name: Verify release contract
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: ./scripts/release-contract "${RUNNER_TEMP}/release-notes.md"
 
-      - uses: goreleaser/goreleaser-action@v6
+      - uses: goreleaser/goreleaser-action@v7
         with:
-          version: "~> v2"
+          version-file: .tool-versions
           args: release --clean --release-notes=${{ runner.temp }}/release-notes.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
