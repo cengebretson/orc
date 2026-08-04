@@ -29,8 +29,9 @@ Release validation is pinned and non-publishing: `make release-check` verifies
 the version/changelog contract, runs disposable workspace QA, and evaluates all
 four GoReleaser platform archives plus checksums before a tag can be pushed.
 
-Release `v0.16.1` successfully published macOS and Linux archives plus
-checksums. See `CHANGELOG.md` for the complete shipped history.
+Releases publish macOS and Linux archives plus checksums, and carry their
+changelog section as the release body. See `CHANGELOG.md` for the shipped
+history and the current version — naming one here only goes stale.
 
 ## Missing parts
 
