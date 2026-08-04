@@ -41,7 +41,6 @@ Acceptance:
 ## Future backlog
 
 - Native Herdr event-stream optimization, named sessions, and remote attach.
-- Structured confirm/choice/text human responses.
 - Explicit remote tmux-client selection for standalone watch/focus processes.
 - Durable arbitrary labels and `--label key=value` filters.
 - User profiles for personal defaults across workspaces.
