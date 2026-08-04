@@ -16,12 +16,10 @@ Orc use, and Orc must not reproduce a user's tmux cosmetics inside Herdr.
 
 ## Motivation
 
-Orc already has a strong tmux workflow and a backend-neutral runtime model.
-The remaining gap is that tmux is currently a terminal backend, while Herdr is
-also an agent-control backend. As a result, tmux can launch, inventory, focus,
-capture, and park agents, but it cannot yet provide authoritative structured
-agent state, atomic prompting, lifecycle waits, or stall detection through
-`orc ctl`.
+Orc already has a strong tmux workflow, a backend-neutral runtime model, and
+hook-backed structured lifecycle reads and waits. The remaining control gap is
+safe exact-instance prompting and prompt-stall detection; later phases add the
+managed Live rail, reconciliation, and conservative presentation fallbacks.
 
 The goal is not to turn tmux itself into Herdr. The goal is to let Orc supply
 the missing agent semantics while preserving the tmux environment users have
@@ -570,6 +568,8 @@ and waits for the provider hook to register before declaring the agent live.
 
 ### Phase 1: identity and event contract
 
+Status: implemented.
+
 - Extend durable runtime state with agent and instance identity.
 - Stamp and inventory identity metadata on exact tmux panes.
 - Add event validation, sequencing, timestamps, and deduplication.
@@ -593,6 +593,8 @@ Acceptance: supported agents emit observable, sequenced state transitions in
 an isolated live tmux session.
 
 ### Phase 3: tmux lifecycle control
+
+Status: implemented.
 
 - Implement tmux `StateAgent`.
 - Implement event-driven/polled `WaitAgent` with cancellation and timeouts.

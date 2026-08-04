@@ -468,11 +468,11 @@ Agents call these commands when their durable work state changes. They are hidde
 
 These backend-neutral JSON commands are intended for supervisors, integrations, and diagnostics. Lifecycle state comes from native backend APIs; terminal capture remains diagnostic text only.
 
-- `orc ctl agent state --ticket <ticket>` — read the exact recorded Herdr agent's recognized lifecycle as JSON
+- `orc ctl agent state --ticket <ticket>` — read the exact recorded Herdr or tmux agent's recognized lifecycle as JSON; tmux state comes only from installed provider hooks
 - `orc ctl status` — read aggregate durable/live session state and stable attention counts as JSON; durable paused work needs attention
 - `orc ctl agent watch [--ticket <ticket>]` — stream per-ticket `agent_state`, `agent_error`, and `agent_stopped` transitions as compact JSONL until interrupted
-- `orc ctl agent prompt --ticket <ticket> "<text>" --wait --timeout 120s` — atomically prompt the exact recorded Herdr agent and wait for a settled lifecycle state
-- `orc ctl agent wait --ticket <ticket> --until blocked --timeout 120s` — wait for recognized lifecycle state without scraping terminal text
+- `orc ctl agent prompt --ticket <ticket> "<text>" --wait --timeout 120s` — atomically prompt the exact recorded Herdr agent and wait for a settled lifecycle state (tmux prompting is not yet supported)
+- `orc ctl agent wait --ticket <ticket> --until blocked --timeout 120s` — wait for recognized Herdr or hook-published tmux lifecycle state without scraping terminal text
 - `orc ctl session capture --ticket <ticket> [--lines 80]` — capture up to 5,000 recent lines from the exact recorded Herdr or tmux pane; captured text is never treated as lifecycle state
 
 `orc mark` validates transitions before writing `STATE.yaml`: pending tickets must be started before `next`, `done` is rejected from `pending`, stage and worker overrides must exist, invalid workspace config blocks advancement, and `artifact_policy: block` blocks `next` when required artifacts are missing, empty, or unchanged from the feature template (override with `--force`). Use `orc artifacts <ticket>` when an agent or human needs the same artifact checklist without advancing the ticket.

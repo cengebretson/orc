@@ -18,6 +18,7 @@
 package mux
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"time"
@@ -77,10 +78,12 @@ type Metadata struct {
 // Target is an exact backend-owned terminal location. Identifiers are opaque:
 // callers persist and return them but never derive them from labels.
 type Target struct {
-	Backend   string `json:"backend"`
-	Workspace string `json:"workspace"`
-	Tab       string `json:"tab,omitempty"`
-	Pane      string `json:"pane,omitempty"`
+	Backend       string `json:"backend"`
+	Workspace     string `json:"workspace"`
+	Tab           string `json:"tab,omitempty"`
+	Pane          string `json:"pane,omitempty"`
+	AgentID       string `json:"agent_id,omitempty"`
+	AgentInstance string `json:"agent_instance,omitempty"`
 }
 
 // WorktreeTargetSpec describes a backend-native workspace rooted in a Git
@@ -121,6 +124,7 @@ type Notification struct {
 type AgentControlOptions struct {
 	Until   []string
 	Timeout time.Duration
+	Context context.Context
 }
 
 // AgentControlResult is the structured live state returned by a state read,
@@ -378,17 +382,34 @@ type NotificationBackend interface {
 	ShowNotification(notification Notification) error
 }
 
-// AgentControlBackend is an optional capability for multiplexers that can
-// read recognized agent lifecycle state, submit prompts atomically, and wait
-// for state transitions.
-// Backends without reliable lifecycle detection must not emulate it by
-// scraping screen text.
-type AgentControlBackend interface {
+// AgentStateBackend is an optional capability for multiplexers with reliable
+// authoritative lifecycle detection. Backends must not emulate it by scraping
+// screen text.
+type AgentStateBackend interface {
 	Backend
 
 	StateAgent(target Target) (AgentControlResult, error)
-	PromptAgent(target Target, text string, wait bool, options AgentControlOptions) (AgentControlResult, error)
+}
+
+// AgentWaitBackend extends state reads with a context-cancelable lifecycle
+// wait.
+type AgentWaitBackend interface {
+	AgentStateBackend
+
 	WaitAgent(target Target, options AgentControlOptions) (AgentControlResult, error)
+}
+
+// AgentPromptBackend extends lifecycle control with exact-instance prompting.
+type AgentPromptBackend interface {
+	AgentWaitBackend
+
+	PromptAgent(target Target, text string, wait bool, options AgentControlOptions) (AgentControlResult, error)
+}
+
+// AgentControlBackend is the complete control surface retained for callers
+// that require state, wait, and prompt together.
+type AgentControlBackend interface {
+	AgentPromptBackend
 }
 
 // TerminalCaptureBackend is an optional capability for reading terminal text

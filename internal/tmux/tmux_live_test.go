@@ -68,6 +68,20 @@ func TestLiveTmuxWindowMetadataAttentionAndExactSend(t *testing.T) {
 	if err != nil || eventResult.StateChangeSeq != 1 {
 		t.Fatalf("ApplyAgentEvent = %+v, %v", eventResult, err)
 	}
+	controlTarget := mux.Target{
+		Backend: "tmux", Workspace: session, Tab: "review", Pane: pane,
+		AgentID: metadata.AgentID, AgentInstance: metadata.AgentInstance,
+	}
+	agentState, err := (Backend{}).StateAgent(controlTarget)
+	if err != nil || agentState.Lifecycle != mux.LifecycleWorking || agentState.StateChangeSeq != 1 {
+		t.Fatalf("StateAgent = %+v, %v", agentState, err)
+	}
+	waited, err := (Backend{}).WaitAgent(controlTarget, mux.AgentControlOptions{
+		Until: []string{mux.LifecycleWorking}, Timeout: time.Second,
+	})
+	if err != nil || waited.Lifecycle != mux.LifecycleWorking || waited.StateChangeSeq != 1 {
+		t.Fatalf("WaitAgent = %+v, %v", waited, err)
+	}
 	panes, err := ListPanesDetailed()
 	if err != nil {
 		t.Fatalf("ListPanesDetailed: %v", err)

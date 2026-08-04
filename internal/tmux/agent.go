@@ -45,6 +45,9 @@ func (Backend) PrepareAgentLaunch(target mux.Target, tab, dir string, meta mux.M
 	if err := (Backend{}).SetTargetMetadata(preparedTarget, meta); err != nil {
 		return mux.Target{}, nil, err
 	}
+	if err := initializeAgentLifecycle(pane, time.Now()); err != nil {
+		return mux.Target{}, nil, err
+	}
 	preparedArgv := make([]string, 0, len(argv)+4)
 	preparedArgv = append(preparedArgv,
 		"env",
@@ -54,6 +57,28 @@ func (Backend) PrepareAgentLaunch(target mux.Target, tab, dir string, meta mux.M
 	)
 	preparedArgv = append(preparedArgv, argv...)
 	return preparedTarget, preparedArgv, nil
+}
+
+// initializeAgentLifecycle prevents a new instance from inheriting the prior
+// occupant's pane-bound state before its first provider hook arrives.
+func initializeAgentLifecycle(pane string, at time.Time) error {
+	updates := [][2]string{
+		{"@orc_agent_state", mux.LifecycleUnknown},
+		{"@orc_agent_state_seq", "0"},
+		{"@orc_agent_state_since", strconv.FormatInt(at.Unix(), 10)},
+		{"@orc_agent_state_source", "launch"},
+		{"@orc_agent_event_id", ""},
+		{"@orc_agent_event_seq", "0"},
+		{"@agent_attention", ""},
+		{"@agent_attention_since", ""},
+		{"@agent_attention_source", "launch"},
+	}
+	for _, update := range updates {
+		if err := setPaneOption(pane, update[0], update[1]); err != nil {
+			return fmt.Errorf("initialize tmux agent lifecycle: %w", err)
+		}
+	}
+	return nil
 }
 
 // ApplyAgentEvent validates and commits one provider lifecycle event from the

@@ -8,6 +8,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Added exact-instance tmux lifecycle reads and context-cancelable waits to
+  `orc ctl agent state`, `wait`, and `watch`. Stable replacement, offline,
+  invalid-state, cancellation, and timeout codes now match the structured
+  control contract, and new launches reset inherited pane state to `unknown`.
 - Added an idempotent Codex and Claude lifecycle-hook installer through
   `orc doctor --install-agent-hooks`, with dry-run planning, explicit Codex
   trust guidance, foreign-hook preservation, atomic writes, and doctor health

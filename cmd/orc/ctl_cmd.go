@@ -143,7 +143,7 @@ type ctlStatusSummary struct {
 }
 
 func runCtlAgentState(_ *cobra.Command, _ []string) error {
-	controller, target, ticketID, err := resolveCtlAgent(ctlStateTicket)
+	controller, target, ticketID, err := resolveCtlStateAgent(ctlStateTicket)
 	if err != nil {
 		return err
 	}
@@ -256,7 +256,7 @@ func runCtlAgentPrompt(cmd *cobra.Command, args []string) error {
 	if cmd != nil && !ctlPromptWait && (cmd.Flags().Changed("timeout") || len(ctlPromptUntil) > 0) {
 		return ctlError("invalid_argument", "--timeout and --until require --wait")
 	}
-	controller, target, ticketID, err := resolveCtlAgent(ctlPromptTicket)
+	controller, target, ticketID, err := resolveCtlPromptAgent(ctlPromptTicket)
 	if err != nil {
 		return err
 	}
@@ -264,7 +264,7 @@ func runCtlAgentPrompt(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	options := mux.AgentControlOptions{Until: until}
+	options := mux.AgentControlOptions{Until: until, Context: commandContext(cmd)}
 	if ctlPromptWait {
 		if ctlPromptTimeout <= 0 {
 			return ctlError("invalid_argument", "--timeout must be greater than zero")
@@ -278,8 +278,8 @@ func runCtlAgentPrompt(cmd *cobra.Command, args []string) error {
 	return printJSON(map[string]any{"type": "agent_prompted", "ticket": ticketID, "agent": result})
 }
 
-func runCtlAgentWait(_ *cobra.Command, _ []string) error {
-	controller, target, ticketID, err := resolveCtlAgent(ctlWaitTicket)
+func runCtlAgentWait(cmd *cobra.Command, _ []string) error {
+	controller, target, ticketID, err := resolveCtlWaitAgent(ctlWaitTicket)
 	if err != nil {
 		return err
 	}
@@ -291,7 +291,7 @@ func runCtlAgentWait(_ *cobra.Command, _ []string) error {
 		return ctlError("invalid_argument", "--timeout must be greater than zero")
 	}
 	result, err := controller.WaitAgent(target, mux.AgentControlOptions{
-		Until: until, Timeout: ctlWaitTimeout,
+		Until: until, Timeout: ctlWaitTimeout, Context: commandContext(cmd),
 	})
 	if err != nil {
 		return err
@@ -299,18 +299,53 @@ func runCtlAgentWait(_ *cobra.Command, _ []string) error {
 	return printJSON(map[string]any{"type": "agent_waited", "ticket": ticketID, "agent": result})
 }
 
-func resolveCtlAgent(ticketArg string) (mux.AgentControlBackend, mux.Target, string, error) {
+func resolveCtlStateAgent(ticketArg string) (mux.AgentStateBackend, mux.Target, string, error) {
 	backend, target, ticketID, err := resolveCtlTarget(ticketArg)
 	if err != nil {
 		return nil, mux.Target{}, "", err
 	}
-	controller, ok := backend.(mux.AgentControlBackend)
+	controller, ok := backend.(mux.AgentStateBackend)
 	if !ok {
 		return nil, mux.Target{}, "", ctlError(
 			"unsupported_backend", "%s does not provide recognized agent lifecycle control", backend.Name(),
 		)
 	}
 	return controller, target, ticketID, nil
+}
+
+func resolveCtlWaitAgent(ticketArg string) (mux.AgentWaitBackend, mux.Target, string, error) {
+	backend, target, ticketID, err := resolveCtlTarget(ticketArg)
+	if err != nil {
+		return nil, mux.Target{}, "", err
+	}
+	controller, ok := backend.(mux.AgentWaitBackend)
+	if !ok {
+		return nil, mux.Target{}, "", ctlError(
+			"unsupported_backend", "%s does not provide recognized agent lifecycle waiting", backend.Name(),
+		)
+	}
+	return controller, target, ticketID, nil
+}
+
+func resolveCtlPromptAgent(ticketArg string) (mux.AgentPromptBackend, mux.Target, string, error) {
+	backend, target, ticketID, err := resolveCtlTarget(ticketArg)
+	if err != nil {
+		return nil, mux.Target{}, "", err
+	}
+	controller, ok := backend.(mux.AgentPromptBackend)
+	if !ok {
+		return nil, mux.Target{}, "", ctlError(
+			"unsupported_backend", "%s does not provide recognized agent prompting", backend.Name(),
+		)
+	}
+	return controller, target, ticketID, nil
+}
+
+func commandContext(cmd *cobra.Command) context.Context {
+	if cmd == nil || cmd.Context() == nil {
+		return context.Background()
+	}
+	return cmd.Context()
 }
 
 func resolveCtlTarget(ticketArg string) (mux.Backend, mux.Target, string, error) {
@@ -369,7 +404,7 @@ func collectCtlAgentStates(ticketArg string) ([]ctlAgentSnapshot, error) {
 	}
 	result := make([]ctlAgentSnapshot, 0, len(tickets))
 	for _, ticketID := range tickets {
-		controller, target, resolvedTicket, err := resolveCtlAgent(ticketID)
+		controller, target, resolvedTicket, err := resolveCtlStateAgent(ticketID)
 		if err != nil {
 			var commandErr *ctlCommandError
 			if ticketArg == "" && errors.As(err, &commandErr) && commandErr.code == "unsupported_backend" {
@@ -399,11 +434,18 @@ func collectCtlAgentStates(ticketArg string) ([]ctlAgentSnapshot, error) {
 
 func ctlAgentError(err error) *ctlAgentWatchError {
 	code := "agent_unavailable"
+	message := err.Error()
 	var commandErr *ctlCommandError
 	if errors.As(err, &commandErr) {
 		code = commandErr.code
+		message = commandErr.message
 	}
-	return &ctlAgentWatchError{Code: code, Message: err.Error()}
+	var agentErr *mux.AgentControlError
+	if errors.As(err, &agentErr) {
+		code = agentErr.Code
+		message = agentErr.Message
+	}
+	return &ctlAgentWatchError{Code: code, Message: message}
 }
 
 func ctlAgentTickets(ticketArg string) ([]string, error) {

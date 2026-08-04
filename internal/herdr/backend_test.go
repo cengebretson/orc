@@ -1,6 +1,7 @@
 package herdr
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -206,6 +207,26 @@ func TestWaitAgentUsesHerdrLifecycleWait(t *testing.T) {
 	}
 	if result.Lifecycle != "done" || result.Agent != "claude" {
 		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestWaitAgentHonorsCancelledContextBeforeCallingHerdr(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	called := false
+	b := Backend{run: func(args ...string) ([]byte, error) {
+		called = true
+		return nil, nil
+	}}
+	_, err := b.WaitAgent(mux.Target{
+		Backend: "herdr", Workspace: "w1", Tab: "t1", Pane: "p1",
+	}, mux.AgentControlOptions{Context: ctx})
+	var controlErr *mux.AgentControlError
+	if !errors.As(err, &controlErr) || controlErr.Code != "cancelled" {
+		t.Fatalf("WaitAgent() error = %#v", err)
+	}
+	if called {
+		t.Fatal("WaitAgent() invoked the Herdr CLI after cancellation")
 	}
 }
 

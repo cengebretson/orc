@@ -48,5 +48,10 @@ func runtimeTarget(s *state.State) (mux.Target, bool) {
 	if !ok {
 		return mux.Target{}, false
 	}
-	return mux.Target{Backend: target.Backend, Workspace: target.Workspace, Tab: target.Tab, Pane: target.Pane}, true
+	resolved := mux.Target{Backend: target.Backend, Workspace: target.Workspace, Tab: target.Tab, Pane: target.Pane}
+	if s.Runtime.Agent != nil {
+		resolved.AgentID = s.Runtime.Agent.ID
+		resolved.AgentInstance = s.Runtime.Agent.Instance
+	}
+	return resolved, true
 }

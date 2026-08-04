@@ -34,14 +34,16 @@ func TestPrepareAgentLaunchStampsBeforeReturningWrappedCommand(t *testing.T) {
 	if !reflect.DeepEqual(argv, wantArgv) {
 		t.Fatalf("argv = %#v, want %#v", argv, wantArgv)
 	}
-	var stampedID, stampedInstance bool
+	var stampedID, stampedInstance, initializedState, initializedSequence bool
 	for _, call := range *calls {
 		joined := strings.Join(call.args, " ")
 		stampedID = stampedID || joined == "set-option -p -t %7 @orc_agent_id agent-1"
 		stampedInstance = stampedInstance || joined == "set-option -p -t %7 @orc_agent_instance instance-1"
+		initializedState = initializedState || joined == "set-option -p -t %7 @orc_agent_state unknown"
+		initializedSequence = initializedSequence || joined == "set-option -p -t %7 @orc_agent_state_seq 0"
 	}
-	if !stampedID || !stampedInstance {
-		t.Fatalf("identity stamp calls missing: %#v", *calls)
+	if !stampedID || !stampedInstance || !initializedState || !initializedSequence {
+		t.Fatalf("identity/lifecycle stamp calls missing: %#v", *calls)
 	}
 }
 

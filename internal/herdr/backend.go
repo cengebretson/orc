@@ -2,6 +2,7 @@
 package herdr
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -16,19 +17,24 @@ import (
 )
 
 type commandRunner func(args ...string) ([]byte, error)
+type contextCommandRunner func(context.Context, ...string) ([]byte, error)
 
 // Backend drives the Herdr session selected by HERDR's caller context.
 type Backend struct {
-	run commandRunner
+	run        commandRunner
+	runContext contextCommandRunner
 }
 
-func New() Backend { return Backend{run: runCLI} }
+func New() Backend { return Backend{run: runCLI, runContext: runCLIContext} }
 
 var _ mux.Backend = Backend{}
 var _ mux.TargetBackend = Backend{}
 var _ mux.WorktreeTargetBackend = Backend{}
 var _ mux.TaskCellBackend = Backend{}
 var _ mux.NotificationBackend = Backend{}
+var _ mux.AgentStateBackend = Backend{}
+var _ mux.AgentWaitBackend = Backend{}
+var _ mux.AgentPromptBackend = Backend{}
 var _ mux.AgentControlBackend = Backend{}
 var _ mux.TerminalCaptureBackend = Backend{}
 
@@ -95,6 +101,9 @@ func (b Backend) PromptAgent(target mux.Target, text string, wait bool, options 
 	if !wait && (len(options.Until) > 0 || options.Timeout > 0) {
 		return mux.AgentControlResult{}, fmt.Errorf("herdr agent prompt wait options require wait=true")
 	}
+	if wait && options.Context != nil && options.Context.Err() != nil {
+		return mux.AgentControlResult{}, herdrCancelledError()
+	}
 	target, err := b.resolveExactAgentTarget(target)
 	if err != nil {
 		return mux.AgentControlResult{}, err
@@ -107,12 +116,18 @@ func (b Backend) PromptAgent(target mux.Target, text string, wait bool, options 
 			return mux.AgentControlResult{}, err
 		}
 	}
+	if wait {
+		return b.agentControlContext(options.Context, target, args...)
+	}
 	return b.agentControl(target, args...)
 }
 
 // WaitAgent blocks on Herdr's recognized lifecycle state for the exact
 // recorded pane. An empty Until list uses Herdr's settled-state defaults.
 func (b Backend) WaitAgent(target mux.Target, options mux.AgentControlOptions) (mux.AgentControlResult, error) {
+	if options.Context != nil && options.Context.Err() != nil {
+		return mux.AgentControlResult{}, herdrCancelledError()
+	}
 	target, err := b.resolveExactAgentTarget(target)
 	if err != nil {
 		return mux.AgentControlResult{}, err
@@ -121,7 +136,7 @@ func (b Backend) WaitAgent(target mux.Target, options mux.AgentControlOptions) (
 	if err != nil {
 		return mux.AgentControlResult{}, err
 	}
-	return b.agentControl(target, args...)
+	return b.agentControlContext(options.Context, target, args...)
 }
 
 func appendAgentWaitOptions(args []string, options mux.AgentControlOptions) ([]string, error) {
@@ -178,7 +193,17 @@ func (b Backend) resolveExactAgentTarget(target mux.Target) (mux.Target, error) 
 }
 
 func (b Backend) agentControl(target mux.Target, args ...string) (mux.AgentControlResult, error) {
-	out, commandErr := b.command(args...)
+	return b.agentControlContext(context.Background(), target, args...)
+}
+
+func (b Backend) agentControlContext(ctx context.Context, target mux.Target, args ...string) (mux.AgentControlResult, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	out, commandErr := b.commandContext(ctx, args...)
+	if ctx.Err() != nil {
+		return mux.AgentControlResult{}, herdrCancelledError()
+	}
 	envelope, decodeErr := decodeResponseEnvelope(out)
 	if decodeErr == nil && envelope.Error != nil {
 		return mux.AgentControlResult{}, &mux.AgentControlError{
@@ -209,6 +234,10 @@ func (b Backend) agentControl(target mux.Target, args ...string) (mux.AgentContr
 		Backend: "herdr", Target: target, Agent: result.Agent.Agent, Name: result.Agent.Name,
 		Lifecycle: result.Agent.AgentStatus, StateChangeSeq: result.Agent.StateChangeSeq,
 	}, nil
+}
+
+func herdrCancelledError() error {
+	return &mux.AgentControlError{Backend: "herdr", Code: "cancelled", Message: "agent wait was cancelled"}
 }
 
 func (b Backend) Available() bool {
@@ -844,8 +873,22 @@ func (b Backend) command(args ...string) ([]byte, error) {
 	return runner(args...)
 }
 
+func (b Backend) commandContext(ctx context.Context, args ...string) ([]byte, error) {
+	if b.runContext != nil {
+		return b.runContext(ctx, args...)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return b.command(args...)
+}
+
 func runCLI(args ...string) ([]byte, error) {
-	cmd := exec.Command("herdr", args...)
+	return runCLIContext(context.Background(), args...)
+}
+
+func runCLIContext(ctx context.Context, args ...string) ([]byte, error) {
+	cmd := exec.CommandContext(ctx, "herdr", args...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return out, fmt.Errorf("herdr %s: %s: %w", strings.Join(args, " "), strings.TrimSpace(string(out)), err)

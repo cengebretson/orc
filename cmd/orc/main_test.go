@@ -118,6 +118,7 @@ func TestRunCtlAgentStateTargetsRecordedHerdrPane(t *testing.T) {
 	if err := state.Update(featureDir, func(s *state.State) error {
 		s.Runtime.Mux = &state.MuxRuntime{Backend: "herdr", Workspace: "w9", Tab: "w9:t1", Pane: "w9:p1"}
 		s.Runtime.Tmux = nil
+		s.Runtime.Agent = &state.AgentRuntime{ID: "agent-9", Instance: "instance-9"}
 		return nil
 	}); err != nil {
 		t.Fatal(err)
@@ -148,7 +149,7 @@ func TestRunCtlAgentStateTargetsRecordedHerdrPane(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if gotTarget.Pane != "w9:p1" {
+	if gotTarget.Pane != "w9:p1" || gotTarget.AgentID != "agent-9" || gotTarget.AgentInstance != "instance-9" {
 		t.Fatalf("target = %#v", gotTarget)
 	}
 	var payload struct {
@@ -436,7 +437,7 @@ func TestRunCtlAgentWaitUsesBackendLifecycleWait(t *testing.T) {
 			return mux.AgentControlResult{}, nil
 		},
 		waitFunc: func(target mux.Target, options mux.AgentControlOptions) (mux.AgentControlResult, error) {
-			if target.Pane != "w9:p1" || options.Timeout != 30*time.Second || len(options.Until) != 1 || options.Until[0] != "done" {
+			if target.Pane != "w9:p1" || options.Timeout != 30*time.Second || options.Context == nil || len(options.Until) != 1 || options.Until[0] != "done" {
 				t.Fatalf("target=%#v options=%#v", target, options)
 			}
 			return mux.AgentControlResult{Backend: "herdr", Target: target, Agent: "codex", Lifecycle: "done"}, nil
@@ -479,6 +480,15 @@ func TestWriteCtlErrorPreservesHerdrStallCode(t *testing.T) {
 	writeCtlError(&out, &mux.AgentControlError{Backend: "herdr", Code: "agent_prompt_stalled", Message: "no observed state change"})
 	if !strings.Contains(out.String(), `"code":"agent_prompt_stalled"`) || !strings.Contains(out.String(), `"message":"no observed state change"`) {
 		t.Fatalf("error output = %s", out.String())
+	}
+}
+
+func TestCtlAgentErrorPreservesBackendCodeAndMessage(t *testing.T) {
+	got := ctlAgentError(&mux.AgentControlError{
+		Backend: "tmux", Code: "agent_replaced", Message: "recorded instance was replaced",
+	})
+	if got.Code != "agent_replaced" || got.Message != "recorded instance was replaced" {
+		t.Fatalf("ctlAgentError() = %#v", got)
 	}
 }
 
