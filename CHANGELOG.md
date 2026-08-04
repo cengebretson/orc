@@ -6,14 +6,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### Fixed
+**Breaking:** `orc doctor --install-agent-hooks` is now `orc hooks install`
+(`--dry-run` moves with it). Hook installation writes into your Codex and
+Claude configuration rather than the workspace, so it is its own command;
+`orc doctor` still reports whether the hooks are installed.
 
-- GitHub Releases now carry their changelog section as the release body.
-  `.goreleaser.yaml` set `changelog.disable`, which skips the changelog pipe —
-  and that pipe is what reads `--release-notes`. Every release up to and
-  including `v0.17.0` published with an empty body as a result; `v0.17.0`'s
-  notes were restored by hand. `make release-check` could not have caught this,
-  because snapshot mode skips the same pipe and never renders a release body.
+### Added
+
+- Added two guards for release notes. `scripts/release-contract` now rejects a
+  `.goreleaser.yaml` that sets `changelog.disable`, catching the cause on every
+  CI run rather than at tag time; the release workflow's new
+  `scripts/verify-release-published` step compares the published release body
+  against the notes GoReleaser was given, covering the failure modes a static
+  check cannot anticipate.
 
 ### Changed
 
@@ -26,14 +31,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   new command; `--fix` stays on `doctor`, where repairing a stale workspace lock
   is exactly what a doctor should do.
 
-### Added
+### Fixed
 
-- Added two guards for release notes. `scripts/release-contract` now rejects a
-  `.goreleaser.yaml` that sets `changelog.disable`, catching the cause on every
-  CI run rather than at tag time; the release workflow's new
-  `scripts/verify-release-published` step compares the published release body
-  against the notes GoReleaser was given, covering the failure modes a static
-  check cannot anticipate.
+- GitHub Releases now carry their changelog section as the release body.
+  `.goreleaser.yaml` set `changelog.disable`, which skips the changelog pipe —
+  and that pipe is what reads `--release-notes`. Every release up to and
+  including `v0.17.0` published with an empty body as a result; `v0.17.0`'s
+  notes were restored by hand. `make release-check` could not have caught this,
+  because snapshot mode skips the same pipe and never renders a release body.
 
 ## [0.17.0] - 2026-08-03
 
