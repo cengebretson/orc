@@ -24,14 +24,29 @@ checksums. See `CHANGELOG.md` for the complete shipped history.
 
 Work in this order:
 
-1. Ship Orc as a Herdr plugin.
-2. Ship the agent hook installer for tmux-backed agents.
-3. Add the conservative attention fallback and attention-age display.
-4. Harden release validation so GoReleaser template failures are caught before
+1. Deliver the tmux-first agent orchestration phases in `super-orc.md`:
+   identity and events, hook installation, lifecycle control, safe prompting,
+   the managed rail, and restoration/fallback hardening.
+2. Ship Orc as an additive Herdr plugin.
+3. Harden release validation so GoReleaser template failures are caught before
    a tag is pushed.
-5. Add `CONTEXT.md`, the project glossary.
+4. Add `CONTEXT.md`, the project glossary.
 
-## 1. Ship Orc as a Herdr plugin
+The hook installer and conservative attention fallback previously listed here
+are now phases 2 and 6 of `super-orc.md`; that specification is authoritative
+for their agent identity, lifecycle, safety, and verification requirements.
+
+## 1. Deliver Super Orc
+
+Implement `super-orc.md` in its stated phase order. tmux remains Orc's portable
+default and receives the richer agent-control experience. Herdr remains an
+optional backend and behavioral reference.
+
+Do not treat this item as a single release-sized change. Each phase must retain
+backward compatibility, pass its own acceptance criteria, and leave existing
+tmux and Herdr workspaces usable.
+
+## 2. Ship Orc as a Herdr plugin
 
 Package Orc as a thin Herdr UI adapter. The plugin must remain additive: Orc
 cannot require Herdr, and Herdr cannot become the owner of workflow state.
@@ -60,7 +75,7 @@ Acceptance:
   currently focused human view by accident.
 - A normal Orc workspace remains fully usable when Herdr is absent.
 
-## 2. Ship the agent hook installer
+### Super Orc phase 2 reference: agent hook installer
 
 tmux attention currently depends on separately installed hooks. Orc should own
 an idempotent installer for supported agent CLIs.
@@ -95,7 +110,7 @@ Verification:
 - Treat an agent that cannot authenticate in the sandbox as skipped, not
   failed.
 
-## 3. Add conservative attention fallback
+### Super Orc phase 6 reference: conservative attention fallback
 
 This fallback is for tmux-backed agents that provide no hook state. It is not a
 second lifecycle authority and must never advance durable workflow state.
@@ -119,7 +134,7 @@ Screen-derived attention is presentation metadata only. `orc ctl`, completion,
 and stage transitions continue to use recognized backend lifecycle or durable
 state, never terminal text.
 
-## 4. Harden release validation
+## 3. Harden release validation
 
 The `v0.16.0` tag reached GitHub before GoReleaser rejected the build-date
 template. `v0.16.1` fixed the template and released successfully, but the same
@@ -141,7 +156,7 @@ Acceptance:
 - A broken GoReleaser template fails locally and in CI before a tag is created.
 - Snapshot validation cannot create or modify a GitHub release.
 
-## 5. Add the project glossary
+## 4. Add the project glossary
 
 Create `CONTEXT.md` with concise, implementation-independent definitions for
 stage, loop stage, worker, pack, feature folder, runtime, jit, park, attention,
