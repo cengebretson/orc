@@ -1,4 +1,4 @@
-.PHONY: build install clean test lint tidy fmt check release-check
+.PHONY: build install clean test lint tidy fmt check verify-agents release-check
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 BUILD_DATE ?= $(shell date -u +%Y-%m-%d)
@@ -32,6 +32,9 @@ fmt:
 	gofmt -l -w ./cmd ./internal
 
 check: lint test
+
+verify-agents:
+	$(GO_ENV) ./scripts/verify-agent-hooks
 
 release-check: build
 	ORC_BIN="$(CURDIR)/orc" ./scripts/release-check

@@ -63,6 +63,8 @@ var doctorCmd = &cobra.Command{
 
 var doctorFix bool
 var doctorSystem bool
+var doctorInstallAgentHooks bool
+var doctorDryRun bool
 
 var nextCmd = &cobra.Command{
 	Use:   "next <ticket>",

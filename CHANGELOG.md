@@ -8,6 +8,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Added an idempotent Codex and Claude lifecycle-hook installer through
+  `orc doctor --install-agent-hooks`, with dry-run planning, explicit Codex
+  trust guidance, foreign-hook preservation, atomic writes, and doctor health
+  reporting for idle, working, and blocked states.
 - Added the first Super Orc identity foundation: durable agent and live-instance
   state, pre-launch tmux identity stamping and provider environment, exact-
   instance validation, and a deduplicated hook event command that publishes

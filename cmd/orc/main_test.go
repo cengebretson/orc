@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cengebretson/orc/internal/agenthooks"
 	"github.com/cengebretson/orc/internal/agentidentity"
 	"github.com/cengebretson/orc/internal/config"
 	"github.com/cengebretson/orc/internal/mux"
@@ -821,6 +822,67 @@ func TestRunDoctorSystemRejectsTicketArg(t *testing.T) {
 	})
 	if err == nil || !strings.Contains(err.Error(), "doctor --system does not accept a ticket") {
 		t.Fatalf("runDoctor --system ticket err = %v", err)
+	}
+}
+
+func TestRunDoctorAgentHooksDryRunDoesNotApply(t *testing.T) {
+	resetCommandGlobals(t)
+	doctorInstallAgentHooks = true
+	doctorDryRun = true
+	plan := &agenthooks.Plan{Integrations: []agenthooks.Integration{{
+		Engine: "codex", SupportedStates: []string{"idle", "working", "blocked"},
+		Changes: []agenthooks.Change{
+			{Kind: "create", Path: "/config/codex/hooks/orc-agent-state.sh"},
+			{Kind: "update", Path: "/config/codex/hooks.json"},
+		},
+	}}}
+	buildAgentHookPlan = func(agenthooks.Options) *agenthooks.Plan { return plan }
+	applyAgentHookPlan = func(*agenthooks.Plan) error {
+		t.Fatal("dry run must not apply")
+		return nil
+	}
+
+	out, err := captureStdout(func() error { return runDoctor(nil, nil) })
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"Agent hooks (dry run)", "codex", "create", "update", "idle, working, blocked"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("dry-run output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestRunDoctorAgentHooksAppliesAndPrintsTrustGuidance(t *testing.T) {
+	resetCommandGlobals(t)
+	doctorInstallAgentHooks = true
+	plan := &agenthooks.Plan{Integrations: []agenthooks.Integration{{
+		Engine: "codex", SupportedStates: []string{"idle"}, Changes: []agenthooks.Change{{Kind: "unchanged", Path: "/config/hooks.json"}},
+	}}}
+	buildAgentHookPlan = func(agenthooks.Options) *agenthooks.Plan { return plan }
+	applied := false
+	applyAgentHookPlan = func(got *agenthooks.Plan) error {
+		applied = got == plan
+		return nil
+	}
+
+	out, err := captureStdout(func() error { return runDoctor(nil, nil) })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !applied {
+		t.Fatal("agent hook plan was not applied")
+	}
+	if !strings.Contains(out, "review and trust") || !strings.Contains(out, "/hooks") || !strings.Contains(out, "restart active sessions") {
+		t.Fatalf("install guidance missing:\n%s", out)
+	}
+}
+
+func TestRunDoctorDryRunRequiresAgentHookInstall(t *testing.T) {
+	resetCommandGlobals(t)
+	doctorDryRun = true
+	if err := runDoctor(nil, nil); err == nil || !strings.Contains(err.Error(), "requires --install-agent-hooks") {
+		t.Fatalf("runDoctor error = %v", err)
 	}
 }
 
@@ -1697,7 +1759,11 @@ func resetCommandGlobals(t *testing.T) {
 	oldVersion := version
 	oldDoctorFix := doctorFix
 	oldDoctorSystem := doctorSystem
+	oldDoctorInstallAgentHooks := doctorInstallAgentHooks
+	oldDoctorDryRun := doctorDryRun
 	oldDoctorLookPath := doctorLookPath
+	oldBuildAgentHookPlan := buildAgentHookPlan
+	oldApplyAgentHookPlan := applyAgentHookPlan
 	oldStatusJSON := statusJSON
 	oldNextDry := nextDry
 	oldNextWorker := nextWorker
@@ -1744,7 +1810,11 @@ func resetCommandGlobals(t *testing.T) {
 		version = oldVersion
 		doctorFix = oldDoctorFix
 		doctorSystem = oldDoctorSystem
+		doctorInstallAgentHooks = oldDoctorInstallAgentHooks
+		doctorDryRun = oldDoctorDryRun
 		doctorLookPath = oldDoctorLookPath
+		buildAgentHookPlan = oldBuildAgentHookPlan
+		applyAgentHookPlan = oldApplyAgentHookPlan
 		statusJSON = oldStatusJSON
 		nextDry = oldNextDry
 		nextWorker = oldNextWorker
@@ -1792,7 +1862,11 @@ func resetCommandGlobals(t *testing.T) {
 	version = "dev"
 	doctorFix = false
 	doctorSystem = false
+	doctorInstallAgentHooks = false
+	doctorDryRun = false
 	doctorLookPath = exec.LookPath
+	buildAgentHookPlan = func(agenthooks.Options) *agenthooks.Plan { return &agenthooks.Plan{} }
+	applyAgentHookPlan = agenthooks.Apply
 	statusJSON = false
 	nextDry = false
 	nextWorker = ""

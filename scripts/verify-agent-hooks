@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+for required in go tmux python3; do
+  if ! command -v "$required" >/dev/null 2>&1; then
+    echo "SKIP: $required is required for agent-hook verification"
+    exit 0
+  fi
+done
+
+verify_dir="$(mktemp -d "${TMPDIR:-/tmp}/orc-agent-verify.XXXXXX")"
+tmux_server="orc-agent-verify-$$"
+cleanup() {
+  tmux -L "$tmux_server" kill-server >/dev/null 2>&1 || true
+  rm -rf "$verify_dir"
+}
+trap cleanup EXIT HUP INT TERM
+
+orc_bin="$verify_dir/orc"
+codex_home="$verify_dir/codex"
+claude_home="$verify_dir/claude"
+mkdir -p "$codex_home" "$claude_home"
+go build -o "$orc_bin" ./cmd/orc/...
+HOME="$verify_dir" CODEX_HOME="$codex_home" CLAUDE_CONFIG_DIR="$claude_home" \
+  "$orc_bin" doctor --install-agent-hooks >/dev/null
+
+tmux -L "$tmux_server" -f /dev/null new-session -d -s verify
+pane="$(tmux -L "$tmux_server" display-message -p -t verify '#{pane_id}')"
+tmux -L "$tmux_server" set-option -p -t "$pane" @orc_agent 1
+tmux -L "$tmux_server" set-option -p -t "$pane" @orc_agent_id agent-verify
+tmux -L "$tmux_server" set-option -p -t "$pane" @orc_agent_instance instance-verify
+
+send_hook() {
+  local hook_path="$1"
+  local engine="$2"
+  local lifecycle="$3"
+  local event_name="$4"
+  local command
+  printf -v command \
+    "printf '%%s' %q | ORC_AGENT_ID=agent-verify ORC_AGENT_INSTANCE=instance-verify bash %q %q %q %q" \
+    "{\"session_id\":\"provider-verify\",\"hook_event_name\":\"$event_name\",\"turn_id\":\"turn-$lifecycle\"}" \
+    "$hook_path" "$engine" "$lifecycle" "$orc_bin"
+  tmux -L "$tmux_server" set-buffer -b orc-verify-hook -- "$command"
+  tmux -L "$tmux_server" paste-buffer -b orc-verify-hook -t "$pane"
+  tmux -L "$tmux_server" send-keys -t "$pane" Enter
+}
+
+wait_for_state() {
+  local expected="$1"
+  local state=""
+  for _ in {1..50}; do
+    state="$(tmux -L "$tmux_server" show-options -p -qv -t "$pane" @orc_agent_state)"
+    if [[ "$state" == "$expected" ]]; then
+      return 0
+    fi
+    sleep 0.1
+  done
+  echo "FAIL: expected lifecycle $expected, got ${state:-empty}" >&2
+  return 1
+}
+
+send_hook "$codex_home/hooks/orc-agent-state.sh" codex working UserPromptSubmit
+wait_for_state working
+send_hook "$claude_home/hooks/orc-agent-state.sh" claude blocked PermissionRequest
+wait_for_state blocked
+
+echo "PASS: Codex and Claude hooks published isolated tmux lifecycle events"

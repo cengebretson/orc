@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cengebretson/orc/internal/agenthooks"
 	"github.com/cengebretson/orc/internal/doctor"
 )
 
@@ -115,6 +116,34 @@ func TestRunSystemWithOptionsReportsInstallReadiness(t *testing.T) {
 	}
 	if !report.OK() {
 		t.Fatal("system report should remain OK when only optional tools are missing")
+	}
+}
+
+func TestAppendAgentHookChecksReportsReadinessAndSupportedStates(t *testing.T) {
+	report := &doctor.Report{Label: "System"}
+	plan := &agenthooks.Plan{Integrations: []agenthooks.Integration{
+		{
+			Engine: "codex", Executable: "codex", ConfigPath: "/config/hooks.json",
+			SupportedStates: []string{"idle", "working", "blocked"},
+			Changes:         []agenthooks.Change{{Kind: "unchanged", Path: "/config/hooks.json"}},
+		},
+		{
+			Engine: "claude", Executable: "claude", ConfigPath: "/config/settings.json",
+			SupportedStates: []string{"idle", "working", "blocked"},
+			Changes:         []agenthooks.Change{{Kind: "create", Path: "/config/settings.json"}},
+		},
+	}}
+	doctor.AppendAgentHookChecks(report, plan, func(name string) (string, error) {
+		if name == "codex" {
+			return "/bin/codex", nil
+		}
+		return "", os.ErrNotExist
+	})
+	if check := findCheck(report, "agent hooks", "codex"); check == nil || check.Status != doctor.OK || !strings.Contains(check.Detail, "idle, working, blocked") {
+		t.Fatalf("codex hook check = %#v", check)
+	}
+	if check := findCheck(report, "agent hooks", "claude"); check == nil || check.Status != doctor.Warning || !strings.Contains(check.Detail, "--install-agent-hooks") {
+		t.Fatalf("claude hook check = %#v", check)
 	}
 }
 

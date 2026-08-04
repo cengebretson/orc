@@ -581,6 +581,8 @@ recorded agent instance and never targets a replacement.
 
 ### Phase 2: hook installer
 
+Status: implemented.
+
 - Add `internal/agenthooks` with Codex and Claude integrations.
 - Add install and dry-run doctor flags.
 - Publish lifecycle and attention through the event contract.
@@ -656,12 +658,14 @@ workflow state, and restored sessions cannot inherit stale agent identity.
 - rail creation, reuse, resizing tolerance, and safe close;
 - multiple attached clients where practical.
 
-### Real-agent verification
+### Agent-hook verification
 
-`make verify-agents` drives each installed supported agent in an isolated tmux
-server and temporary config root. It verifies only observable supported states.
-Authentication unavailable in the test environment is reported as skipped,
-not failed.
+`make verify-agents` installs both provider integrations into temporary config
+roots, feeds representative Codex and Claude payloads through the installed
+scripts, and verifies the resulting lifecycle options in an isolated tmux
+server. It does not use personal configuration, authenticate an agent, or
+submit a paid model request. A release smoke test may additionally exercise
+installed real agents when authentication is already available.
 
 The normal required gate remains:
 

@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/cengebretson/orc/internal/agenthooks"
 	"github.com/cengebretson/orc/internal/config"
 	"github.com/cengebretson/orc/internal/health"
 	"github.com/cengebretson/orc/internal/state"
@@ -121,6 +122,40 @@ func Print(r *Report) {
 		} else {
 			fmt.Printf("%s%s  %s\n", indent, c.Status, c.Name)
 		}
+	}
+}
+
+// AppendAgentHookChecks adds provider hook readiness without making missing
+// optional agents or uninstalled hooks fail the broader doctor report.
+func AppendAgentHookChecks(report *Report, plan *agenthooks.Plan, lookPath func(string) (string, error)) {
+	if lookPath == nil {
+		lookPath = exec.LookPath
+	}
+	for _, integration := range plan.Integrations {
+		status := Warning
+		detail := integration.Summary()
+		executableReady := false
+		if executable, err := lookPath(integration.Executable); err == nil {
+			executableReady = true
+			detail += "; executable " + executable
+			if detected, versionErr := agenthooks.DetectVersion(executable); versionErr == nil {
+				detail += "; version " + detected
+			} else {
+				detail += "; version unavailable"
+			}
+		} else {
+			detail += "; executable unavailable"
+		}
+		if integration.Err == nil && integration.Ready() {
+			if executableReady {
+				status = OK
+			}
+		} else if integration.Err == nil {
+			detail += "; run orc doctor --install-agent-hooks"
+		}
+		report.Checks = append(report.Checks, Check{
+			Group: "agent hooks", Name: integration.Engine, Status: status, Detail: detail,
+		})
 	}
 }
 
