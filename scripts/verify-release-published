@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Verifies that a published GitHub release actually carries the notes it was
+# given. This runs after GoReleaser publishes, so it detects rather than
+# prevents: a failure here means the release is already public and needs its
+# body repaired with `gh release edit <tag> --notes-file <file>`.
+#
+# It exists because the release body is the one release artifact no local gate
+# can check. `make release-check` runs GoReleaser in snapshot mode, and
+# snapshot mode never renders a release body at all.
+
+release_tag="${1:-}"
+notes_file="${2:-}"
+
+fail() {
+	printf 'release-published: %s\n' "$*" >&2
+	exit 1
+}
+
+[[ -n "$release_tag" ]] || fail "usage: verify-release-published <tag> <notes-file>"
+[[ -n "$notes_file" ]] || fail "usage: verify-release-published <tag> <notes-file>"
+[[ -f "$notes_file" ]] || fail "notes file not found: $notes_file"
+command -v gh >/dev/null 2>&1 || fail "gh is required to read the published release"
+
+# Distinguish "no release" from "empty body" so a publish that never happened
+# never reads as a formatting problem.
+if ! body="$(gh release view "$release_tag" --json body --jq .body 2>/dev/null)"; then
+	fail "no published release found for $release_tag"
+fi
+
+grep -Eq '[^[:space:]]' <<<"$body" || \
+	fail "release $release_tag published with an empty body; expected the CHANGELOG section for that version"
+
+# Compare against what GoReleaser was handed. Checking only for non-emptiness
+# would pass a body that is present but wrong -- truncated, or left over from a
+# previous run. Trailing whitespace and blank edges are normalized because the
+# API round-trip is not byte-exact.
+normalize() {
+	sed -e 's/[[:space:]]*$//' "$@" | awk '
+		{ lines[NR] = $0 }
+		END {
+			first = 1
+			while (first <= NR && lines[first] == "") first++
+			last = NR
+			while (last >= first && lines[last] == "") last--
+			for (i = first; i <= last; i++) print lines[i]
+		}
+	'
+}
+
+if ! diff -q <(normalize <<<"$body") <(normalize "$notes_file") >/dev/null; then
+	printf 'release-published: body of %s does not match %s\n' "$release_tag" "$notes_file" >&2
+	diff -u <(normalize "$notes_file") <(normalize <<<"$body") | head -40 >&2
+	fail "repair with: gh release edit $release_tag --notes-file $notes_file"
+fi
+
+printf '✓ release %s published with its changelog section (%s bytes)\n' \
+	"$release_tag" "$(wc -c <<<"$body" | tr -d '[:space:]')"

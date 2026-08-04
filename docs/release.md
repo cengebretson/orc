@@ -194,6 +194,24 @@ After the workflow succeeds, verify the GitHub release contains:
 - `orc_<version>_linux_amd64.tar.gz`
 - `orc_<version>_linux_arm64.tar.gz`
 - `checksums.txt`
+- Release notes matching the `CHANGELOG.md` section for the version.
+
+The workflow's final step asserts that last item through
+`scripts/verify-release-published`, comparing the published body against the
+notes GoReleaser was handed. It is the only check that can: `make release-check`
+runs GoReleaser in snapshot mode, and snapshot mode never renders a release
+body, so no local gate can see this. A failure there means the release is
+already public — repair it with:
+
+```sh
+gh release edit "v${version}" --notes-file <notes>
+```
+
+`scripts/release-contract` guards the known cause up front, before a tag
+exists: it rejects a `.goreleaser.yaml` that sets `changelog.disable`, because
+GoReleaser reads `--release-notes` inside its changelog pipe and disabling the
+pipe drops the notes silently. Every release through `v0.17.0` published with
+an empty body for that reason.
 
 Download the archive for the current platform, verify it against
 `checksums.txt`, then run:

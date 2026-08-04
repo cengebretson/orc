@@ -33,3 +33,11 @@ jobs:
           args: release --clean --release-notes=${{ runner.temp }}/release-notes.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # The release body is the one artifact no local gate can check: snapshot
+      # mode never renders one. This detects a bad body rather than preventing
+      # it, so a failure here means the release is public and needs repairing.
+      - name: Verify published release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./scripts/verify-release-published "${GITHUB_REF_NAME}" "${RUNNER_TEMP}/release-notes.md"

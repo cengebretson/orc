@@ -15,6 +15,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   notes were restored by hand. `make release-check` could not have caught this,
   because snapshot mode skips the same pipe and never renders a release body.
 
+### Added
+
+- Added two guards for release notes. `scripts/release-contract` now rejects a
+  `.goreleaser.yaml` that sets `changelog.disable`, catching the cause on every
+  CI run rather than at tag time; the release workflow's new
+  `scripts/verify-release-published` step compares the published release body
+  against the notes GoReleaser was given, covering the failure modes a static
+  check cannot anticipate.
+
 ## [0.17.0] - 2026-08-03
 
 **Breaking:** five `orc watch` flags are gone. Replace `--tmux-toggle`,

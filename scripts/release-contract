@@ -5,6 +5,7 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 project_root="$(cd "$script_dir/.." && pwd)"
 version_file="${VERSION_FILE:-$project_root/VERSION}"
 changelog_file="${CHANGELOG_FILE:-$project_root/CHANGELOG.md}"
+goreleaser_file="${GORELEASER_FILE:-$project_root/.goreleaser.yaml}"
 notes_file="${1:-$project_root/.cache/release-notes.md}"
 release_tag="${RELEASE_TAG:-}"
 
@@ -15,6 +16,20 @@ fail() {
 
 [[ -f "$version_file" ]] || fail "VERSION file not found: $version_file"
 [[ -f "$changelog_file" ]] || fail "changelog not found: $changelog_file"
+[[ -f "$goreleaser_file" ]] || fail "GoReleaser config not found: $goreleaser_file"
+
+# The release workflow hands GoReleaser --release-notes pointing at the notes
+# this script extracts. GoReleaser reads that flag inside its changelog pipe,
+# so setting changelog.disable skips the read and publishes an empty release
+# body — silently, and invisibly to `make release-check`, because snapshot mode
+# skips the same pipe. Every release through v0.17.0 shipped that way.
+changelog_disabled="$(awk '
+	/^changelog:/ { in_block = 1; next }
+	in_block && /^[^[:space:]#]/ { in_block = 0 }
+	in_block && /^[[:space:]]+disable:[[:space:]]*(true|yes|on)[[:space:]]*$/ { print "yes"; exit }
+' "$goreleaser_file")"
+[[ -z "$changelog_disabled" ]] || \
+	fail "$(basename "$goreleaser_file") sets changelog.disable, which skips the pipe that reads --release-notes; the published release body would be empty"
 
 version="$(tr -d '[:space:]' <"$version_file")"
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]] || \
