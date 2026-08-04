@@ -42,21 +42,24 @@ func SetWindowMetadata(session, window string, metadata mux.Metadata) error {
 // SetPaneMetadata stamps the exact agent pane used by Orc.
 func SetPaneMetadata(pane string, metadata mux.Metadata) error {
 	options := []struct {
-		name  string
-		value string
+		name           string
+		value          string
+		clearWhenEmpty bool
 	}{
-		{"@orc_agent", "1"},
-		{"@orc_ticket", metadata.Ticket},
-		{"@orc_stage", metadata.Stage},
-		{"@orc_worker", metadata.Worker},
-		{"@orc_engine", metadata.Engine},
-		{"@orc_provider_engine", metadata.Engine},
-		{"@orc_provider_session", metadata.ProviderSessionID},
-		{"@orc_feature_dir", metadata.FeatureDir},
+		{name: "@orc_agent", value: "1"},
+		{name: "@orc_agent_id", value: metadata.AgentID, clearWhenEmpty: true},
+		{name: "@orc_agent_instance", value: metadata.AgentInstance, clearWhenEmpty: true},
+		{name: "@orc_ticket", value: metadata.Ticket},
+		{name: "@orc_stage", value: metadata.Stage},
+		{name: "@orc_worker", value: metadata.Worker},
+		{name: "@orc_engine", value: metadata.Engine},
+		{name: "@orc_provider_engine", value: metadata.Engine, clearWhenEmpty: true},
+		{name: "@orc_provider_session", value: metadata.ProviderSessionID, clearWhenEmpty: true},
+		{name: "@orc_feature_dir", value: metadata.FeatureDir},
 	}
 	for _, option := range options {
 		if option.value == "" {
-			if option.name == "@orc_provider_engine" || option.name == "@orc_provider_session" {
+			if option.clearWhenEmpty {
 				if err := newCommand("tmux", "set-option", "-p", "-u", "-t", pane, option.name).Run(); err != nil {
 					return fmt.Errorf("clear %s on pane %s: %w", option.name, pane, err)
 				}

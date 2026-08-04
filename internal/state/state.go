@@ -56,9 +56,10 @@ type State struct {
 }
 
 type Runtime struct {
-	Mux  *MuxRuntime  `yaml:"mux,omitempty"`
-	Tmux *TmuxRuntime `yaml:"tmux,omitempty"`
-	JIT  *JITRuntime  `yaml:"jit,omitempty"`
+	Mux   *MuxRuntime   `yaml:"mux,omitempty"`
+	Tmux  *TmuxRuntime  `yaml:"tmux,omitempty"`
+	Agent *AgentRuntime `yaml:"agent,omitempty"`
+	JIT   *JITRuntime   `yaml:"jit,omitempty"`
 }
 
 // MuxRuntime records the exact target created by a terminal multiplexer.
@@ -69,6 +70,16 @@ type MuxRuntime struct {
 	Workspace string `yaml:"workspace"`
 	Tab       string `yaml:"tab,omitempty"`
 	Pane      string `yaml:"pane,omitempty"`
+}
+
+// AgentRuntime identifies the durable Orc agent and its current live launch.
+// ID survives provider resumes; Instance changes whenever the process is
+// replaced, even when the multiplexer pane itself survives.
+type AgentRuntime struct {
+	ID                string `yaml:"id"`
+	Instance          string `yaml:"instance"`
+	Engine            string `yaml:"engine,omitempty"`
+	ProviderSessionID string `yaml:"provider_session,omitempty"`
 }
 
 type TmuxRuntime struct {

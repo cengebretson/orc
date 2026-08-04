@@ -35,6 +35,8 @@ func TestLiveTmuxWindowMetadataAttentionAndExactSend(t *testing.T) {
 	}
 
 	metadata := mux.Metadata{
+		AgentID:           "agent-orc-123",
+		AgentInstance:     "instance-orc-123",
 		Ticket:            "ORC-123",
 		Stage:             "review",
 		Worker:            "default:ada",
@@ -51,6 +53,13 @@ func TestLiveTmuxWindowMetadataAttentionAndExactSend(t *testing.T) {
 	}
 	if err := SetPaneMetadata(pane, metadata); err != nil {
 		t.Fatalf("SetPaneMetadata: %v", err)
+	}
+	if resolved, err := ValidateAgentTarget(
+		mux.Target{Backend: "tmux", Workspace: session, Tab: "review", Pane: pane},
+		metadata.AgentID,
+		metadata.AgentInstance,
+	); err != nil || resolved != pane {
+		t.Fatalf("ValidateAgentTarget = %q, %v; want %q", resolved, err, pane)
 	}
 	withoutProviderID := metadata
 	withoutProviderID.ProviderSessionID = ""

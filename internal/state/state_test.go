@@ -675,11 +675,18 @@ func TestRuntimeMutators(t *testing.T) {
 	if err := state.SetRuntimeTarget(dir, "ORC-2", "%7"); err != nil {
 		t.Fatal(err)
 	}
+	if err := state.SetMuxAgentRuntime(
+		dir,
+		state.MuxRuntime{Backend: "tmux", Workspace: "ORC-2", Tab: "develop", Pane: "%7"},
+		state.AgentRuntime{ID: "agent-2", Instance: "instance-2", Engine: "codex", ProviderSessionID: "provider-2"},
+	); err != nil {
+		t.Fatal(err)
+	}
 	if err := state.SetJIT(dir, "default:fred", "review this"); err != nil {
 		t.Fatal(err)
 	}
 	got, _ = state.Load(dir)
-	if got.Runtime.Mux == nil || got.Runtime.Mux.Pane != "%7" || got.Runtime.JIT == nil || got.Runtime.JIT.Worker != "default:fred" || got.Runtime.JIT.StartedAt == "" {
+	if got.Runtime.Mux == nil || got.Runtime.Mux.Pane != "%7" || got.Runtime.Agent == nil || got.Runtime.Agent.ID != "agent-2" || got.Runtime.Agent.Instance != "instance-2" || got.Runtime.Agent.Engine != "codex" || got.Runtime.Agent.ProviderSessionID != "provider-2" || got.Runtime.JIT == nil || got.Runtime.JIT.Worker != "default:fred" || got.Runtime.JIT.StartedAt == "" {
 		t.Fatalf("runtime after target/JIT = %+v", got.Runtime)
 	}
 	if err := state.ClearJIT(dir); err != nil {
@@ -695,6 +702,24 @@ func TestRuntimeMutators(t *testing.T) {
 	got, _ = state.Load(dir)
 	if got.Runtime != (state.Runtime{}) {
 		t.Fatalf("runtime after ClearRuntime = %+v", got.Runtime)
+	}
+}
+
+func TestSetMuxAgentRuntimeRejectsIncompleteIdentity(t *testing.T) {
+	dir := t.TempDir()
+	if err := state.Create(dir, &state.State{Ticket: "ORC-3", Slug: "ORC-3-runtime", Status: "active"}); err != nil {
+		t.Fatal(err)
+	}
+	target := state.MuxRuntime{Backend: "tmux", Workspace: "ORC-3", Tab: "develop", Pane: "%3"}
+	if err := state.SetMuxAgentRuntime(dir, target, state.AgentRuntime{ID: "agent-3"}); err == nil {
+		t.Fatal("SetMuxAgentRuntime should reject a missing instance id")
+	}
+	got, err := state.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Runtime != (state.Runtime{}) {
+		t.Fatalf("invalid identity mutated runtime: %+v", got.Runtime)
 	}
 }
 

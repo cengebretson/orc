@@ -1,5 +1,7 @@
 package state
 
+import "fmt"
+
 // SetMuxRuntime records the exact backend-neutral multiplexer target.
 func SetMuxRuntime(featureDir string, target MuxRuntime) error {
 	return Update(featureDir, func(s *State) error {
@@ -7,6 +9,24 @@ func SetMuxRuntime(featureDir string, target MuxRuntime) error {
 		// New writes use runtime.mux. Preserve runtime.tmux only when loading old
 		// state; do not write two competing sources of truth.
 		s.Runtime.Tmux = nil
+		return nil
+	})
+}
+
+// SetMuxAgentRuntime atomically records an exact multiplexer target and the
+// agent instance occupying it. New launch paths should use this once they have
+// both identities so readers cannot observe one without the other.
+func SetMuxAgentRuntime(featureDir string, target MuxRuntime, agent AgentRuntime) error {
+	if target.Backend == "" || target.Workspace == "" || target.Tab == "" || target.Pane == "" {
+		return fmt.Errorf("agent runtime requires exact backend, workspace, tab, and pane ids")
+	}
+	if agent.ID == "" || agent.Instance == "" {
+		return fmt.Errorf("agent runtime requires agent and instance ids")
+	}
+	return Update(featureDir, func(s *State) error {
+		s.Runtime.Mux = &target
+		s.Runtime.Tmux = nil
+		s.Runtime.Agent = &agent
 		return nil
 	})
 }

@@ -8,6 +8,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Added the first Super Orc identity foundation: durable agent and live-instance
+  state, tmux pane identity metadata and inventory, and exact-instance
+  validation that rejects replaced agents without falling back to another pane.
 - Completed the structured `orc ctl` surface with aggregate session status,
   transition-only agent lifecycle JSONL watching, and exact-target terminal
   capture for Herdr and tmux.

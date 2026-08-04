@@ -17,7 +17,8 @@ import (
 var paneFormat = strings.Join([]string{
 	"#{pane_id}", "#{session_name}", "#{window_name}",
 	"#{pane_current_path}", "#{pane_current_command}", "#{pane_pid}",
-	"#{@orc_agent}", "#{@orc_ticket}", "#{@orc_stage}",
+	"#{@orc_agent}", "#{@orc_agent_id}", "#{@orc_agent_instance}",
+	"#{@orc_ticket}", "#{@orc_stage}",
 	"#{@orc_worker}", "#{@orc_engine}", "#{@orc_provider_engine}",
 	"#{@orc_provider_session}", "#{@orc_feature_dir}",
 	"#{@agent_attention}", "#{@agent_attention_since}",
@@ -65,17 +66,18 @@ func parseDetailedPanes(out []byte) []mux.Pane {
 	for _, line := range strings.Split(text, "\n") {
 		line = strings.TrimSuffix(line, "\r")
 		fields := strings.Split(line, "\t")
-		if len(fields) < 16 || fields[0] == "" {
+		if len(fields) < 18 || fields[0] == "" {
 			continue
 		}
 		pid, _ := strconv.Atoi(fields[5])
-		since, _ := strconv.ParseInt(fields[15], 10, 64)
+		since, _ := strconv.ParseInt(fields[17], 10, 64)
 		panes = append(panes, mux.Pane{
 			Backend: "tmux", ID: fields[0], Session: fields[1], Window: fields[2],
 			CWD: fields[3], Command: fields[4], PID: pid, Agent: fields[6] == "1",
-			Ticket: fields[7], Stage: fields[8], Worker: fields[9], Engine: fields[10],
-			ProviderEngine: fields[11], ProviderSessionID: fields[12],
-			FeatureDir: fields[13], Attention: normalizeAttention(fields[14]),
+			AgentID: fields[7], AgentInstance: fields[8], Ticket: fields[9],
+			Stage: fields[10], Worker: fields[11], Engine: fields[12],
+			ProviderEngine: fields[13], ProviderSessionID: fields[14],
+			FeatureDir: fields[15], Attention: normalizeAttention(fields[16]),
 			AttentionSince: since,
 		})
 	}

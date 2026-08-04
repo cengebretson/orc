@@ -144,6 +144,64 @@ func TestValidatePaneTargetAndFallback(t *testing.T) {
 	})
 }
 
+func TestValidateAgentTargetRequiresExactInstance(t *testing.T) {
+	target := mux.Target{Backend: "tmux", Workspace: "orc", Tab: "build", Pane: "%7"}
+
+	t.Run("matching", func(t *testing.T) {
+		calls := stubCommands(t, commandResult{output: "orc\tbuild\tagent-1\tinstance-1\n"})
+		got, err := ValidateAgentTarget(target, "agent-1", "instance-1")
+		if err != nil || got != "%7" {
+			t.Fatalf("ValidateAgentTarget() = %q, %v; want %%7, nil", got, err)
+		}
+		if len(*calls) != 1 {
+			t.Fatalf("calls = %d, want 1", len(*calls))
+		}
+	})
+
+	t.Run("replaced", func(t *testing.T) {
+		calls := stubCommands(t, commandResult{output: "orc\tbuild\tagent-1\tinstance-2\n"})
+		if _, err := ValidateAgentTarget(target, "agent-1", "instance-1"); err == nil || !strings.Contains(err.Error(), "different agent instance") {
+			t.Fatalf("ValidateAgentTarget() error = %v, want replacement error", err)
+		}
+		if len(*calls) != 1 {
+			t.Fatalf("calls = %d, want no fallback lookup", len(*calls))
+		}
+	})
+
+	t.Run("wrong window", func(t *testing.T) {
+		stubCommands(t, commandResult{output: "orc\treview\tagent-1\tinstance-1\n"})
+		if _, err := ValidateAgentTarget(target, "agent-1", "instance-1"); err == nil || !strings.Contains(err.Error(), "no longer belongs") {
+			t.Fatalf("ValidateAgentTarget() error = %v, want target error", err)
+		}
+	})
+
+	t.Run("missing identity", func(t *testing.T) {
+		calls := stubCommands(t)
+		if _, err := ValidateAgentTarget(target, "", ""); err == nil {
+			t.Fatal("ValidateAgentTarget() should reject missing identity")
+		}
+		if len(*calls) != 0 {
+			t.Fatalf("calls = %d, want validation before tmux", len(*calls))
+		}
+	})
+}
+
+func TestSetPaneMetadataClearsMissingAgentIdentity(t *testing.T) {
+	calls := stubCommands(t)
+	if err := SetPaneMetadata("%7", mux.Metadata{Ticket: "ORC-7"}); err != nil {
+		t.Fatal(err)
+	}
+	var clearedID, clearedInstance bool
+	for _, call := range *calls {
+		joined := strings.Join(call.args, " ")
+		clearedID = clearedID || joined == "set-option -p -u -t %7 @orc_agent_id"
+		clearedInstance = clearedInstance || joined == "set-option -p -u -t %7 @orc_agent_instance"
+	}
+	if !clearedID || !clearedInstance {
+		t.Fatalf("identity clear calls missing: %#v", *calls)
+	}
+}
+
 func TestMetadataUsesCommandBoundary(t *testing.T) {
 	calls := stubCommands(t)
 	err := SetWindowMetadata("orc", "build", mux.Metadata{

@@ -27,14 +27,14 @@ func TestWriteScriptCleansUpAfterCommandFailure(t *testing.T) {
 func TestParseDetailedPanesPreservesEmptyAttention(t *testing.T) {
 	row := strings.Join([]string{
 		"%1", "orc-1", "develop", "/work", "codex", "4242", "1",
-		"ORC-1", "develop", "default:bob", "codex", "codex", "provider-1", "/feature", "", "",
+		"agent-1", "instance-1", "ORC-1", "develop", "default:bob", "codex", "codex", "provider-1", "/feature", "", "",
 	}, "\t") + "\n"
 
 	got := parseDetailedPanes([]byte(row))
 	if len(got) != 1 {
 		t.Fatalf("panes = %#v", got)
 	}
-	if got[0].ID != "%1" || got[0].ProviderSessionID != "provider-1" || got[0].Attention != "" {
+	if got[0].ID != "%1" || got[0].AgentID != "agent-1" || got[0].AgentInstance != "instance-1" || got[0].ProviderSessionID != "provider-1" || got[0].Attention != "" {
 		t.Fatalf("pane = %#v", got[0])
 	}
 	if got[0].AttentionSince != 0 {
@@ -49,7 +49,7 @@ func TestParseDetailedPanesNormalizesAttention(t *testing.T) {
 	rows := func(attention string) string {
 		return strings.Join([]string{
 			"%1", "orc-1", "develop", "/work", "codex", "4242", "1",
-			"ORC-1", "develop", "default:bob", "codex", "codex", "p1", "/feature", attention, "1700000000",
+			"agent-1", "instance-1", "ORC-1", "develop", "default:bob", "codex", "codex", "p1", "/feature", attention, "1700000000",
 		}, "\t") + "\n"
 	}
 

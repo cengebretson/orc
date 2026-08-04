@@ -45,6 +45,8 @@ const EnvResumedFrom = "ORC_RESUMED_FROM"
 // Backends are not required to store it as tmux-style user options — only to
 // return what they were given through ListPanes.
 type Metadata struct {
+	AgentID           string
+	AgentInstance     string
 	Ticket            string
 	Stage             string
 	Workflow          string
@@ -196,6 +198,8 @@ func RollUpAttention(panes []Pane) (state string, since int64) {
 type Pane struct {
 	Backend           string `json:"backend,omitempty"`
 	ID                string `json:"id"`
+	AgentID           string `json:"agent_id,omitempty"`
+	AgentInstance     string `json:"agent_instance,omitempty"`
 	Session           string `json:"session"`
 	Window            string `json:"window"`
 	CWD               string `json:"cwd,omitempty"`
