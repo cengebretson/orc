@@ -381,7 +381,7 @@ func durableRepositories(repos map[string]state.Repo) []Repository {
 		worktree := ""
 		if repo.Worktree != "" {
 			worktree = "."
-			if repo.Main == "" || !samePath(repo.Main, repo.Worktree) {
+			if repo.Main == "" || !gitmeta.SamePath(repo.Main, repo.Worktree) {
 				worktree = filepath.Base(repo.Worktree)
 			}
 		}
@@ -520,7 +520,7 @@ func matchTelemetry(engine, cwd string, pane *mux.Pane, sessions []telemetry.Liv
 		if used[i] || !engineMatches(providerEngine, sessions[i].Engine) {
 			continue
 		}
-		if !samePath(cwd, sessions[i].CWD) {
+		if !gitmeta.SamePath(cwd, sessions[i].CWD) {
 			continue
 		}
 		if best == -1 || sessions[i].LastActive.After(sessions[best].LastActive) {
@@ -579,15 +579,6 @@ func markTelemetryUsed(used map[int]bool, indices []int) {
 	for _, index := range indices {
 		used[index] = true
 	}
-}
-
-func samePath(left, right string) bool {
-	if left == "" || right == "" {
-		return false
-	}
-	a, errA := filepath.Abs(left)
-	b, errB := filepath.Abs(right)
-	return errA == nil && errB == nil && filepath.Clean(a) == filepath.Clean(b)
 }
 
 func kindRank(kind string) int {

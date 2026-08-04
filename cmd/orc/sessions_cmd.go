@@ -14,6 +14,7 @@ import (
 	"github.com/cengebretson/orc/internal/sessionlist"
 	"github.com/cengebretson/orc/internal/sessionpicker"
 	"github.com/cengebretson/orc/internal/telemetry"
+	"github.com/cengebretson/orc/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -68,8 +69,8 @@ func runSessions(cmd *cobra.Command, args []string) error {
 		}
 		repository, branch := repositoryColumns(session.Repositories)
 		fmt.Printf("%-10s  %-14s  %-22s  %-24s  %-9s  %-18s  %-11s  %-17s  %-10s  %s\n",
-			session.Kind, emptyDash(session.Ticket), repository, branch, emptyDash(engine), emptyDash(model),
-			emptyDash(liveState), target, context, active)
+			session.Kind, ui.EmptyDash(session.Ticket), repository, branch, ui.EmptyDash(engine), ui.EmptyDash(model),
+			ui.EmptyDash(liveState), target, context, active)
 	}
 	return nil
 }
@@ -204,7 +205,7 @@ func liveColumns(live *telemetry.Live) (model, state, context, active string) {
 		context = compactTokens(live.ContextUsed)
 	}
 	if !live.LastActive.IsZero() {
-		active = relativeTime(time.Now(), live.LastActive)
+		active = ui.RelativeTime(time.Now(), live.LastActive)
 	}
 	return live.Model, live.State, context, active
 }
@@ -219,30 +220,6 @@ func compactTokens(tokens uint64) string {
 	return fmt.Sprintf("%d", tokens)
 }
 
-func relativeTime(now, then time.Time) string {
-	d := now.Sub(then)
-	if d < 0 {
-		d = 0
-	}
-	switch {
-	case d < time.Minute:
-		return "now"
-	case d < time.Hour:
-		return fmt.Sprintf("%dm", int(d.Minutes()))
-	case d < 24*time.Hour:
-		return fmt.Sprintf("%dh", int(d.Hours()))
-	default:
-		return fmt.Sprintf("%dd", int(d.Hours()/24))
-	}
-}
-
-func emptyDash(value string) string {
-	if value == "" {
-		return "-"
-	}
-	return value
-}
-
 func repositoryColumns(repositories []sessionlist.Repository) (string, string) {
 	if len(repositories) == 0 {
 		return "-", "-"
@@ -252,7 +229,7 @@ func repositoryColumns(repositories []sessionlist.Repository) (string, string) {
 	if first.Worktree != "" && first.Worktree != "." {
 		repository += "/" + first.Worktree
 	}
-	branch := emptyDash(first.Branch)
+	branch := ui.EmptyDash(first.Branch)
 	if len(repositories) > 1 {
 		suffix := fmt.Sprintf(" +%d", len(repositories)-1)
 		repository += suffix

@@ -65,8 +65,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Removed unreferenced internal helpers left behind by the `mux.Backend`
   refactor (`sessionlist.ManagedTelemetry`, `watch.Focus`,
   `workspacesnapshot.LoadItems`, `tmux.SendCommand`, `runner.ResolveWorkflow`,
-  `ticket.ResolveWithArchive`, and `health.Print`). No user-facing behavior
-  changed.
+  `ticket.ResolveWithArchive`, and `health.Print`), along with the remaining
+  nil-backend wrappers and superseded renderers that only tests still reached.
+  No user-facing behavior changed.
+- Consolidated duplicated internal helpers so the copies can no longer drift
+  apart. Shell quoting moved to `internal/shellquote`, which now distinguishes
+  always-quote (`Quote`, required where hook commands are matched against
+  config written by earlier versions) from quote-only-if-needed (`Word`).
+  Path comparison, relative-time and empty-value rendering, and the loop-count
+  stage label each have a single implementation, and the stricter of each
+  previously divergent pair won: an empty path is no longer "the same path" as
+  another empty path, a zero timestamp renders as `-` rather than `now`, and
+  whitespace-only values render as `-`.
 
 ## [0.16.1] - 2026-08-02
 

@@ -96,7 +96,7 @@ func inspectGit(cwd string) (Metadata, error) {
 		repositoryRoot = filepath.Dir(commonDir)
 	}
 	worktree := "."
-	if !samePath(repositoryRoot, worktreeRoot) {
+	if !SamePath(repositoryRoot, worktreeRoot) {
 		worktree = filepath.Base(worktreeRoot)
 	}
 	return Metadata{
@@ -106,7 +106,14 @@ func inspectGit(cwd string) (Metadata, error) {
 	}, nil
 }
 
-func samePath(left, right string) bool {
+// SamePath reports whether two paths resolve to the same location.
+//
+// An empty path is never equal to anything, including another empty path: an
+// unknown location is not evidence that two things live in the same place.
+func SamePath(left, right string) bool {
+	if left == "" || right == "" {
+		return false
+	}
 	leftAbs, leftErr := filepath.Abs(left)
 	rightAbs, rightErr := filepath.Abs(right)
 	if leftErr != nil || rightErr != nil {

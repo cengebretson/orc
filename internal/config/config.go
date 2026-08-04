@@ -325,6 +325,36 @@ func (c *Config) OwnerStage(workflowName, loopStageName string) (string, bool) {
 	return "", false
 }
 
+// LoopCountLabel renders a loop stage's progress against its configured
+// maximum as a " (n/max)" suffix, for views that append it to a stage name.
+//
+// It returns "" when the label would say nothing useful: the stage is not a
+// loop stage, its owner or loop policy cannot be resolved, the loop has no
+// maximum, or the stage has not run yet. stageCounts is a feature's
+// state.StageCounts; a count recorded under a stage alias is resolved to its
+// canonical name.
+func (c *Config) LoopCountLabel(workflowName, stageName string, stageCounts map[string]int) string {
+	if c == nil || !c.IsLoopStage(workflowName, stageName) {
+		return ""
+	}
+	owner, ok := c.OwnerStage(workflowName, stageName)
+	if !ok {
+		return ""
+	}
+	loopDef, ok := c.LoopConfig(workflowName, owner)
+	if !ok || loopDef.Max <= 0 {
+		return ""
+	}
+	count := stageCounts[stageName]
+	if count == 0 {
+		count = stageCounts[c.ResolveStage(stageName)]
+	}
+	if count == 0 {
+		return ""
+	}
+	return fmt.Sprintf(" (%d/%d)", count, loopDef.Max)
+}
+
 // Load reads orc.yaml from the workspace root.
 // Returns an empty Config (not an error) if the file does not exist.
 func Load(root string) (*Config, error) {

@@ -5,6 +5,8 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+
+	"github.com/cengebretson/orc/internal/shellquote"
 )
 
 func TestWriteScriptCleansUpAfterCommandFailure(t *testing.T) {
@@ -102,10 +104,10 @@ func TestWriteScriptQuotesArguments(t *testing.T) {
 	if !strings.Contains(text, "trap 'rm -f ") {
 		t.Fatalf("script missing cleanup trap:\n%s", text)
 	}
-	if !strings.Contains(text, "cd "+shellQuote(runDir)+" || exit 1") {
+	if !strings.Contains(text, "cd "+shellquote.Word(runDir)+" || exit 1") {
 		t.Fatalf("script missing guarded cd into run dir:\n%s", text)
 	}
-	if !strings.Contains(text, shellQuote("value with 'quotes'")) {
+	if !strings.Contains(text, shellquote.Word("value with 'quotes'")) {
 		t.Fatalf("script missing quoted argument:\n%s", text)
 	}
 	if !strings.Contains(text, "trap - EXIT\nexec printf") {
@@ -143,8 +145,8 @@ func TestBuildWatchCommandQuotesArguments(t *testing.T) {
 	})
 
 	for _, want := range []string{
-		shellQuote("/tmp/orc bin/orc"),
-		"--workspace " + shellQuote("/tmp/work space"),
+		shellquote.Word("/tmp/orc bin/orc"),
+		"--workspace " + shellquote.Word("/tmp/work space"),
 		"watch PROJ-123",
 		"--interval 2s",
 		"--wide",

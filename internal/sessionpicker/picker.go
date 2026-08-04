@@ -154,12 +154,12 @@ func (m *Model) applyFilter() {
 func (c Candidate) summary(now time.Time) string {
 	live := c.Live
 	return fmt.Sprintf("%s  %s  %s  ctx %s  %s  %s  %s",
-		emptyDash(live.Engine), emptyDash(live.Model), shortID(live.ProviderSessionID),
-		contextValue(live), c.repositoryLabel(), emptyDash(c.Branch), relativeTime(now, live.LastActive))
+		terminalui.EmptyDash(live.Engine), terminalui.EmptyDash(live.Model), shortID(live.ProviderSessionID),
+		contextValue(live), c.repositoryLabel(), terminalui.EmptyDash(c.Branch), terminalui.RelativeTime(now, live.LastActive))
 }
 
 func (c Candidate) repositoryLabel() string {
-	label := emptyDash(c.Repository)
+	label := terminalui.EmptyDash(c.Repository)
 	if c.Worktree != "" && c.Worktree != "." && label != "-" {
 		label += "/" + c.Worktree
 	}
@@ -176,38 +176,11 @@ func contextValue(live telemetry.Live) string {
 	return "-"
 }
 
-func relativeTime(now, then time.Time) string {
-	if then.IsZero() {
-		return "-"
-	}
-	d := now.Sub(then)
-	if d < 0 {
-		d = 0
-	}
-	switch {
-	case d < time.Minute:
-		return "now"
-	case d < time.Hour:
-		return fmt.Sprintf("%dm", int(d.Minutes()))
-	case d < 24*time.Hour:
-		return fmt.Sprintf("%dh", int(d.Hours()))
-	default:
-		return fmt.Sprintf("%dd", int(d.Hours()/24))
-	}
-}
-
 func shortID(id string) string {
 	if len(id) <= 12 {
-		return emptyDash(id)
+		return terminalui.EmptyDash(id)
 	}
 	return id[:12]
-}
-
-func emptyDash(value string) string {
-	if strings.TrimSpace(value) == "" {
-		return "-"
-	}
-	return value
 }
 
 func cwdLabel(cwd string) string {

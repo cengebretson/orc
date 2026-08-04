@@ -2,6 +2,8 @@ package tmux
 
 import (
 	"fmt"
+
+	"github.com/cengebretson/orc/internal/shellquote"
 )
 
 // The attention vocabulary, the resume variable, and the pane and metadata
@@ -81,7 +83,7 @@ func SendCommandTarget(session, window, pane, featureDir, runDir string, argv []
 		return "", err
 	}
 
-	if err := newCommand("tmux", "send-keys", "-t", pane, "exec bash "+shellQuote(script), "Enter").Run(); err != nil {
+	if err := newCommand("tmux", "send-keys", "-t", pane, "exec bash "+shellquote.Word(script), "Enter").Run(); err != nil {
 		return "", fmt.Errorf("send command to pane %s: %w", pane, err)
 	}
 	return pane, nil

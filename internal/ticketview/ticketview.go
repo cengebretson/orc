@@ -75,7 +75,7 @@ func Build(root, featureDir string, s *state.State, opts Options) Summary {
 		State:          s,
 		Workflow:       workflow,
 		Stage:          s.Stage.Name,
-		StageLoopLabel: loopCountSuffix(cfg, workflow, s.Stage.Name, s),
+		StageLoopLabel: cfg.LoopCountLabel(workflow, s.Stage.Name, s.StageCounts),
 		WorkerID:       workerID,
 		NextAdvance:    "auto",
 		JIT:            s.Runtime.JIT,
@@ -120,28 +120,6 @@ func Build(root, featureDir string, s *state.State, opts Options) Summary {
 	}
 
 	return summary
-}
-
-func loopCountSuffix(cfg *config.Config, workflow, stageName string, s *state.State) string {
-	if cfg == nil || !cfg.IsLoopStage(workflow, stageName) {
-		return ""
-	}
-	owner, ok := cfg.OwnerStage(workflow, stageName)
-	if !ok {
-		return ""
-	}
-	loopDef, ok := cfg.LoopConfig(workflow, owner)
-	if !ok || loopDef.Max <= 0 {
-		return ""
-	}
-	count := s.StageCounts[stageName]
-	if count == 0 {
-		count = s.StageCounts[cfg.ResolveStage(stageName)]
-	}
-	if count == 0 {
-		return ""
-	}
-	return fmt.Sprintf(" (%d/%d)", count, loopDef.Max)
 }
 
 func pausedReason(s *state.State) string {

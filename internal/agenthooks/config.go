@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"strings"
+
+	"github.com/cengebretson/orc/internal/shellquote"
 )
 
 func mergeConfig(existing []byte, def definition) ([]byte, error) {
@@ -63,12 +65,8 @@ func canonicalEntry(def definition, event eventDefinition) map[string]any {
 }
 
 func hookCommand(def definition, lifecycle string) string {
-	return "bash " + shellQuote(def.hookPath) + " " + shellQuote(def.engine) + " " +
-		shellQuote(lifecycle) + " " + shellQuote(def.orcBinary)
-}
-
-func shellQuote(value string) string {
-	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
+	return "bash " + shellquote.Quote(def.hookPath) + " " + shellquote.Quote(def.engine) + " " +
+		shellquote.Quote(lifecycle) + " " + shellquote.Quote(def.orcBinary)
 }
 
 func removeOwnedHandlers(entries []any, hookPath string) ([]any, error) {
@@ -108,7 +106,7 @@ func removeOwnedHandlers(entries []any, hookPath string) ([]any, error) {
 }
 
 func isOwnedCommand(command, hookPath string) bool {
-	return strings.HasPrefix(command, "bash "+shellQuote(hookPath)+" ")
+	return strings.HasPrefix(command, "bash "+shellquote.Quote(hookPath)+" ")
 }
 
 func objectProperty(root map[string]any, name string, create bool) (map[string]any, error) {
