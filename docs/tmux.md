@@ -63,6 +63,27 @@ pane when that is more convenient:
 bind-key R split-window -v -l 40% -c "#{pane_current_path}" 'exec orc --workspace "$ORC_WORKSPACE" sessions resume'
 ```
 
+## Agent prompting
+
+With Orc's Codex or Claude lifecycle hooks installed, tmux implements the same
+structured state, prompt, wait, and watch commands as the Herdr backend. Prompt
+delivery revalidates the recorded pane and agent instance, loads at most 64 KiB
+of UTF-8 text into a private tmux buffer over stdin, requires bracketed paste,
+and sends Enter as an encoded key. Prompt text is never interpolated into a
+shell command or command-line argument.
+
+In `orc watch`, press `s`, compose the message, press `enter` to review, and
+press `y` to confirm. For automation, use:
+
+```sh
+orc ctl agent prompt --ticket ORC-9 "Review this diff" --wait --timeout 120s
+```
+
+When `--wait` is used, tmux must observe a new authoritative lifecycle sequence
+within the startup grace period. Otherwise Orc returns
+`agent_prompt_stalled`; replacement, exit, cancellation, and timeout remain
+distinct structured errors.
+
 ## Verification
 
 Reload the configuration and inspect the bindings:

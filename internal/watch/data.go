@@ -215,6 +215,11 @@ func rowFromFeature(f *featurelist.Feature, cfg *config.Config) row {
 		}
 	}
 	room, branch := featureRoom(s)
+	target, _ := s.Runtime.MuxTarget(s.Stage.Name)
+	agentID, agentInstance := "", ""
+	if s.Runtime.Agent != nil {
+		agentID, agentInstance = s.Runtime.Agent.ID, s.Runtime.Agent.Instance
+	}
 	worker := f.WorkerName
 	if worker == "" {
 		worker = f.WorkerID
@@ -243,6 +248,9 @@ func rowFromFeature(f *featurelist.Feature, cfg *config.Config) row {
 		session:       tmuxSession(s),
 		window:        muxTab(s),
 		pane:          tmuxPane(s),
+		backend:       target.Backend,
+		agentID:       agentID,
+		agentInstance: agentInstance,
 		tmuxState:     tmuxState(s, f.TmuxLive),
 		attention:     f.Attention,
 		room:          room,

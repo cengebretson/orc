@@ -1,6 +1,7 @@
 package watch
 
 import (
+	"strings"
 	"time"
 
 	"github.com/cengebretson/orc/internal/contextpressure"
@@ -33,6 +34,12 @@ type dataMsg struct {
 
 type attachDoneMsg struct {
 	err error
+}
+
+type promptDoneMsg struct {
+	ticket string
+	result mux.AgentControlResult
+	err    error
 }
 
 type Options struct {
@@ -76,6 +83,9 @@ type row struct {
 	engine          string
 	model           string
 	providerID      string
+	backend         string
+	agentID         string
+	agentInstance   string
 	liveState       string
 	lastActive      time.Time
 	contextTrend    []uint64
@@ -126,6 +136,11 @@ type Model struct {
 	viewport  viewport.Model
 	searching bool
 	searchBox textinput.Model
+
+	prompting  bool
+	confirming bool
+	promptBox  textinput.Model
+	promptRow  row
 }
 
 // New constructs the watch model without starting a Bubble Tea program so it
@@ -151,6 +166,10 @@ func New(root string, opts Options) (Model, error) {
 	searchBox.Placeholder = "filter sessions..."
 	searchBox.Prompt = "/ "
 	searchBox.CharLimit = 96
+	promptBox := textinput.New()
+	promptBox.Placeholder = "message for the selected agent..."
+	promptBox.Prompt = "> "
+	promptBox.CharLimit = mux.MaxAgentPromptBytes
 	return Model{
 		root:       root,
 		ticket:     opts.Ticket,
@@ -161,14 +180,15 @@ func New(root string, opts Options) (Model, error) {
 		petLayout:  petLayout,
 		petTicking: mode == ModePet,
 		searchBox:  searchBox,
+		promptBox:  promptBox,
 		mux:        backend,
 	}, nil
 }
 
 // CanSwitchSection reports whether dashboard-level navigation can safely
-// consume a section-switch or help key without stealing search input.
+// consume a section-switch or help key without stealing modal input.
 func (m Model) CanSwitchSection() bool {
-	return !m.searching
+	return !m.searching && !m.prompting && !m.confirming
 }
 
 // SetActive controls background refresh and animation work while watch is
@@ -208,6 +228,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport.Width = max(1, msg.Width-2)
 		m.viewport.Height = max(1, msg.Height)
 		m.searchBox.Width = max(8, msg.Width-6)
+		m.promptBox.Width = max(8, msg.Width-6)
 		m.refreshPreview()
 		return m, nil
 	case tickMsg:
@@ -260,7 +281,54 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.message = "attach failed: " + msg.err.Error()
 		}
 		return m, nil
+	case promptDoneMsg:
+		if msg.err != nil {
+			m.message = "prompt failed: " + msg.err.Error()
+		} else {
+			m.message = "prompt sent to " + msg.ticket
+			if msg.result.Lifecycle != "" {
+				m.message += " · " + msg.result.Lifecycle
+			}
+		}
+		return m, loadDataWithMux(m.root, m.ticket, m.demo, m.mux)
 	case tea.KeyMsg:
+		if m.prompting {
+			switch msg.String() {
+			case "ctrl+c":
+				return m, tea.Quit
+			case "esc":
+				m.cancelPrompt()
+				return m, nil
+			case "enter":
+				if strings.TrimSpace(m.promptBox.Value()) == "" {
+					m.message = "prompt text is required"
+					return m, nil
+				}
+				m.prompting = false
+				m.confirming = true
+				m.promptBox.Blur()
+				m.message = ""
+				return m, nil
+			default:
+				var cmd tea.Cmd
+				m.promptBox, cmd = m.promptBox.Update(msg)
+				return m, cmd
+			}
+		}
+		if m.confirming {
+			switch msg.String() {
+			case "ctrl+c":
+				return m, tea.Quit
+			case "y", "Y":
+				return m, m.sendConfirmedPrompt()
+			case "n", "N", "esc":
+				m.cancelPrompt()
+				m.message = "prompt cancelled"
+				return m, nil
+			default:
+				return m, nil
+			}
+		}
 		if m.help {
 			switch {
 			case key.Matches(msg, keys.quit):
@@ -403,6 +471,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmd, message := m.focusNext()
 			m.message = message
 			return m, cmd
+		case key.Matches(msg, keys.sendPrompt):
+			m.message = m.beginPrompt()
+			if m.prompting {
+				return m, textinput.Blink
+			}
+			return m, nil
 		}
 		if m.preview {
 			var cmd tea.Cmd
@@ -416,6 +490,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) View() string {
 	if m.width == 0 {
 		return ""
+	}
+	if m.prompting || m.confirming {
+		return m.renderPromptAction()
 	}
 	if m.help {
 		return m.renderHelp()

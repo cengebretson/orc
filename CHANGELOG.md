@@ -8,6 +8,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Added safe exact-instance prompting for tmux through private stdin-loaded
+  buffers, bracketed paste, encoded submission, and automatic cleanup. Waiting
+  prompts now require an authoritative hook transition and distinguish stalls,
+  timeouts, replacement, and agent exit; `orc watch` adds an explicit compose,
+  review, and `y`-confirm prompt action.
 - Added exact-instance tmux lifecycle reads and context-cancelable waits to
   `orc ctl agent state`, `wait`, and `watch`. Stable replacement, offline,
   invalid-state, cancellation, and timeout codes now match the structured

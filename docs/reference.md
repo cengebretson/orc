@@ -340,7 +340,7 @@ Older tickets without a pane continue to use their stage window; if that window
 later has multiple panes, Orc requires exactly one pane marked
 `@orc_agent=1` instead of guessing.
 
-The first structured agent-control surface is available for Herdr-backed
+The structured agent-control surface is available for Herdr- and tmux-backed
 tickets:
 
 ```bash
@@ -352,10 +352,13 @@ orc ctl agent wait --ticket ORC-9 --until blocked --timeout 120s
 All commands target the exact recorded pane and emit JSON. `agent state` reads
 the current recognized lifecycle without waiting or changing focus. `--until`
 may be repeated with `idle`, `working`, `blocked`, `done`, or `unknown`; without
-it, Herdr waits for its settled defaults (`idle`, `done`, or `blocked`). Prompt
-waits preserve Herdr's distinct `agent_prompt_stalled` error when submission
-produces no observed lifecycle change. The tmux backend reports this capability
-as unsupported because Orc does not infer lifecycle state from screen text.
+it, each backend waits for its settled defaults (`idle`, `done`, or `blocked`).
+Tmux lifecycle state comes only from installed provider hooks, never screen
+text. Tmux prompts are limited to 64 KiB of valid UTF-8, reject unsafe control
+data, require the target application to enable bracketed paste, and never place
+the prompt in a shell command or process argument. Waiting prompts preserve the
+stable `agent_prompt_stalled` outcome when no new authoritative lifecycle
+sequence follows submission.
 
 `runtime.jit` is present only while a one-off JIT task is open. Finish the task
 with `orc mark <ticket> jit "<summary>"`; that records a history entry and clears

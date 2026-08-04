@@ -5,8 +5,27 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cengebretson/orc/internal/mux"
+	"github.com/cengebretson/orc/internal/mux/muxtest"
 	tea "github.com/charmbracelet/bubbletea"
 )
+
+type watchPromptBackend struct {
+	*muxtest.Fake
+	prompt func(mux.Target, string, bool, mux.AgentControlOptions) (mux.AgentControlResult, error)
+}
+
+func (b *watchPromptBackend) StateAgent(target mux.Target) (mux.AgentControlResult, error) {
+	return mux.AgentControlResult{Backend: b.Name(), Target: target, Lifecycle: mux.LifecycleIdle}, nil
+}
+
+func (b *watchPromptBackend) WaitAgent(target mux.Target, _ mux.AgentControlOptions) (mux.AgentControlResult, error) {
+	return b.StateAgent(target)
+}
+
+func (b *watchPromptBackend) PromptAgent(target mux.Target, text string, wait bool, options mux.AgentControlOptions) (mux.AgentControlResult, error) {
+	return b.prompt(target, text, wait, options)
+}
 
 func TestDisplayStateUsesDurableStatusFirst(t *testing.T) {
 	tests := []struct {
@@ -239,5 +258,95 @@ func TestWatchUpdateFocusesNextAttentionSession(t *testing.T) {
 	}
 	if gotSession != "REVIEW" || gotWindow != "code-review" {
 		t.Fatalf("newAttachCmd called with %q/%q", gotSession, gotWindow)
+	}
+}
+
+func TestWatchPromptRequiresReviewAndExplicitConfirmation(t *testing.T) {
+	var gotTarget mux.Target
+	var gotText string
+	backend := &watchPromptBackend{
+		Fake: &muxtest.Fake{NameFunc: func() string { return "tmux" }},
+		prompt: func(target mux.Target, text string, wait bool, options mux.AgentControlOptions) (mux.AgentControlResult, error) {
+			if !wait || options.Context == nil || options.Timeout != watchPromptTimeout || len(options.Until) != 5 {
+				t.Fatalf("wait=%v options=%#v", wait, options)
+			}
+			gotTarget, gotText = target, text
+			return mux.AgentControlResult{Backend: "tmux", Target: target, Lifecycle: mux.LifecycleIdle}, nil
+		},
+	}
+	m, err := New(t.TempDir(), Options{Mux: backend})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.width = 48
+	m.rows = []row{{
+		ticket: "PROJ-123", backend: "tmux", session: "orc", window: "develop", pane: "%7",
+		agentID: "agent-1", agentInstance: "instance-1", tmuxState: "live",
+	}}
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	m = watchModel(t, updated)
+	if !m.prompting || m.confirming || cmd == nil || m.CanSwitchSection() {
+		t.Fatalf("prompt start = prompting %v confirming %v cmd %v", m.prompting, m.confirming, cmd)
+	}
+	for _, r := range "please review" {
+		updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		m = watchModel(t, updated)
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = watchModel(t, updated)
+	if m.prompting || !m.confirming || !strings.Contains(m.View(), "Send this prompt? y / n") {
+		t.Fatalf("confirmation state = prompting %v confirming %v\n%s", m.prompting, m.confirming, m.View())
+	}
+
+	// Enter alone is intentionally not confirmation.
+	updated, cmd = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = watchModel(t, updated)
+	if !m.confirming || cmd != nil {
+		t.Fatal("enter sent prompt without explicit y confirmation")
+	}
+	updated, cmd = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	m = watchModel(t, updated)
+	if m.confirming || cmd == nil || m.message != "sending prompt to PROJ-123" {
+		t.Fatalf("confirmed state = %#v", m)
+	}
+	updated, _ = m.Update(cmd())
+	m = watchModel(t, updated)
+	if m.message != "prompt sent to PROJ-123 · idle" {
+		t.Fatalf("message = %q", m.message)
+	}
+	if gotText != "please review" || gotTarget != (mux.Target{
+		Backend: "tmux", Workspace: "orc", Tab: "develop", Pane: "%7", AgentID: "agent-1", AgentInstance: "instance-1",
+	}) {
+		t.Fatalf("prompt = %q / %#v", gotText, gotTarget)
+	}
+}
+
+func TestWatchPromptRejectsMissingExactIdentityAndCanCancel(t *testing.T) {
+	backend := &watchPromptBackend{
+		Fake: &muxtest.Fake{NameFunc: func() string { return "tmux" }},
+		prompt: func(mux.Target, string, bool, mux.AgentControlOptions) (mux.AgentControlResult, error) {
+			t.Fatal("unexpected prompt")
+			return mux.AgentControlResult{}, nil
+		},
+	}
+	m, err := New(t.TempDir(), Options{Mux: backend})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.rows = []row{{ticket: "OLD-1", backend: "tmux", session: "orc", window: "develop", pane: "%7", tmuxState: "live"}}
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	m = watchModel(t, updated)
+	if m.prompting || m.message != "no exact agent target for OLD-1" {
+		t.Fatalf("missing identity state = %#v", m)
+	}
+
+	m.rows[0].agentID, m.rows[0].agentInstance = "agent-1", "instance-1"
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	m = watchModel(t, updated)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = watchModel(t, updated)
+	if m.prompting || m.confirming || m.promptBox.Value() != "" {
+		t.Fatalf("cancelled state = %#v", m)
 	}
 }

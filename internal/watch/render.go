@@ -249,6 +249,32 @@ func (m Model) renderFilter(width int) string {
 	return mutedStyle.Render(truncate(fmt.Sprintf("/ %s  (%d/%d)", m.searchBox.Value(), len(m.rows), len(m.allRows)), width))
 }
 
+func (m Model) renderPromptAction() string {
+	width := max(24, m.width)
+	inner := min(72, max(20, width-4))
+	var content strings.Builder
+	content.WriteString(selectedStyle.Render("SEND TO " + truncate(m.promptRow.ticket, max(1, inner-8))))
+	content.WriteString("\n\n")
+	if m.prompting {
+		content.WriteString(truncate(m.promptBox.View(), inner))
+		content.WriteString("\n\n")
+		content.WriteString(mutedStyle.Render("enter review · esc cancel"))
+	} else {
+		content.WriteString(wrap(m.promptBox.Value(), inner))
+		content.WriteString("\n\n")
+		content.WriteString(blockedStyle.Render("Send this prompt? y / n"))
+	}
+	if m.message != "" {
+		content.WriteString("\n\n")
+		content.WriteString(mutedStyle.Render(truncate(m.message, inner)))
+	}
+	var b strings.Builder
+	b.WriteString(watchHeaderStyle.Width(inner + 4).Render(" ORC WATCH · PROMPT"))
+	b.WriteString("\n\n")
+	b.WriteString(selectedCardStyle.Width(inner).Render(content.String()))
+	return b.String()
+}
+
 func (m Model) renderPreview() string {
 	content := m.viewport.View()
 	if strings.TrimSpace(content) == "" {

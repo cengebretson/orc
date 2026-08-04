@@ -606,6 +606,8 @@ tmux and Herdr, with documented differences only where capabilities differ.
 
 ### Phase 4: prompt and stall detection
 
+Status: implemented.
+
 - Implement safe exact-pane prompt delivery.
 - Require lifecycle movement and report stalled prompts.
 - Detect replacement and exit during prompt/wait.

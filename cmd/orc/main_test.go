@@ -456,6 +456,42 @@ func TestRunCtlAgentWaitUsesBackendLifecycleWait(t *testing.T) {
 	}
 }
 
+func TestRunCtlAgentPromptUsesTmuxExactInstanceCapability(t *testing.T) {
+	resetCommandGlobals(t)
+	globalWorkspace = mutableFixtureWorkspace(t)
+	featureDir := filepath.Join(globalWorkspace, "features", "HOT-42-login-500-error")
+	if err := state.Update(featureDir, func(s *state.State) error {
+		s.Runtime.Mux = &state.MuxRuntime{Backend: "tmux", Workspace: "hot-42", Tab: "develop", Pane: "%9"}
+		s.Runtime.Tmux = nil
+		s.Runtime.Agent = &state.AgentRuntime{ID: "agent-9", Instance: "instance-9"}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var gotTarget mux.Target
+	muxBackend = &ctlTestBackend{
+		Fake: &muxtest.Fake{NameFunc: func() string { return "tmux" }},
+		promptFunc: func(target mux.Target, text string, wait bool, options mux.AgentControlOptions) (mux.AgentControlResult, error) {
+			if text != "review this" || wait || options.Context == nil {
+				t.Fatalf("text=%q wait=%v options=%#v", text, wait, options)
+			}
+			gotTarget = target
+			return mux.AgentControlResult{Backend: "tmux", Target: target, Lifecycle: mux.LifecycleIdle}, nil
+		},
+	}
+	ctlPromptTicket = "HOT-42"
+	out, err := captureStdout(func() error { return runCtlAgentPrompt(nil, []string{"review this"}) })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotTarget.Pane != "%9" || gotTarget.AgentID != "agent-9" || gotTarget.AgentInstance != "instance-9" {
+		t.Fatalf("target = %#v", gotTarget)
+	}
+	if !strings.Contains(out, `"agent_prompted"`) {
+		t.Fatalf("output = %s", out)
+	}
+}
+
 func TestRunCtlAgentPromptRejectsBackendWithoutLifecycleControl(t *testing.T) {
 	resetCommandGlobals(t)
 	globalWorkspace = mutableFixtureWorkspace(t)
@@ -466,6 +502,7 @@ func TestRunCtlAgentPromptRejectsBackendWithoutLifecycleControl(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+	muxBackend = &muxtest.Fake{NameFunc: func() string { return "tmux" }}
 	ctlPromptTicket = "HOT-42"
 
 	err := runCtlAgentPrompt(nil, []string{"review this"})
@@ -475,9 +512,9 @@ func TestRunCtlAgentPromptRejectsBackendWithoutLifecycleControl(t *testing.T) {
 	}
 }
 
-func TestWriteCtlErrorPreservesHerdrStallCode(t *testing.T) {
+func TestWriteCtlErrorPreservesAgentStallCode(t *testing.T) {
 	var out bytes.Buffer
-	writeCtlError(&out, &mux.AgentControlError{Backend: "herdr", Code: "agent_prompt_stalled", Message: "no observed state change"})
+	writeCtlError(&out, &mux.AgentControlError{Backend: "tmux", Code: "agent_prompt_stalled", Message: "no observed state change"})
 	if !strings.Contains(out.String(), `"code":"agent_prompt_stalled"`) || !strings.Contains(out.String(), `"message":"no observed state change"`) {
 		t.Fatalf("error output = %s", out.String())
 	}

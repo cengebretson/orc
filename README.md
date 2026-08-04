@@ -471,7 +471,7 @@ These backend-neutral JSON commands are intended for supervisors, integrations, 
 - `orc ctl agent state --ticket <ticket>` — read the exact recorded Herdr or tmux agent's recognized lifecycle as JSON; tmux state comes only from installed provider hooks
 - `orc ctl status` — read aggregate durable/live session state and stable attention counts as JSON; durable paused work needs attention
 - `orc ctl agent watch [--ticket <ticket>]` — stream per-ticket `agent_state`, `agent_error`, and `agent_stopped` transitions as compact JSONL until interrupted
-- `orc ctl agent prompt --ticket <ticket> "<text>" --wait --timeout 120s` — atomically prompt the exact recorded Herdr agent and wait for a settled lifecycle state (tmux prompting is not yet supported)
+- `orc ctl agent prompt --ticket <ticket> "<text>" --wait --timeout 120s` — safely prompt the exact recorded Herdr or tmux agent and optionally wait for a settled lifecycle; tmux accepts up to 64 KiB of UTF-8 text, requires bracketed paste, and reports `agent_prompt_stalled` unless hooks observe a new lifecycle sequence
 - `orc ctl agent wait --ticket <ticket> --until blocked --timeout 120s` — wait for recognized Herdr or hook-published tmux lifecycle state without scraping terminal text
 - `orc ctl session capture --ticket <ticket> [--lines 80]` — capture up to 5,000 recent lines from the exact recorded Herdr or tmux pane; captured text is never treated as lifecycle state
 

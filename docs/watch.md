@@ -370,6 +370,7 @@ Keybindings:
 | `enter` | preview selected prompt |
 | `a` | attach/focus selected agent session/window |
 | `i` | attach to the next live session that needs attention |
+| `s` | compose, review, and explicitly confirm a prompt to the selected exact agent |
 | `n` | toggle the selected prompt preview |
 | `v` | toggle the rail and little-orc pet view |
 | `l` | toggle responsive and column pet layouts (pet view only) |
@@ -381,8 +382,9 @@ Keybindings:
 | `q` | quit watch pane |
 | `?` | toggle the compact key help overlay |
 
-Prompt sending must be explicit. Selecting a ticket or pressing `enter` does
-not paste into an agent pane by itself.
+Prompt sending is explicit. Press `s` to compose text, `enter` to review it,
+then `y` to send it to the selected exact agent instance. Selection, preview,
+and `enter` alone never paste into an agent pane.
 
 ## Attach/focus
 
@@ -408,10 +410,12 @@ wants more context; this expanded page includes recent history.
 When a ticket is blocked because `STATE.yaml` is `paused`, label the prompt text
 as `Blocker`. For non-blocked states, label it as `Next`.
 
-Watch does not send text. `orc next`, `orc jit`, and structured `orc ctl`
-commands are the canonical launch/control surfaces. Prompt sending from Watch
-is roadmap work and must be explicit, confirmed, exact-targeted, and covered
-for quoting and ambiguous targets.
+Watch sends text only through the compose/review/confirm flow. It requires a
+live backend with prompt capability plus an exact recorded workspace, tab,
+pane, agent ID, and instance ID. Delivery then uses the same backend control
+contract as `orc ctl` and waits briefly for an authoritative lifecycle
+acknowledgement; an unavailable, stopped, stalled, replaced, or legacy target
+is reported without guessing or falling back to the selected pane.
 
 ## tmux toggle
 

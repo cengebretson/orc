@@ -1,13 +1,82 @@
 package watch
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
+	"time"
 
 	"github.com/cengebretson/orc/internal/mux"
 	"github.com/cengebretson/orc/internal/tmux"
 	tea "github.com/charmbracelet/bubbletea"
 )
+
+const watchPromptTimeout = 5 * time.Second
+
+func (m *Model) beginPrompt() string {
+	if m.demo {
+		return "demo mode: prompting is disabled"
+	}
+	r, ok := m.selectedWork()
+	if !ok {
+		return "no session selected"
+	}
+	if r.tmuxState != "live" {
+		return "agent session stopped for " + r.ticket
+	}
+	if r.backend == "" || r.session == "" || r.window == "" || r.pane == "" || r.agentID == "" || r.agentInstance == "" {
+		return "no exact agent target for " + r.ticket
+	}
+	controller, ok := m.mux.(mux.AgentPromptBackend)
+	if !ok || controller.Name() != r.backend {
+		return r.backend + " prompting is unavailable"
+	}
+	m.promptRow = r
+	m.promptBox.SetValue("")
+	m.promptBox.Focus()
+	m.prompting = true
+	m.confirming = false
+	return ""
+}
+
+func (m *Model) cancelPrompt() {
+	m.prompting = false
+	m.confirming = false
+	m.promptBox.Blur()
+	m.promptBox.SetValue("")
+	m.promptRow = row{}
+}
+
+func (m *Model) sendConfirmedPrompt() tea.Cmd {
+	r := m.promptRow
+	text := m.promptBox.Value()
+	controller, ok := m.mux.(mux.AgentPromptBackend)
+	if !ok || controller.Name() != r.backend {
+		m.cancelPrompt()
+		m.message = r.backend + " prompting is unavailable"
+		return nil
+	}
+	target := mux.Target{
+		Backend: r.backend, Workspace: r.session, Tab: r.window, Pane: r.pane,
+		AgentID: r.agentID, AgentInstance: r.agentInstance,
+	}
+	m.prompting = false
+	m.confirming = false
+	m.promptBox.Blur()
+	m.promptBox.SetValue("")
+	m.promptRow = row{}
+	m.message = "sending prompt to " + r.ticket
+	return func() tea.Msg {
+		result, err := controller.PromptAgent(target, text, true, mux.AgentControlOptions{
+			Until: []string{
+				mux.LifecycleIdle, mux.LifecycleWorking, mux.LifecycleBlocked, mux.LifecycleDone, mux.LifecycleUnknown,
+			},
+			Timeout: watchPromptTimeout,
+			Context: context.Background(),
+		})
+		return promptDoneMsg{ticket: r.ticket, result: result, err: err}
+	}
+}
 
 func (m Model) attachSelected() (tea.Cmd, string) {
 	if m.demo {

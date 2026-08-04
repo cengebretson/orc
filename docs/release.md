@@ -15,11 +15,11 @@ The v1 release boundary includes:
 - Dashboard workspace views and the dedicated Live rail, exact tmux pane
   targeting, attention-driven focus, live Claude/Codex telemetry, session
   search/resume, park/unpark recovery, repository grouping, and context-pressure
-  presentation.
+  presentation, including explicitly confirmed exact-agent prompting.
 
 The following are explicitly post-v1 and do not block a release:
 
-- Direct prompt sending from `orc watch` and structured human-response forms.
+- Structured human-response forms beyond the confirmed free-text Watch action.
 - Agent completion notifications.
 - Durable arbitrary labels and label filters.
 - Remote pack install/update/uninstall, registries, signing, and provenance.
@@ -111,8 +111,16 @@ In a second terminal, verify:
   provider overlay.
 - `/` filters by ticket, repository, branch, worker, engine, and provider model.
 - `a` focuses the exact agent pane and `i` selects the next attention item.
+- `s` opens prompt composition; `enter` only advances to review, `n` cancels,
+  and only an explicit `y` sends to the captured exact agent instance.
 - Context pressure is a percentage when the provider reports a limit and `n/a`
   otherwise.
+
+With lifecycle hooks healthy, send a disposable prompt containing spaces,
+quotes, shell metacharacters, and a newline through `orc ctl agent prompt
+--wait`. Confirm the text arrives literally in only the recorded pane and the
+command returns a recognized lifecycle or a distinct structured stall,
+replacement, exit, cancellation, or timeout error.
 
 Exercise recovery after the provider has emitted a resumable session identity:
 
