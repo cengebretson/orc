@@ -122,6 +122,13 @@ Without it — or on other terminals — portraits fall back to chafa character
 art, then to built-in ASCII art if chafa is not installed. Set
 `ORC_PORTRAIT=symbols` or `ORC_PORTRAIT=kitty` to override the detection.
 
+**Colors:** the dashboard and watch rail default to the built-in
+`catppuccin-mocha` theme. Set `settings.theme: terminal` in `orc.yaml` to derive
+them from your terminal's own palette instead — accent colors become ANSI slots
+your terminal maps, and body text is left unset so its default foreground shows
+through, which keeps it readable on light and dark backgrounds alike.
+`orc doctor` reports an unknown theme name and lists the valid ones.
+
 ## Getting started
 
 ### 1. Scaffold a workspace

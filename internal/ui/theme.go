@@ -4,6 +4,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -71,4 +72,20 @@ func Logo() string {
 		return ""
 	}
 	return strings.TrimRight(string(data), "\n")
+}
+
+// ThemeNames lists the embedded themes, sorted. A theme is selected by name in
+// orc.yaml and an unknown name falls back silently, so callers need a way to
+// tell a user what the valid names actually are.
+func ThemeNames() []string {
+	entries, err := themeFS.ReadDir("themes")
+	if err != nil {
+		return nil
+	}
+	names := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		names = append(names, strings.TrimSuffix(entry.Name(), ".json"))
+	}
+	sort.Strings(names)
+	return names
 }

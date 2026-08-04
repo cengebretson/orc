@@ -9,6 +9,7 @@ import (
 
 	"github.com/cengebretson/orc/internal/config"
 	"github.com/cengebretson/orc/internal/state"
+	"github.com/cengebretson/orc/internal/ui"
 	"github.com/cengebretson/orc/internal/workers"
 )
 
@@ -65,6 +66,7 @@ func Run(root string) *Report {
 	// orc.yaml (repos + workflows) — grouped under their own section
 	for _, r := range []Result{
 		checkOrcConfig(root),
+		checkTheme(root),
 		checkRepoPaths(root),
 		checkWorkflowRefs(root),
 		checkDirWithCount(root, "stages", "*.md", "stage"),
@@ -354,4 +356,28 @@ func checkLoopCounts(root string) Result {
 		return Result{}
 	}
 	return Result{Name: "loop counts", Status: Empty, Detail: "approaching limit: " + strings.Join(warnings, "  ·  ")}
+}
+
+// checkTheme validates settings.theme against the embedded themes. An unknown
+// name falls back to the default silently, so without this a typo looks like
+// the theme setting simply does nothing.
+func checkTheme(root string) Result {
+	cfg, err := config.Load(root)
+	if err != nil {
+		return Result{Name: "theme", Status: OK, Group: "workspace"}
+	}
+	name := strings.TrimSpace(cfg.Settings.Theme)
+	if name == "" {
+		return Result{Name: "theme", Status: OK, Detail: "default", Group: "workspace"}
+	}
+	for _, known := range ui.ThemeNames() {
+		if name == known {
+			return Result{Name: "theme", Status: OK, Detail: name, Group: "workspace"}
+		}
+	}
+	return Result{
+		Name: "theme", Status: Empty, Group: "workspace",
+		Detail: fmt.Sprintf("unknown theme %q — using the default; available: %s",
+			name, strings.Join(ui.ThemeNames(), ", ")),
+	}
 }

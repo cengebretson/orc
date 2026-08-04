@@ -27,6 +27,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   not exposed alike by both providers today, and converting it would need a
   per-model price table Orc would have to keep current — a number that looks
   precise and is quietly wrong is worse than one that is honestly coarse.
+- Added a `terminal` theme that derives dashboard and watch colors from the
+  terminal's own palette. Accent roles become ANSI slot indices the terminal
+  maps, and body text is left unset so its default foreground shows through —
+  the only choice that stays readable on light and dark backgrounds alike.
+  Select it with `settings.theme: terminal` in `orc.yaml`.
+- `orc doctor` now validates `settings.theme` and lists the available names. An
+  unknown theme falls back to the default silently, so without the check a typo
+  looked like the setting simply did nothing.
 
 ## [0.19.0] - 2026-08-04
 
