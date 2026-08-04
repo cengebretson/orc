@@ -9,6 +9,7 @@ import (
 
 	"github.com/cengebretson/orc/internal/contextpressure"
 	"github.com/cengebretson/orc/internal/featurelist"
+	"github.com/cengebretson/orc/internal/sessionlist"
 	"github.com/cengebretson/orc/internal/telemetry"
 )
 
@@ -36,7 +37,7 @@ func TestBuildItemsJoinsRuntimeTelemetryAndContext(t *testing.T) {
 
 	items := buildItems(
 		[]*featurelist.Feature{feature},
-		map[string]telemetry.Live{filepath.Clean(featureDir): live},
+		map[string]sessionlist.ManagedRuntime{filepath.Clean(featureDir): {Live: live, HasTelemetry: true}},
 		contextpressure.DefaultThresholds(),
 	)
 	if len(items) != 1 || items[0].Feature != feature || !items[0].HasTelemetry {

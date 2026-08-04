@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/cengebretson/orc/internal/contextpressure"
 	"github.com/cengebretson/orc/internal/worktreesetup"
@@ -99,6 +100,12 @@ func Validate(cfg *Config, workerIDs []string) ValidationErrors {
 			default:
 				errs = append(errs, ValidationError{Path: fmt.Sprintf("settings.parking.wake_on[%d]", i), Message: "condition must be status_change, attention, or stage_change"})
 			}
+		}
+	}
+	if settings := cfg.Settings.Rail; settings != nil && settings.StuckAfter != "" {
+		duration, err := time.ParseDuration(settings.StuckAfter)
+		if err != nil || duration <= 0 {
+			errs = append(errs, ValidationError{Path: "settings.rail.stuck_after", Message: "stuck_after must be a positive duration"})
 		}
 	}
 

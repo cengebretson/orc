@@ -37,19 +37,32 @@ type Repository struct {
 }
 
 type Session struct {
-	Kind         string          `json:"kind"`
-	Running      bool            `json:"running"`
-	Ticket       string          `json:"ticket,omitempty"`
-	Stage        string          `json:"stage,omitempty"`
-	Status       string          `json:"status,omitempty"`
-	Worker       string          `json:"worker,omitempty"`
-	Engine       string          `json:"engine,omitempty"`
-	FeatureDir   string          `json:"feature_dir,omitempty"`
-	Attention    string          `json:"attention,omitempty"`
-	Lifecycle    string          `json:"lifecycle,omitempty"`
-	Repositories []Repository    `json:"repositories,omitempty"`
-	Target       *Target         `json:"target,omitempty"`
-	Live         *telemetry.Live `json:"live,omitempty"`
+	Kind           string          `json:"kind"`
+	Running        bool            `json:"running"`
+	Ticket         string          `json:"ticket,omitempty"`
+	Stage          string          `json:"stage,omitempty"`
+	Status         string          `json:"status,omitempty"`
+	Worker         string          `json:"worker,omitempty"`
+	Engine         string          `json:"engine,omitempty"`
+	FeatureDir     string          `json:"feature_dir,omitempty"`
+	Attention      string          `json:"attention,omitempty"`
+	Lifecycle      string          `json:"lifecycle,omitempty"`
+	LifecycleSince int64           `json:"lifecycle_since,omitempty"`
+	StateChangeSeq uint64          `json:"state_change_seq,omitempty"`
+	Repositories   []Repository    `json:"repositories,omitempty"`
+	Target         *Target         `json:"target,omitempty"`
+	Live           *telemetry.Live `json:"live,omitempty"`
+}
+
+// ManagedRuntime is the authoritative multiplexer observation for one managed
+// feature, optionally enriched with provider telemetry.
+type ManagedRuntime struct {
+	Live           telemetry.Live
+	HasTelemetry   bool
+	Attention      string
+	Lifecycle      string
+	LifecycleSince int64
+	StateChangeSeq uint64
 }
 
 type Options struct {
@@ -75,6 +88,19 @@ func ManagedTelemetry(root string, features []*featurelist.Feature) map[string]t
 // ManagedTelemetryWithMux returns provider telemetry using the selected live
 // multiplexer inventory.
 func ManagedTelemetryWithMux(root string, features []*featurelist.Feature, backend mux.Backend) map[string]telemetry.Live {
+	runtime := ManagedRuntimeWithMux(root, features, backend)
+	result := make(map[string]telemetry.Live)
+	for featureDir, observation := range runtime {
+		if observation.HasTelemetry {
+			result[featureDir] = observation.Live
+		}
+	}
+	return result
+}
+
+// ManagedRuntimeWithMux returns authoritative pane lifecycle and optional
+// provider telemetry keyed by feature directory.
+func ManagedRuntimeWithMux(root string, features []*featurelist.Feature, backend mux.Backend) map[string]ManagedRuntime {
 	if len(features) == 0 {
 		return nil
 	}
@@ -82,7 +108,22 @@ func ManagedTelemetryWithMux(root string, features []*featurelist.Feature, backe
 	if err != nil {
 		return nil
 	}
-	return managedTelemetryFromSessions(sessions)
+	result := make(map[string]ManagedRuntime)
+	for _, session := range sessions {
+		if session.Kind != KindManaged || session.FeatureDir == "" {
+			continue
+		}
+		observation := ManagedRuntime{
+			Attention: session.Attention, Lifecycle: session.Lifecycle,
+			LifecycleSince: session.LifecycleSince, StateChangeSeq: session.StateChangeSeq,
+		}
+		if session.Live != nil {
+			observation.Live = *session.Live
+			observation.HasTelemetry = true
+		}
+		result[filepath.Clean(session.FeatureDir)] = observation
+	}
+	return result
 }
 
 func managedTelemetryFromSessions(sessions []Session) map[string]telemetry.Live {
@@ -161,6 +202,8 @@ func Collect(root string, opts Options) ([]Session, error) {
 			entry.Target = &Target{Backend: pane.Backend, Session: pane.Session, Window: pane.Window, Pane: pane.ID}
 			entry.Attention = pane.Attention
 			entry.Lifecycle = pane.Lifecycle
+			entry.LifecycleSince = pane.LifecycleSince
+			entry.StateChangeSeq = pane.StateChangeSeq
 			if pane.ProviderEngine != "" {
 				entry.Engine = pane.ProviderEngine
 			} else if pane.Engine != "" {
@@ -191,6 +234,7 @@ func Collect(root string, opts Options) ([]Session, error) {
 		entry := Session{
 			Kind: KindOrphaned, Running: true, Ticket: pane.Ticket, Stage: pane.Stage, Worker: pane.Worker,
 			Engine: pane.Engine, FeatureDir: pane.FeatureDir, Attention: pane.Attention, Lifecycle: pane.Lifecycle,
+			LifecycleSince: pane.LifecycleSince, StateChangeSeq: pane.StateChangeSeq,
 			Target: &Target{Backend: pane.Backend, Session: pane.Session, Window: pane.Window, Pane: pane.ID},
 		}
 		if entry.Engine == "" {

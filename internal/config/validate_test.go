@@ -93,6 +93,11 @@ func TestValidate_NotifyEvents(t *testing.T) {
 	assertValidationError(t, config.Validate(cfg, nil), "settings.notify.on[1]", `event must be "blocked", "complete", "error", or "all"`)
 }
 
+func TestValidate_RailStuckAfter(t *testing.T) {
+	cfg := &config.Config{Settings: config.Settings{Rail: &config.RailSettings{StuckAfter: "soon"}}}
+	assertValidationError(t, config.Validate(cfg, nil), "settings.rail.stuck_after", "stuck_after must be a positive duration")
+}
+
 func TestValidate_RepoIdentity(t *testing.T) {
 	cfg := &config.Config{Repos: []config.Repo{
 		{},

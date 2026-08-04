@@ -442,6 +442,8 @@ Live rail; `orc dashboard` starts in Live. Press `?` for navigation help.
   - `--pet-layout column` — start with one pet card per row
   - `--tmux-toggle` — open or close the watch rail beside the current tmux pane
   - `--wide` — render the wider table layout
+- `orc rail open|close|toggle` — manage one proven Orc-owned `orc watch` pane in the current tmux window; defaults to a focus-preserving 64-column right split
+- `orc rail collapse|expand|toggle-collapsed` — resize that live pane between a five-column state strip and its previous mouse-adjusted size
 - Both `orc watch` and the merged Live dashboard tab display matched provider context pressure using configurable
   green/yellow/red percentage boundaries; unknown provider limits display `n/a`.
 - `orc archive <ticket>` — archive a completed feature, remove worktrees

@@ -24,6 +24,7 @@ var paneFormat = strings.Join([]string{
 	"#{@orc_agent_state}", "#{@orc_agent_state_seq}",
 	"#{@orc_agent_state_since}", "#{@orc_agent_state_source}",
 	"#{@agent_attention}", "#{@agent_attention_since}",
+	"#{@orc_agent_seen_seq}",
 }, "\t")
 
 // windowPanes returns the panes of one window. A missing server or window is
@@ -75,15 +76,28 @@ func parseDetailedPanes(out []byte) []mux.Pane {
 		sequence, _ := strconv.ParseUint(fields[17], 10, 64)
 		lifecycleSince, _ := strconv.ParseInt(fields[18], 10, 64)
 		attentionSince, _ := strconv.ParseInt(fields[21], 10, 64)
+		var seenSequence uint64
+		if len(fields) >= 23 {
+			seenSequence, _ = strconv.ParseUint(fields[22], 10, 64)
+		}
+		attention := normalizeAttention(fields[20])
+		if seenSequence >= sequence && sequence > 0 {
+			attention = ""
+			attentionSince = 0
+		}
+		lifecycle := normalizeLifecycle(fields[16])
+		if lifecycle == mux.LifecycleDone && seenSequence >= sequence && sequence > 0 {
+			lifecycle = mux.LifecycleIdle
+		}
 		panes = append(panes, mux.Pane{
 			Backend: "tmux", ID: fields[0], Session: fields[1], Window: fields[2],
 			CWD: fields[3], Command: fields[4], PID: pid, Agent: fields[6] == "1",
 			AgentID: fields[7], AgentInstance: fields[8], Ticket: fields[9],
 			Stage: fields[10], Worker: fields[11], Engine: fields[12],
 			ProviderEngine: fields[13], ProviderSessionID: fields[14],
-			FeatureDir: fields[15], Lifecycle: normalizeLifecycle(fields[16]),
+			FeatureDir: fields[15], Lifecycle: lifecycle,
 			StateChangeSeq: sequence, LifecycleSince: lifecycleSince, LifecycleSource: fields[19],
-			Attention: normalizeAttention(fields[20]), AttentionSince: attentionSince,
+			Attention: attention, AttentionSince: attentionSince, SeenSeq: seenSequence,
 		})
 	}
 	return panes

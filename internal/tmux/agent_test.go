@@ -48,7 +48,7 @@ func TestPrepareAgentLaunchStampsBeforeReturningWrappedCommand(t *testing.T) {
 }
 
 func TestApplyAgentEventCommitsSequenceLast(t *testing.T) {
-	calls := stubCommands(t, commandResult{output: "orc\tdevelop\tagent-1\tinstance-1\tidle\t4\told-event\t4\n"})
+	calls := stubCommands(t, commandResult{output: "orc\tdevelop\tagent-1\tinstance-1\tidle\t4\told-event\t4\t/work/features/ORC-1\t3\n"})
 	result, err := applyAgentEventAt("%7", mux.AgentEvent{
 		AgentID: "agent-1", AgentInstance: "instance-1", Engine: "codex",
 		ProviderSessionID: "provider-1", Lifecycle: mux.LifecycleBlocked, EventID: "event-5",
@@ -58,6 +58,9 @@ func TestApplyAgentEventCommitsSequenceLast(t *testing.T) {
 	}
 	if result.Target.Pane != "%7" || result.Lifecycle != mux.LifecycleBlocked || result.StateChangeSeq != 5 || result.Duplicate {
 		t.Fatalf("result = %+v", result)
+	}
+	if !result.Notify || result.FeatureDir != "/work/features/ORC-1" {
+		t.Fatalf("notification result = %+v", result)
 	}
 	last := (*calls)[len(*calls)-1]
 	if got := strings.Join(last.args, " "); got != "set-option -p -t %7 @orc_agent_state_seq 5" {
@@ -86,6 +89,34 @@ func TestApplyAgentEventCommitsSequenceLast(t *testing.T) {
 	}
 	if len(wantOptions) != 0 {
 		t.Fatalf("missing option updates: %#v; calls: %#v", wantOptions, *calls)
+	}
+}
+
+func TestAcknowledgeAgentValidatesExactInstanceAndRecordsSeenSequence(t *testing.T) {
+	calls := stubCommands(t, commandResult{output: "orc\tdevelop\tagent-1\tinstance-1\tdone\t8\t8\t1\t0\n"})
+	err := (Backend{}).AcknowledgeAgent(mux.Target{
+		Backend: "tmux", Workspace: "orc", Tab: "develop", Pane: "%7",
+		AgentID: "agent-1", AgentInstance: "instance-1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join((*calls)[1].args, " "); got != "set-option -p -t %7 @orc_agent_seen_seq 8" {
+		t.Fatalf("acknowledgement command = %q", got)
+	}
+}
+
+func TestAcknowledgedDonePresentsAsIdle(t *testing.T) {
+	stubCommands(t, commandResult{output: "orc\tdevelop\tagent-1\tinstance-1\tdone\t8\t8\t1\t0\t8\n"})
+	result, err := (Backend{}).StateAgent(mux.Target{
+		Backend: "tmux", Workspace: "orc", Tab: "develop", Pane: "%7",
+		AgentID: "agent-1", AgentInstance: "instance-1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Lifecycle != mux.LifecycleIdle || result.StateChangeSeq != 8 {
+		t.Fatalf("acknowledged state = %+v, want idle at sequence 8", result)
 	}
 }
 

@@ -9,6 +9,9 @@ import (
 )
 
 func (m Model) renderRail() string {
+	if m.width > 0 && m.width <= 7 {
+		return m.renderCollapsedRail()
+	}
 	width := max(12, m.width)
 	inner := max(8, width-1)
 	var b strings.Builder
@@ -78,6 +81,34 @@ func (m Model) renderRail() string {
 	return strings.TrimRight(b.String(), "\n")
 }
 
+func (m Model) renderCollapsedRail() string {
+	width := max(1, m.width)
+	rowLimit := len(m.rows)
+	if m.height > 1 {
+		rowLimit = min(rowLimit, m.height-1)
+	}
+	lines := make([]string, 0, max(rowLimit+1, m.height))
+	for i := 0; i < rowLimit; i++ {
+		icon, label := displayState(m.rows[i])
+		icon = animatedStateIcon(m.rows[i], icon, label, m.renderNow(), m.uiFrame)
+		if m.rows[i].woken {
+			icon, label = "↟", "woken"
+		}
+		lines = append(lines, centerRailCell(stateStyle(label).Render(icon), width))
+	}
+	if m.height > 0 {
+		for len(lines) < m.height-1 {
+			lines = append(lines, "")
+		}
+	}
+	lines = append(lines, centerRailCell(accentStyle.Render("»"), width))
+	return strings.Join(lines, "\n")
+}
+
+func centerRailCell(value string, width int) string {
+	return strings.Repeat(" ", max(0, (width-1)/2)) + value
+}
+
 func renderRailRow(r row, selected bool, width int, now time.Time, frame int) string {
 	icon, label := displayState(r)
 	icon = animatedStateIcon(r, icon, label, now, frame)
@@ -90,14 +121,38 @@ func renderRailRow(r row, selected bool, width int, now time.Time, frame int) st
 	} else if now.Before(r.flashUntil) {
 		style = transitionRowStyle
 	}
+	badge := lifecycleAgeBadge(r, now)
+	suffix := ""
+	if badge != "" {
+		suffix = " " + badge
+	}
+	ticketWidth := max(1, width-4-len(suffix))
 	if selected {
-		content := "▌ " + icon + " " + truncate(r.ticket, max(1, width-4))
+		content := "▌ " + icon + " " + truncate(r.ticket, ticketWidth) + suffix
 		return style.Width(width).Render(content)
 	}
 	if now.Before(r.celebrateUntil) || r.demoCelebration || now.Before(r.flashUntil) {
-		return style.Width(width).Render("  " + icon + " " + truncate(r.ticket, max(1, width-4)))
+		return style.Width(width).Render("  " + icon + " " + truncate(r.ticket, ticketWidth) + suffix)
 	}
-	return "  " + stateStyle(label).Render(icon) + " " + truncate(r.ticket, max(1, width-4))
+	return "  " + stateStyle(label).Render(icon) + " " + truncate(r.ticket, ticketWidth) + mutedStyle.Render(suffix)
+}
+
+const stuckLifecycleAge = 15 * time.Minute
+
+func lifecycleAgeBadge(r row, now time.Time) string {
+	if r.lifecycleSince.IsZero() || now.IsZero() || r.lifecycleSince.After(now) {
+		return ""
+	}
+	age := now.Sub(r.lifecycleSince)
+	value := humanDuration(age)
+	threshold := r.stuckAfter
+	if threshold <= 0 {
+		threshold = stuckLifecycleAge
+	}
+	if r.liveState == "working" && age >= threshold {
+		return "stuck " + value
+	}
+	return value
 }
 
 func (m Model) renderNow() time.Time {

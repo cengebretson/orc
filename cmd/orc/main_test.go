@@ -71,6 +71,53 @@ func TestRunAgentEventRejectsMissingInheritedPane(t *testing.T) {
 	}
 }
 
+func TestRunAgentEventNotifiesOnlyAuthoritativeUnseenTransitions(t *testing.T) {
+	resetCommandGlobals(t)
+	root := mutableFixtureWorkspace(t)
+	featureDir := filepath.Join(root, "features", "HOT-42-login-500-error")
+	if err := state.Update(featureDir, func(s *state.State) error {
+		s.Runtime.Mux = &state.MuxRuntime{Backend: "tmux", Workspace: "orc", Tab: "develop", Pane: "%9"}
+		s.Runtime.Tmux = nil
+		s.Runtime.Agent = &state.AgentRuntime{ID: "agent-9", Instance: "instance-9", Stage: s.Stage.Name, Engine: "codex"}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("TMUX_PANE", "%9")
+	agentEventAgentID = "agent-9"
+	agentEventInstance = "instance-9"
+	agentEventEngine = "codex"
+	agentEventLifecycle = "done"
+	agentEventID = "event-9"
+	applyAgentEvent = func(string, mux.AgentEvent) (mux.AgentEventResult, error) {
+		return mux.AgentEventResult{
+			Lifecycle: mux.LifecycleDone, FeatureDir: featureDir, Notify: true,
+			Target: mux.Target{Backend: "tmux", Workspace: "orc", Tab: "develop", Pane: "%9", AgentID: "agent-9", AgentInstance: "instance-9"},
+		}, nil
+	}
+	var events []orcnotify.Event
+	sendTransitionNotification = func(_ config.NotifySettings, event orcnotify.Event) error {
+		events = append(events, event)
+		return nil
+	}
+	if err := runAgentEvent(nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 1 || events[0].Name != "complete" || events[0].Ticket != "HOT-42" || events[0].WorkDir != root {
+		t.Fatalf("events = %#v", events)
+	}
+
+	applyAgentEvent = func(string, mux.AgentEvent) (mux.AgentEventResult, error) {
+		return mux.AgentEventResult{Lifecycle: mux.LifecycleDone, FeatureDir: featureDir, Duplicate: true}, nil
+	}
+	if err := runAgentEvent(nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("duplicate event notified: %#v", events)
+	}
+}
+
 func (b *ctlTestBackend) StateAgent(target mux.Target) (mux.AgentControlResult, error) {
 	return b.stateFunc(target)
 }

@@ -98,6 +98,23 @@ func TestRenderRailIsCompact(t *testing.T) {
 	}
 }
 
+func TestRailRendersLifecycleAgeStuckAndCollapsedAffordance(t *testing.T) {
+	now := time.Date(2026, 8, 3, 17, 0, 0, 0, time.UTC)
+	r := row{ticket: "ORC-5", status: "active", tmuxState: "live", liveState: "working", lifecycleSince: now.Add(-16 * time.Minute)}
+	if got := lifecycleAgeBadge(r, now); got != "stuck 16m" {
+		t.Fatalf("lifecycleAgeBadge() = %q, want stuck 16m", got)
+	}
+	view := (Model{width: 64, height: 10, rows: []row{r}, now: now}).renderRail()
+	if !strings.Contains(view, "stuck 16m") {
+		t.Fatalf("expanded rail missing stuck age:\n%s", view)
+	}
+	collapsed := (Model{width: 5, height: 4, rows: []row{r}, now: now}).renderRail()
+	lines := strings.Split(collapsed, "\n")
+	if len(lines) != 4 || !strings.Contains(lines[len(lines)-1], "»") {
+		t.Fatalf("collapsed rail = %q, want four rows with final expand affordance", collapsed)
+	}
+}
+
 func TestParkingGroupIsVisibleExpandableAndWokenRowsAreFlagged(t *testing.T) {
 	searchBox := textinput.New()
 	allRows := []row{

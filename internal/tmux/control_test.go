@@ -22,7 +22,7 @@ func TestStateAgentReadsExactInstanceLifecycle(t *testing.T) {
 	if got.Backend != "tmux" || got.Target != target || got.Agent != "agent-1" || got.Lifecycle != mux.LifecycleWorking || got.StateChangeSeq != 14 {
 		t.Fatalf("StateAgent() = %#v", got)
 	}
-	want := []string{"display-message", "-p", "-t", "%7", "#{session_name}\t#{window_name}\t#{@orc_agent_id}\t#{@orc_agent_instance}\t#{@orc_agent_state}\t#{@orc_agent_state_seq}\t#{@orc_agent_event_seq}\t#{bracket_paste_flag}\t#{pane_dead}"}
+	want := []string{"display-message", "-p", "-t", "%7", "#{session_name}\t#{window_name}\t#{@orc_agent_id}\t#{@orc_agent_instance}\t#{@orc_agent_state}\t#{@orc_agent_state_seq}\t#{@orc_agent_event_seq}\t#{bracket_paste_flag}\t#{pane_dead}\t#{@orc_agent_seen_seq}"}
 	if len(*calls) != 1 || !reflect.DeepEqual((*calls)[0].args, want) {
 		t.Fatalf("calls = %#v", *calls)
 	}

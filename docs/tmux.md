@@ -17,7 +17,8 @@ The defaults use these prefix bindings:
 
 | Key | Action |
 |-----|--------|
-| `W` | Toggle a 32-column `orc watch` rail on the right. |
+| `W` | Toggle a 64-column managed Orc rail on the right. |
+| `C` | Collapse or restore the managed rail without restarting it. |
 | `P` | Open the wide watch dashboard in a 90% by 80% popup. |
 | `S` | Show `orc sessions --all` in a pageable popup. |
 | `R` | Open the interactive `orc sessions resume` picker in a popup. |
@@ -46,14 +47,38 @@ If every binding runs from inside the Orc workspace, you may omit
 `--workspace "$ORC_WORKSPACE"`; Orc searches upward from the command's working
 directory for `orc.yaml`.
 
-## Split alternatives
+## Managed rail
 
-`orc watch --tmux-toggle` owns its split pane, marks it with `@orc_watch`, and
-closes the same pane when invoked again. To put the rail on the bottom instead:
+`orc rail open|close|toggle` manages one Orc-owned `orc watch` pane in the
+current tmux window. Opening reuses an existing rail, preserves focus, and
+stamps `@orc_rail=1` plus `@orc_role=rail`; closing refuses to kill a pane when
+ownership is absent or ambiguous. The pane remains a normal mouse-resizable
+tmux pane. The older `orc watch --tmux-toggle` flag remains compatible.
+
+Collapse resizes the live pane instead of restarting it:
+
+```sh
+orc rail collapse
+orc rail expand
+orc rail toggle-collapsed
+```
+
+Orc remembers the current mouse-adjusted size before collapsing, uses five
+columns as the compact floor, and displays `»` on the rail's last row. Override
+the initial 64-column size or choose a bottom rail when opening:
 
 ```tmux
-bind-key W run-shell 'orc --workspace "$ORC_WORKSPACE" watch --tmux-toggle --tmux-layout bottom --tmux-size 25%'
+bind-key W run-shell 'orc --workspace "$ORC_WORKSPACE" rail toggle --layout bottom --size 18'
 ```
+
+Rows display authoritative lifecycle age. A continuously `working` agent is
+marked `stuck` after 15 minutes by default; configure another positive Go
+duration with `settings.rail.stuck_after` (for example `30m`). Explicit Orc
+attach, focus, prompt, and Live-rail actions acknowledge the exact agent
+sequence. State reads and captures never acknowledge it.
+
+Authoritative hook-published `blocked` and unseen `done` transitions use
+`settings.notify`; duplicate events and acknowledgements do not notify again.
 
 `orc sessions resume` continues the selected provider in the foreground. The
 popup therefore remains open for the resumed session's lifetime. Use a normal

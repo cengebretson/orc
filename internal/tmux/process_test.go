@@ -302,10 +302,25 @@ func TestWatchHelpersUseBoundary(t *testing.T) {
 	}
 
 	t.Run("find marked pane", func(t *testing.T) {
-		stubCommands(t, commandResult{output: "%1\t\n%2\t1\n"})
+		stubCommands(t, commandResult{output: "%1\t\t\t\n%2\t1\trail\t1\n"})
 		got, err := findWatchPane()
 		if err != nil || got != "%2" {
 			t.Fatalf("findWatchPane() = %q, %v; want %%2, nil", got, err)
+		}
+	})
+
+	t.Run("find legacy marked pane", func(t *testing.T) {
+		stubCommands(t, commandResult{output: "%2\t\t\t1\n"})
+		got, err := findWatchPane()
+		if err != nil || got != "%2" {
+			t.Fatalf("findWatchPane() = %q, %v; want legacy %%2, nil", got, err)
+		}
+	})
+
+	t.Run("reject ambiguous ownership", func(t *testing.T) {
+		stubCommands(t, commandResult{output: "%2\t1\trail\t1\n%3\t1\trail\t1\n"})
+		if _, err := findWatchPane(); err == nil {
+			t.Fatal("findWatchPane() error = nil, want ambiguous ownership error")
 		}
 	})
 
@@ -319,4 +334,77 @@ func TestWatchHelpersUseBoundary(t *testing.T) {
 			t.Fatalf("calls = %d, want 0", len(*calls))
 		}
 	})
+}
+
+func TestManagedRailLifecycle(t *testing.T) {
+	t.Setenv("TMUX", "socket,1,2")
+	originalAvailable := railAvailable
+	railAvailable = func() bool { return true }
+	t.Cleanup(func() { railAvailable = originalAvailable })
+
+	t.Run("open preserves focus and stamps ownership", func(t *testing.T) {
+		calls := stubCommands(t,
+			commandResult{output: "%1\t\t\t\n"},
+			commandResult{output: "%9\n"},
+		)
+		err := OpenRail(WatchToggleOptions{Root: "/work", ExecPath: "/bin/orc"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		joined := make([]string, 0, len(*calls))
+		for _, call := range *calls {
+			joined = append(joined, strings.Join(call.args, " "))
+		}
+		if !strings.Contains(joined[1], "split-window -d -h -l 64") {
+			t.Fatalf("split call = %q, want detached 64-column rail", joined[1])
+		}
+		for _, want := range []string{
+			"set-option -p -t %9 @orc_rail 1",
+			"set-option -p -t %9 @orc_role rail",
+			"set-option -p -t %9 @orc_watch 1",
+			"set-option -w -t %9 @orc_rail_collapsed 0",
+		} {
+			if !containsString(joined, want) {
+				t.Fatalf("calls missing %q: %#v", want, joined)
+			}
+		}
+	})
+
+	t.Run("open reuses owned pane", func(t *testing.T) {
+		calls := stubCommands(t, commandResult{output: "%9\t1\trail\t1\n"})
+		if err := OpenRail(WatchToggleOptions{}); err != nil {
+			t.Fatal(err)
+		}
+		if len(*calls) != 1 {
+			t.Fatalf("calls = %d, want ownership read only", len(*calls))
+		}
+	})
+
+	t.Run("collapse stores current mouse size", func(t *testing.T) {
+		calls := stubCommands(t,
+			commandResult{output: "%9\t1\trail\t1\n"},
+			commandResult{output: "71\t40\tright\t64\n"},
+		)
+		if err := CollapseRail(); err != nil {
+			t.Fatal(err)
+		}
+		joined := make([]string, 0, len(*calls))
+		for _, call := range *calls {
+			joined = append(joined, strings.Join(call.args, " "))
+		}
+		if !containsString(joined, "set-option -p -t %9 @orc_rail_expanded_size 71") ||
+			!containsString(joined, "resize-pane -t %9 -x 5") ||
+			!containsString(joined, "set-option -w -t %9 @orc_rail_collapsed 1") {
+			t.Fatalf("collapse calls = %#v", joined)
+		}
+	})
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }

@@ -43,6 +43,12 @@ type Settings struct {
 	Notify           NotifySettings           `yaml:"notify,omitempty"`
 	Herdr            *HerdrSettings           `yaml:"herdr,omitempty"`
 	Parking          *ParkingSettings         `yaml:"parking,omitempty"`
+	Rail             *RailSettings            `yaml:"rail,omitempty"`
+}
+
+// RailSettings controls presentation-only timing in the tmux Live rail.
+type RailSettings struct {
+	StuckAfter string `yaml:"stuck_after,omitempty"`
 }
 
 // ParkingSettings enables reversible display-only parking in Live views.

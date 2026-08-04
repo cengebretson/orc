@@ -19,6 +19,8 @@
 #   notify:                       # optional best-effort transition hook
 #     on: [blocked, complete]
 #     command: "notify-send 'orc' '{{ticket}} {{event}}'"
+#   rail:
+#     stuck_after: 15m            # working lifecycle age before the rail marks it stuck
 #   herdr:                        # optional native Herdr task-cell layout
 #     task_cell:
 #       test_command: "make test" # right-side test pane; any shell command

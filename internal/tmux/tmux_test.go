@@ -74,6 +74,18 @@ func TestParseDetailedPanesNormalizesAttention(t *testing.T) {
 	}
 }
 
+func TestParseDetailedPanesHidesAcknowledgedAttention(t *testing.T) {
+	row := strings.Join([]string{
+		"%1", "orc-1", "develop", "/work", "codex", "4242", "1",
+		"agent-1", "instance-1", "ORC-1", "develop", "default:bob", "codex", "codex", "p1", "/feature",
+		"done", "7", "1699999999", "hook", "done", "1700000000", "7",
+	}, "\t") + "\n"
+	got := parseDetailedPanes([]byte(row))
+	if len(got) != 1 || got[0].Attention != "" || got[0].AttentionSince != 0 || got[0].SeenSeq != 7 {
+		t.Fatalf("acknowledged pane = %#v", got)
+	}
+}
+
 func TestWriteScriptQuotesArguments(t *testing.T) {
 	runDir := t.TempDir()
 	script, err := writeScript(runDir, []string{"printf", "%s", "value with 'quotes'"})

@@ -18,6 +18,7 @@ var _ mux.Backend = Backend{}
 var _ mux.TargetBackend = Backend{}
 var _ mux.AgentLaunchBackend = Backend{}
 var _ mux.AgentControlBackend = Backend{}
+var _ mux.AgentAcknowledgeBackend = Backend{}
 var _ mux.TerminalCaptureBackend = Backend{}
 
 // Name identifies this backend.

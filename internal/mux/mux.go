@@ -156,6 +156,8 @@ type AgentEventResult struct {
 	Lifecycle      string `json:"lifecycle"`
 	StateChangeSeq uint64 `json:"state_change_seq"`
 	Duplicate      bool   `json:"duplicate,omitempty"`
+	FeatureDir     string `json:"feature_dir,omitempty"`
+	Notify         bool   `json:"notify,omitempty"`
 }
 
 // AgentControlError preserves a backend's stable automation error code, such
@@ -255,6 +257,7 @@ type Pane struct {
 	Lifecycle         string `json:"lifecycle,omitempty"`
 	LifecycleSource   string `json:"lifecycle_source,omitempty"`
 	StateChangeSeq    uint64 `json:"state_change_seq,omitempty"`
+	SeenSeq           uint64 `json:"seen_seq,omitempty"`
 	LifecycleSince    int64  `json:"lifecycle_since,omitempty"`
 	// AttentionSince is when the pane entered its current attention state, in
 	// epoch seconds. Zero means the reporter did not say — treat it as unknown
@@ -389,6 +392,14 @@ type AgentStateBackend interface {
 	Backend
 
 	StateAgent(target Target) (AgentControlResult, error)
+}
+
+// AgentAcknowledgeBackend records that a human explicitly acted on the exact
+// agent instance. Reads and terminal captures must never call this capability.
+type AgentAcknowledgeBackend interface {
+	Backend
+
+	AcknowledgeAgent(target Target) error
 }
 
 // AgentWaitBackend extends state reads with a context-cancelable lifecycle

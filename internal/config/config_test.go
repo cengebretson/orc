@@ -60,6 +60,8 @@ settings:
   parking:
     auto_park: [paused]
     wake_on: [status_change, attention, stage_change]
+  rail:
+    stuck_after: 30m
 repos: []
 `)
 
@@ -93,6 +95,9 @@ repos: []
 	}
 	if cfg.Settings.Parking == nil || strings.Join(cfg.Settings.Parking.AutoPark, ",") != "paused" || strings.Join(cfg.Settings.Parking.WakeOn, ",") != "status_change,attention,stage_change" {
 		t.Errorf("parking settings = %#v", cfg.Settings.Parking)
+	}
+	if cfg.Settings.Rail == nil || cfg.Settings.Rail.StuckAfter != "30m" {
+		t.Errorf("rail settings = %#v", cfg.Settings.Rail)
 	}
 }
 

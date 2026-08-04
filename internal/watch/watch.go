@@ -88,6 +88,9 @@ type row struct {
 	agentInstance   string
 	liveState       string
 	lastActive      time.Time
+	lifecycleSince  time.Time
+	stateChangeSeq  uint64
+	stuckAfter      time.Duration
 	contextTrend    []uint64
 	flashUntil      time.Time
 	celebrateUntil  time.Time

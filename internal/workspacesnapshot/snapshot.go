@@ -5,6 +5,7 @@ package workspacesnapshot
 import (
 	"fmt"
 	"path/filepath"
+	"time"
 
 	"github.com/cengebretson/orc/internal/config"
 	"github.com/cengebretson/orc/internal/contextpressure"
@@ -28,10 +29,14 @@ type Snapshot struct {
 // Workspace interfaces. Feature contains durable state and resolved workspace
 // metadata; Live and Context contain the current runtime observation.
 type WorkItem struct {
-	Feature      *featurelist.Feature
-	Live         telemetry.Live
-	HasTelemetry bool
-	Context      contextpressure.Pressure
+	Feature        *featurelist.Feature
+	Live           telemetry.Live
+	HasTelemetry   bool
+	Context        contextpressure.Pressure
+	Attention      string
+	Lifecycle      string
+	LifecycleSince time.Time
+	StateChangeSeq uint64
 }
 
 func Load(root string) (*Snapshot, error) {
@@ -73,20 +78,28 @@ func LoadItemsWithMux(root string, cfg *config.Config, allWorkers []*workers.Wor
 	if err != nil {
 		return nil, fmt.Errorf("loading features: %w", err)
 	}
-	liveByFeature := sessionlist.ManagedTelemetryWithMux(root, features, backend)
+	runtimeByFeature := sessionlist.ManagedRuntimeWithMux(root, features, backend)
 	thresholds := cfg.ContextPressureThresholds()
-	items := buildItems(features, liveByFeature, thresholds)
+	items := buildItems(features, runtimeByFeature, thresholds)
 	return items, nil
 }
 
-func buildItems(features []*featurelist.Feature, liveByFeature map[string]telemetry.Live, thresholds contextpressure.Thresholds) []*WorkItem {
+func buildItems(features []*featurelist.Feature, runtimeByFeature map[string]sessionlist.ManagedRuntime, thresholds contextpressure.Thresholds) []*WorkItem {
 	items := make([]*WorkItem, 0, len(features))
 	for _, feature := range features {
 		item := &WorkItem{Feature: feature}
-		if live, ok := liveByFeature[filepath.Clean(feature.FeatureDir)]; ok {
-			item.Live = live
-			item.HasTelemetry = true
-			item.Context = contextpressure.Evaluate(live.ContextUsed, live.ContextLimit, thresholds)
+		if runtime, ok := runtimeByFeature[filepath.Clean(feature.FeatureDir)]; ok {
+			item.Attention = runtime.Attention
+			item.Lifecycle = runtime.Lifecycle
+			item.StateChangeSeq = runtime.StateChangeSeq
+			if runtime.LifecycleSince > 0 {
+				item.LifecycleSince = time.Unix(runtime.LifecycleSince, 0)
+			}
+			if runtime.HasTelemetry {
+				item.Live = runtime.Live
+				item.HasTelemetry = true
+				item.Context = contextpressure.Evaluate(runtime.Live.ContextUsed, runtime.Live.ContextLimit, thresholds)
+			}
 		}
 		items = append(items, item)
 	}

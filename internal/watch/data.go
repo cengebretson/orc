@@ -41,11 +41,22 @@ func collectRowsWithMux(root, ticket string, backend mux.Backend) ([]row, error)
 			continue
 		}
 		r := rowFromFeature(f, snapshot.Config)
+		r.stuckAfter = configuredStuckAfter(snapshot.Config)
 		r.context = item.Context
+		if item.Attention != "" {
+			r.attention = item.Attention
+		}
+		if item.Lifecycle != "" {
+			r.liveState = item.Lifecycle
+		}
+		r.lifecycleSince = item.LifecycleSince
+		r.stateChangeSeq = item.StateChangeSeq
 		if item.HasTelemetry {
 			live := item.Live
 			r.providerID = live.ProviderSessionID
-			r.liveState = live.State
+			if item.Lifecycle == "" {
+				r.liveState = live.State
+			}
 			r.model = live.Model
 			r.lastActive = live.LastActive
 			if live.Engine != "" {
@@ -71,6 +82,15 @@ func collectRowsWithMux(root, ticket string, backend mux.Backend) ([]row, error)
 	}
 	sortRows(rows)
 	return filterRowsByTicket(rows, ticket), nil
+}
+
+func configuredStuckAfter(cfg *config.Config) time.Duration {
+	if cfg != nil && cfg.Settings.Rail != nil && cfg.Settings.Rail.StuckAfter != "" {
+		if duration, err := time.ParseDuration(cfg.Settings.Rail.StuckAfter); err == nil && duration > 0 {
+			return duration
+		}
+	}
+	return stuckLifecycleAge
 }
 
 func applyParkingToRows(rows []row, path, root string, policy parking.Policy, observations []parking.Observation, now time.Time) error {

@@ -51,13 +51,13 @@ func readAgentState(target mux.Target) (agentStateSnapshot, error) {
 
 	out, err := newCommand(
 		"tmux", "display-message", "-p", "-t", target.Pane,
-		"#{session_name}\t#{window_name}\t#{@orc_agent_id}\t#{@orc_agent_instance}\t#{@orc_agent_state}\t#{@orc_agent_state_seq}\t#{@orc_agent_event_seq}\t#{bracket_paste_flag}\t#{pane_dead}",
+		"#{session_name}\t#{window_name}\t#{@orc_agent_id}\t#{@orc_agent_instance}\t#{@orc_agent_state}\t#{@orc_agent_state_seq}\t#{@orc_agent_event_seq}\t#{bracket_paste_flag}\t#{pane_dead}\t#{@orc_agent_seen_seq}",
 	).Output()
 	if err != nil {
 		return agentStateSnapshot{}, tmuxAgentError("agent_offline", "agent pane %s is unavailable", target.Pane)
 	}
 	fields := strings.Split(strings.TrimRight(string(out), "\r\n"), "\t")
-	if len(fields) != 9 {
+	if len(fields) < 9 {
 		return agentStateSnapshot{}, tmuxAgentError("invalid_state", "agent pane %s returned invalid lifecycle metadata", target.Pane)
 	}
 	if fields[0] != target.Workspace || fields[1] != target.Tab || fields[2] != target.AgentID || fields[3] != target.AgentInstance {
@@ -93,6 +93,18 @@ func readAgentState(target mux.Target) (agentStateSnapshot, error) {
 		// interrupted or in-flight event, so expose uncertainty rather than the
 		// uncommitted lifecycle value.
 		lifecycle = mux.LifecycleUnknown
+	}
+	if len(fields) >= 10 && lifecycle == mux.LifecycleDone {
+		var seenSequence uint64
+		if fields[9] != "" {
+			seenSequence, err = strconv.ParseUint(fields[9], 10, 64)
+			if err != nil {
+				return agentStateSnapshot{}, tmuxAgentError("invalid_state", "agent pane %s has invalid seen sequence", target.Pane)
+			}
+		}
+		if sequence > 0 && seenSequence >= sequence {
+			lifecycle = mux.LifecycleIdle
+		}
 	}
 	return agentStateSnapshot{
 		result: mux.AgentControlResult{

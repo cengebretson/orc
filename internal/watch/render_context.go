@@ -200,6 +200,9 @@ func activityAge(r row, now time.Time) string {
 		return ""
 	}
 	latest := r.lastActive
+	if r.lifecycleSince.After(latest) {
+		latest = r.lifecycleSince
+	}
 	if latest.IsZero() && len(r.history) > 0 {
 		parsed, err := time.Parse(time.RFC3339, r.history[len(r.history)-1].at)
 		if err == nil {

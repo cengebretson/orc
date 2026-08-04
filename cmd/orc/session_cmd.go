@@ -50,10 +50,19 @@ func runAttach(cmd *cobra.Command, args []string) error {
 	if !muxBackend.SessionExists(target.Workspace) {
 		return fmt.Errorf("no %s workspace for %s — run `orc next %s` to start one", muxBackend.Name(), s.Ticket, s.Ticket)
 	}
+	acknowledgeTarget(muxBackend, target)
 	if backend, ok := muxBackend.(mux.TargetBackend); ok {
 		return backend.AttachTarget(target)
 	}
 	return muxBackend.AttachPane(target.Workspace, target.Tab, target.Pane)
+}
+
+func acknowledgeTarget(backend mux.Backend, target mux.Target) {
+	acknowledger, ok := backend.(mux.AgentAcknowledgeBackend)
+	if !ok || target.Pane == "" || target.AgentID == "" || target.AgentInstance == "" {
+		return
+	}
+	_ = acknowledger.AcknowledgeAgent(target)
 }
 
 func runFocus(cmd *cobra.Command, args []string) error {

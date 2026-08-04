@@ -31,6 +31,7 @@ func (m *Model) beginPrompt() string {
 	if !ok || controller.Name() != r.backend {
 		return r.backend + " prompting is unavailable"
 	}
+	acknowledgeRow(m.mux, r)
 	m.promptRow = r
 	m.promptBox.SetValue("")
 	m.promptBox.Focus()
@@ -97,6 +98,7 @@ func (m Model) attachSelected() (tea.Cmd, string) {
 		target = r.pane
 	}
 	backend := m.mux
+	acknowledgeRow(backend, r)
 	if backend == nil || backend.Name() == "tmux" {
 		cmd, err := newAttachCmd(r.session, r.window, r.pane)
 		if err != nil {
@@ -153,9 +155,21 @@ func FocusWithMux(root string, backend mux.Backend) error {
 		if !attentionNeeded(r) || r.tmuxState != "live" || r.session == "" || r.window == "" {
 			continue
 		}
+		acknowledgeRow(backend, r)
 		return backend.AttachPane(r.session, r.window, r.pane)
 	}
 	return fmt.Errorf("no live session needs attention")
+}
+
+func acknowledgeRow(backend mux.Backend, r row) {
+	acknowledger, ok := backend.(mux.AgentAcknowledgeBackend)
+	if !ok || r.backend != acknowledger.Name() || r.pane == "" || r.agentID == "" || r.agentInstance == "" {
+		return
+	}
+	_ = acknowledger.AcknowledgeAgent(mux.Target{
+		Backend: r.backend, Workspace: r.session, Tab: r.window, Pane: r.pane,
+		AgentID: r.agentID, AgentInstance: r.agentInstance,
+	})
 }
 
 var newAttachCmd = func(session, window, pane string) (*exec.Cmd, error) {

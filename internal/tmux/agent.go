@@ -69,6 +69,7 @@ func initializeAgentLifecycle(pane string, at time.Time) error {
 		{"@orc_agent_state_source", "launch"},
 		{"@orc_agent_event_id", ""},
 		{"@orc_agent_event_seq", "0"},
+		{"@orc_agent_seen_seq", "0"},
 		{"@agent_attention", ""},
 		{"@agent_attention_since", ""},
 		{"@agent_attention_source", "launch"},
@@ -79,6 +80,17 @@ func initializeAgentLifecycle(pane string, at time.Time) error {
 		}
 	}
 	return nil
+}
+
+// AcknowledgeAgent records the committed lifecycle sequence observed by an
+// explicit human action. A later hook sequence remains unseen even if it races
+// this write.
+func (Backend) AcknowledgeAgent(target mux.Target) error {
+	snapshot, err := readAgentState(target)
+	if err != nil {
+		return err
+	}
+	return setPaneOption(target.Pane, "@orc_agent_seen_seq", strconv.FormatUint(snapshot.result.StateChangeSeq, 10))
 }
 
 // ApplyAgentEvent validates and commits one provider lifecycle event from the
@@ -97,16 +109,28 @@ func applyAgentEventAt(pane string, event mux.AgentEvent, at time.Time) (mux.Age
 	}
 	out, err := newCommand(
 		"tmux", "display-message", "-p", "-t", pane,
-		"#{session_name}\t#{window_name}\t#{@orc_agent_id}\t#{@orc_agent_instance}\t#{@orc_agent_state}\t#{@orc_agent_state_seq}\t#{@orc_agent_event_id}\t#{@orc_agent_event_seq}",
+		"#{session_name}\t#{window_name}\t#{@orc_agent_id}\t#{@orc_agent_instance}\t#{@orc_agent_state}\t#{@orc_agent_state_seq}\t#{@orc_agent_event_id}\t#{@orc_agent_event_seq}\t#{@orc_feature_dir}\t#{@orc_agent_seen_seq}",
 	).Output()
 	if err != nil {
 		return mux.AgentEventResult{}, fmt.Errorf("read tmux agent pane %s: %w", pane, err)
 	}
 	fields := strings.Split(strings.TrimRight(string(out), "\r\n"), "\t")
-	if len(fields) != 8 || fields[0] == "" || fields[1] == "" {
+	if len(fields) < 8 || fields[0] == "" || fields[1] == "" {
 		return mux.AgentEventResult{}, fmt.Errorf("tmux pane %s returned invalid agent metadata", pane)
 	}
-	target := mux.Target{Backend: "tmux", Workspace: fields[0], Tab: fields[1], Pane: pane}
+	target := mux.Target{
+		Backend: "tmux", Workspace: fields[0], Tab: fields[1], Pane: pane,
+		AgentID: event.AgentID, AgentInstance: event.AgentInstance,
+	}
+	featureDir := ""
+	var seenSequence uint64
+	if len(fields) >= 10 {
+		featureDir = fields[8]
+		seenSequence, err = parseAgentSequence(fields[9])
+		if err != nil {
+			return mux.AgentEventResult{}, fmt.Errorf("tmux pane %s: invalid seen sequence: %w", pane, err)
+		}
+	}
 	if fields[2] != event.AgentID || fields[3] != event.AgentInstance {
 		return mux.AgentEventResult{}, fmt.Errorf("tmux pane %s hosts a different agent instance", pane)
 	}
@@ -129,7 +153,7 @@ func applyAgentEventAt(pane string, event mux.AgentEvent, at time.Time) (mux.Age
 			sequence = eventSequence
 		}
 		return mux.AgentEventResult{
-			Target: target, Lifecycle: fields[4], StateChangeSeq: sequence, Duplicate: true,
+			Target: target, Lifecycle: fields[4], StateChangeSeq: sequence, Duplicate: true, FeatureDir: featureDir,
 		}, nil
 	}
 
@@ -164,7 +188,11 @@ func applyAgentEventAt(pane string, event mux.AgentEvent, at time.Time) (mux.Age
 	if err := setPaneOption(pane, "@orc_agent_state_seq", strconv.FormatUint(nextSequence, 10)); err != nil {
 		return mux.AgentEventResult{}, err
 	}
-	return mux.AgentEventResult{Target: target, Lifecycle: event.Lifecycle, StateChangeSeq: nextSequence}, nil
+	shouldNotify := (event.Lifecycle == mux.LifecycleBlocked || event.Lifecycle == mux.LifecycleDone) && nextSequence > seenSequence
+	return mux.AgentEventResult{
+		Target: target, Lifecycle: event.Lifecycle, StateChangeSeq: nextSequence,
+		FeatureDir: featureDir, Notify: shouldNotify,
+	}, nil
 }
 
 func validateAgentEvent(event mux.AgentEvent) error {

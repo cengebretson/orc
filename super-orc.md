@@ -619,6 +619,8 @@ for a recognized result.
 
 ### Phase 5: tmux rail and attention UX
 
+Status: implemented.
+
 - Add managed rail open/close/toggle behavior.
 - Add age and stuck-state rendering.
 - Add conservative seen-state handling.

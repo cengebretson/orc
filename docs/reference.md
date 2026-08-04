@@ -138,6 +138,8 @@ settings:
   notify:                # optional transition notification command
     on: [blocked, complete]
     command: "notify-send 'orc' '{{ticket}} {{event}}'"
+  rail:
+    stuck_after: 15m     # positive duration before working is rendered as stuck
   herdr:                 # optional native Herdr layout
     task_cell:
       test_command: "make test"
