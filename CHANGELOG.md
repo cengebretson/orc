@@ -6,6 +6,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- GitHub Releases now carry their changelog section as the release body.
+  `.goreleaser.yaml` set `changelog.disable`, which skips the changelog pipe —
+  and that pipe is what reads `--release-notes`. Every release up to and
+  including `v0.17.0` published with an empty body as a result; `v0.17.0`'s
+  notes were restored by hand. `make release-check` could not have caught this,
+  because snapshot mode skips the same pipe and never renders a release body.
+
 ## [0.17.0] - 2026-08-03
 
 **Breaking:** five `orc watch` flags are gone. Replace `--tmux-toggle`,

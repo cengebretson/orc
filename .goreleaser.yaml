@@ -19,6 +19,11 @@ archives:
 checksum:
   name_template: "checksums.txt"
 
-# Release notes come from CHANGELOG.md via --release-notes in the Release workflow.
+# Release notes come from CHANGELOG.md via --release-notes in the Release
+# workflow. Do not set `changelog.disable` here: disabling skips the changelog
+# pipe entirely, and that pipe is what reads --release-notes into the release
+# body. Every release through v0.17.0 shipped with empty notes for that reason.
+# The pipe returns early once --release-notes is set, so no git-log changelog
+# is generated or appended.
 changelog:
-  disable: true
+  use: git
