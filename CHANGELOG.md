@@ -57,8 +57,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `orc mark --help` and `orc help-all` now list the `jit` verb, which the
   command has always accepted but never advertised.
 - Untracked the 18 MB `cmd/orc/orc` build artifact, committed by accident in
-  `69b3817`, and added it to `.gitignore`. The blob remains in history, so
-  clone size is unchanged until history is rewritten.
+  `69b3817`, and added it to `.gitignore` so it cannot come back. The blob
+  itself stays in history by choice: it is an ancestor of the `v0.16.0` and
+  `v0.16.1` tags, so removing it would rewrite both published releases for
+  8.3 MiB that costs nothing to keep.
 - The live tmux test now skips, rather than fails, where tmux is installed but
   cannot start a server or spawn a shell in a temp directory — the case in
   sandboxed and containerized environments.
