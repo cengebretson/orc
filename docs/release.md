@@ -16,15 +16,14 @@ The v1 release boundary includes:
   targeting, attention-driven focus, live Claude/Codex telemetry, session
   search/resume, park/unpark recovery, repository grouping, and context-pressure
   presentation, including explicitly confirmed exact-agent prompting.
+- Structured confirm/choice/text human responses, durable labels and label
+  filters, per-worker time attribution, and terminal-palette theming.
 
 The following are explicitly post-v1 and do not block a release:
 
-- Structured human-response forms beyond the confirmed free-text Watch action.
-- Agent completion notifications.
-- Durable arbitrary labels and label filters.
 - Remote pack install/update/uninstall, registries, signing, and provenance.
-- User profiles, hosted services, remote tmux control, cost attribution, and a
-  Homebrew tap.
+- User profiles, hosted services, remote tmux client selection, per-run
+  post-mortem logs, token and currency cost, and a Homebrew tap.
 
 ## 1. Automated gates
 
@@ -160,7 +159,11 @@ Choose the version, then update all three release inputs in one focused commit:
    `## [<version>] - YYYY-MM-DD` and leave a fresh `[Unreleased]` section.
 3. Update the comparison links at the bottom of `CHANGELOG.md`: `[Unreleased]`
    starts at the new tag, and `[<version>]` compares the previous tag to it.
-4. Re-run sections 1–3 and commit the release preparation.
+4. Delete anything from `plan.md`'s backlog that this release ships. Nothing
+   automates this, and it is the step most often missed: a shipped item left in
+   the backlog is the one piece of stale documentation a reader has no way to
+   detect, because a roadmap entry looks the same whether or not it is done.
+5. Re-run sections 1–3 and commit the release preparation.
 
 Verify the workflow contract before tagging:
 

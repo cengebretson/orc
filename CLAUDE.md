@@ -127,6 +127,13 @@ part nobody automates: `git release` promotes and dates the section but does
 At release time, if `[Unreleased]` was missed, reconstruct it from
 `git log <last-tag>..HEAD` before cutting.
 
+### Prune the roadmap at release time
+
+`plan.md` holds unshipped work only. Whatever a release ships must come out of
+its backlog in the same commit that promotes the changelog — `git release` does
+not do this, and a shipped item left in the backlog reads exactly like one that
+is still pending.
+
 ### Cutting a release
 
 Use the repo-agnostic `git release` helper (`~/.local/bin/git-release`, shared

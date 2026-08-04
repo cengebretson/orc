@@ -40,15 +40,18 @@ Acceptance:
 
 ## Future backlog
 
-- Native Herdr event-stream optimization, named sessions, and remote attach.
-- Explicit remote tmux-client selection for standalone watch/focus processes.
-- Durable arbitrary labels and `--label key=value` filters.
-- User profiles for personal defaults across workspaces.
-- Remote pack install, update, uninstall, registries, signing, and provenance.
-- Per-run post-mortem logs and per-worker cost attribution.
 - Homebrew distribution.
+- Per-run post-mortem logs: what one agent run did, kept beyond the history
+  entry. Per-worker time attribution already ships; token and currency cost
+  needs cumulative usage the providers do not expose alike, plus a price table
+  to keep current.
 - Optional external-tracker status mapping with write-back disabled by default.
-- Terminal-palette-derived dashboard and watch colors.
+- User profiles for personal defaults across workspaces.
+- Explicit remote tmux-client selection for standalone watch/focus processes.
+  Only matters with several clients attached to one server; attach currently
+  steers the calling client on purpose rather than guessing.
+- Native Herdr event-stream optimization, named sessions, and remote attach.
+- Remote pack install, update, uninstall, registries, signing, and provenance.
 
 ## Explicitly out of scope
 
