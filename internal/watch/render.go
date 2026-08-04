@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cengebretson/orc/internal/state"
 	terminalui "github.com/cengebretson/orc/internal/ui"
 )
 
@@ -363,6 +364,57 @@ func (m Model) renderHelp() string {
 	}
 	var b strings.Builder
 	b.WriteString(watchHeaderStyle.Width(inner + 4).Render(" ORC WATCH · HELP"))
+	b.WriteString("\n\n")
+	b.WriteString(selectedCardStyle.Width(inner).Render(content.String()))
+	return b.String()
+}
+
+// renderAnswerAction draws the control for a pending question. The question is
+// restated above the control: the human is answering something an agent asked,
+// possibly hours ago, and should not have to remember what.
+func (m Model) renderAnswerAction() string {
+	width := max(24, m.width)
+	inner := min(72, max(20, width-4))
+	q := m.answerRow.question
+	var content strings.Builder
+	content.WriteString(selectedStyle.Render("ANSWER " + truncate(m.answerRow.ticket, max(1, inner-8))))
+	content.WriteString("\n\n")
+	content.WriteString(wrap(q.Prompt, inner))
+	content.WriteString("\n\n")
+
+	switch q.Kind {
+	case state.QuestionKindConfirm:
+		content.WriteString(blockedStyle.Render("y  yes      n  no"))
+		content.WriteString("\n\n")
+		content.WriteString(mutedStyle.Render("esc cancel"))
+	case state.QuestionKindChoice:
+		for i, choice := range q.Choices {
+			label := choice.Key
+			if choice.Label != "" {
+				label = choice.Key + "  " + choice.Label
+			}
+			line := "  " + truncate(label, max(1, inner-2))
+			if i == m.answerCursor {
+				content.WriteString(selectedRowStyle.Width(inner).Render("▌ " + truncate(label, max(1, inner-2))))
+			} else {
+				content.WriteString(mutedStyle.Render(line))
+			}
+			content.WriteString("\n")
+		}
+		content.WriteString("\n")
+		content.WriteString(mutedStyle.Render("j/k move · enter select · esc cancel"))
+	case state.QuestionKindText:
+		content.WriteString(truncate(m.promptBox.View(), inner))
+		content.WriteString("\n\n")
+		content.WriteString(mutedStyle.Render("enter answer · esc cancel"))
+	}
+
+	if m.message != "" {
+		content.WriteString("\n\n")
+		content.WriteString(blockedStyle.Render(truncate(m.message, inner)))
+	}
+	var b strings.Builder
+	b.WriteString(watchHeaderStyle.Width(inner + 4).Render(" ORC WATCH · ANSWER"))
 	b.WriteString("\n\n")
 	b.WriteString(selectedCardStyle.Width(inner).Render(content.String()))
 	return b.String()

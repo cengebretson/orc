@@ -449,6 +449,8 @@ Available on every command:
   - `--demo` — preview workflow, attention, context-trend, and completion visuals using read-only synthetic work
   - `/` — filter by ticket, slug, stage, worker, repository, branch, workflow/status, or attention state
   - `i` — jump to the next live `blocked`, `input`, or `review` session
+  - `s` — answer the selected ticket's question, or compose a free-text prompt when it has none;
+    a confirm question offers `y`/`n`, a choice question a pick-list, and a text question a box
   - `p` — expand or collapse automatically parked work
   - to open the rail beside your current tmux pane, use `orc rail toggle` (see below)
   - `--wide` — render the wider table layout

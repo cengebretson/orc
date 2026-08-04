@@ -274,6 +274,8 @@ func rowFromFeature(f *featurelist.Feature, cfg *config.Config) row {
 	}
 	return row{
 		ticket:        s.Ticket,
+		featureDir:    f.FeatureDir,
+		question:      s.Runtime.Question,
 		name:          s.Slug,
 		stage:         stageLabel + f.StageLoopLabel,
 		stageName:     s.Stage.Name,

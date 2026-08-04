@@ -6,6 +6,7 @@ import (
 
 	"github.com/cengebretson/orc/internal/contextpressure"
 	"github.com/cengebretson/orc/internal/mux"
+	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/tmux"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -36,6 +37,11 @@ type attachDoneMsg struct {
 	err error
 }
 
+type answerDeliveredMsg struct {
+	ticket string
+	err    error
+}
+
 type promptDoneMsg struct {
 	ticket string
 	result mux.AgentControlResult
@@ -58,6 +64,8 @@ type workflowStep struct {
 
 type row struct {
 	ticket          string
+	featureDir      string
+	question        *state.QuestionRuntime
 	name            string
 	stage           string
 	stageName       string
@@ -143,6 +151,10 @@ type Model struct {
 	confirming bool
 	promptBox  textinput.Model
 	promptRow  row
+
+	answering    bool
+	answerCursor int
+	answerRow    row
 }
 
 // New constructs the watch model without starting a Bubble Tea program so it
@@ -179,7 +191,7 @@ func New(root string, opts Options) (Model, error) {
 // CanSwitchSection reports whether dashboard-level navigation can safely
 // consume a section-switch or help key without stealing modal input.
 func (m Model) CanSwitchSection() bool {
-	return !m.searching && !m.prompting && !m.confirming
+	return !m.searching && !m.prompting && !m.confirming && !m.answering
 }
 
 // SetActive controls background refresh and animation work while watch is
@@ -257,6 +269,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.message = "attach failed: " + msg.err.Error()
 		}
 		return m, nil
+	case answerDeliveredMsg:
+		// The answer is already recorded; a failed nudge is worth reporting but
+		// never undoes it.
+		if msg.err != nil {
+			m.message += " · agent not notified: " + msg.err.Error()
+		}
+		return m, loadDataWithMux(m.root, m.ticket, m.demo, m.mux)
 	case promptDoneMsg:
 		if msg.err != nil {
 			m.message = "prompt failed: " + msg.err.Error()
@@ -268,6 +287,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, loadDataWithMux(m.root, m.ticket, m.demo, m.mux)
 	case tea.KeyMsg:
+		if m.answering {
+			return m.updateAnswering(msg)
+		}
 		if m.prompting {
 			switch msg.String() {
 			case "ctrl+c":
@@ -424,6 +446,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.message = message
 			return m, cmd
 		case key.Matches(msg, keys.sendPrompt):
+			// Responding to the selected agent is one idea; the control adapts
+			// to whether that agent asked something specific.
+			if selected, ok := m.selectedWork(); ok && selected.question != nil && !selected.question.Answered() {
+				m.message = m.beginAnswer(selected)
+				if m.answering && selected.question.Kind == state.QuestionKindText {
+					return m, textinput.Blink
+				}
+				return m, nil
+			}
 			m.message = m.beginPrompt()
 			if m.prompting {
 				return m, textinput.Blink
@@ -442,6 +473,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) View() string {
 	if m.width == 0 {
 		return ""
+	}
+	if m.answering {
+		return m.renderAnswerAction()
 	}
 	if m.prompting || m.confirming {
 		return m.renderPromptAction()

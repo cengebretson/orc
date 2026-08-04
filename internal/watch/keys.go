@@ -41,7 +41,7 @@ var keys = keyMap{
 	refresh:    key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "refresh now")),
 	attach:     key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "attach selected")),
 	attention:  key.NewBinding(key.WithKeys("i"), key.WithHelp("i", "focus attention")),
-	sendPrompt: key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "send prompt")),
+	sendPrompt: key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "answer / send prompt")),
 	parking:    key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "expand parked")),
 }
 

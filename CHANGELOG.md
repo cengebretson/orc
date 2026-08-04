@@ -20,6 +20,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Orc validates that an answer is one the question offered and refuses anything
   else, leaving the question pending. It never interprets what an option means:
   that stays with the agent that asked.
+- `orc watch` answers questions in place. `s` on a ticket with a pending
+  question opens the control its kind calls for — `y`/`n` for confirm, a
+  pick-list for choice, a text box for text — and falls back to the existing
+  free-text prompt when nothing was asked. Answering needs no live agent, so a
+  ticket whose agent has already exited can still be answered.
 
 ## [0.18.0] - 2026-08-04
 

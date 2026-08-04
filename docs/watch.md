@@ -327,7 +327,7 @@ Keybindings:
 | `enter` | preview selected prompt |
 | `a` | attach/focus selected agent session/window |
 | `i` | attach to the next live session that needs attention |
-| `s` | compose, review, and explicitly confirm a prompt to the selected exact agent |
+| `s` | answer the selected ticket's pending question, or compose, review, and explicitly confirm a free-text prompt when it has none |
 | `n` | toggle the selected prompt preview |
 | `r` | refresh immediately |
 | `j` / `k`, arrows | scroll while details are open |
