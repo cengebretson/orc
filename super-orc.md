@@ -1,6 +1,6 @@
 # Super Orc: tmux-first agent orchestration
 
-Status: draft implementation specification
+Status: implemented.
 
 ## Summary
 
@@ -631,6 +631,8 @@ Acceptance: the rail behaves like a normal resizable tmux pane, survives
 ordinary navigation, avoids duplicates, and never closes an unowned pane.
 
 ### Phase 6: fallback and reconciliation
+
+Status: implemented.
 
 - Add versioned screen rules and workspace overrides.
 - Add debounce, precedence, and unknown-state behavior.

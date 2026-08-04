@@ -51,6 +51,72 @@ func TestCollectClassifiesManagedOrphanedAndUnmanaged(t *testing.T) {
 	}
 }
 
+func TestCollectReconcilesRecordedAgentIdentity(t *testing.T) {
+	base := func() *featurelist.Feature {
+		return &featurelist.Feature{
+			State: &state.State{
+				Ticket: "ORC-6", Stage: state.Stage{Name: "develop"},
+				Runtime: state.Runtime{
+					Mux:   &state.MuxRuntime{Backend: "tmux", Workspace: "orc-6", Tab: "develop", Pane: "%6"},
+					Agent: &state.AgentRuntime{ID: "agent-6", Instance: "instance-6", Engine: "codex", ProviderSessionID: "provider-6"},
+				},
+			},
+			FeatureDir: "/work/orc-6", Engine: "codex",
+		}
+	}
+	tests := []struct {
+		name  string
+		panes []mux.Pane
+		live  []telemetry.Live
+		want  string
+	}{
+		{name: "live", panes: []mux.Pane{{Backend: "tmux", ID: "%6", Session: "orc-6", Window: "develop", Agent: true, AgentID: "agent-6", AgentInstance: "instance-6"}}, want: ReconciliationLive},
+		{name: "resumable", live: []telemetry.Live{{Engine: "codex", ProviderSessionID: "provider-6"}}, want: ReconciliationResumable},
+		{name: "replaced", panes: []mux.Pane{{Backend: "tmux", ID: "%6", Session: "orc-6", Window: "develop", Agent: true, AgentID: "agent-6", AgentInstance: "instance-new"}}, want: ReconciliationReplaced},
+		{name: "orphaned", want: ReconciliationOrphaned},
+		{name: "unknown", panes: []mux.Pane{{Backend: "tmux", ID: "%6", Session: "orc-6", Window: "develop", Agent: true}}, want: ReconciliationUnknown},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := Collect("/work", Options{Features: []*featurelist.Feature{base()}, Panes: tt.panes, Telemetry: tt.live})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(got) != 1 || got[0].Reconciliation != tt.want {
+				t.Fatalf("sessions = %#v, want reconciliation %s", got, tt.want)
+			}
+			if tt.want == ReconciliationReplaced && got[0].Lifecycle != "" {
+				t.Fatalf("replacement leaked pane lifecycle: %#v", got[0])
+			}
+		})
+	}
+}
+
+func TestCollectKeepsFallbackSeparateFromAuthoritativeLifecycle(t *testing.T) {
+	feature := &featurelist.Feature{
+		State: &state.State{
+			Ticket: "ORC-6", Stage: state.Stage{Name: "develop"},
+			Runtime: state.Runtime{
+				Mux:   &state.MuxRuntime{Backend: "tmux", Workspace: "orc-6", Tab: "develop", Pane: "%6"},
+				Agent: &state.AgentRuntime{ID: "agent-6", Instance: "instance-6", Engine: "codex"},
+			},
+		},
+		FeatureDir: "/work/orc-6", Engine: "codex",
+	}
+	pane := mux.Pane{
+		Backend: "tmux", ID: "%6", Session: "orc-6", Window: "develop", Agent: true,
+		AgentID: "agent-6", AgentInstance: "instance-6", Lifecycle: "unknown", LifecycleSource: "launch",
+		ObservedLifecycle: "blocked", ObservationSource: "screen", Attention: "blocked", AttentionSource: "screen",
+	}
+	got, err := Collect("/work", Options{Features: []*featurelist.Feature{feature}, Panes: []mux.Pane{pane}, Telemetry: []telemetry.Live{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].Lifecycle != "unknown" || got[0].LifecycleSource != "launch" || got[0].ObservedLifecycle != "blocked" || got[0].ObservationSource != "screen" || got[0].AttentionSource != "screen" {
+		t.Fatalf("session = %#v", got)
+	}
+}
+
 func TestManagedTelemetryFromSessionsUsesManagedFeatureDirectory(t *testing.T) {
 	live := telemetry.Live{Engine: "codex", ContextUsed: 70, ContextLimit: 100}
 	got := managedTelemetryFromSessions([]Session{

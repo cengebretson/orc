@@ -127,6 +127,18 @@ func runCtlStatus(_ *cobra.Command, _ []string) error {
 		case sessionlist.KindUnmanaged:
 			summary.Unmanaged++
 		}
+		switch session.Reconciliation {
+		case sessionlist.ReconciliationLive:
+			summary.Live++
+		case sessionlist.ReconciliationResumable:
+			summary.Resumable++
+		case sessionlist.ReconciliationReplaced:
+			summary.Replaced++
+		case sessionlist.ReconciliationOrphaned:
+			summary.ReconciliationOrphaned++
+		case sessionlist.ReconciliationUnknown:
+			summary.Unknown++
+		}
 		if ctlSessionNeedsAttention(session) {
 			summary.NeedsAttention++
 		}
@@ -135,11 +147,16 @@ func runCtlStatus(_ *cobra.Command, _ []string) error {
 }
 
 type ctlStatusSummary struct {
-	Total          int `json:"total"`
-	Managed        int `json:"managed"`
-	Orphaned       int `json:"orphaned"`
-	Unmanaged      int `json:"unmanaged"`
-	NeedsAttention int `json:"needs_attention"`
+	Total                  int `json:"total"`
+	Managed                int `json:"managed"`
+	Orphaned               int `json:"orphaned"`
+	Unmanaged              int `json:"unmanaged"`
+	NeedsAttention         int `json:"needs_attention"`
+	Live                   int `json:"reconciliation_live"`
+	Resumable              int `json:"reconciliation_resumable"`
+	Replaced               int `json:"reconciliation_replaced"`
+	ReconciliationOrphaned int `json:"reconciliation_orphaned"`
+	Unknown                int `json:"reconciliation_unknown"`
 }
 
 func runCtlAgentState(_ *cobra.Command, _ []string) error {
@@ -476,9 +493,9 @@ func ctlAgentTickets(ticketArg string) ([]string, error) {
 }
 
 func ctlSessionNeedsAttention(session sessionlist.Session) bool {
-	values := []string{session.Status, session.Attention, session.Lifecycle}
-	if session.Live != nil {
-		values = append(values, session.Live.State)
+	values := []string{session.Status, session.Lifecycle}
+	if session.AttentionSource != "screen" && session.AttentionSource != "title" {
+		values = append(values, session.Attention)
 	}
 	for _, value := range values {
 		switch strings.ToLower(value) {

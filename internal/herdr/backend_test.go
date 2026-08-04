@@ -345,7 +345,7 @@ func TestListPanesMapsLifecycleIdentityAndExactTarget(t *testing.T) {
 		case "workspace list":
 			return response(`{"workspaces":[{"workspace_id":"w9","label":"ORC-9"}]}`), nil
 		case "pane list --workspace w9":
-			return response(`{"panes":[{"pane_id":"p1","workspace_id":"w9","tab_id":"t1","agent":"codex","agent_status":"blocked","foreground_cwd":"/work/orc-9","agent_session":{"value":"session-9"},"tokens":{"ticket":"ORC-9","stage":"develop","worker":"builder","feature_dir":"/work/orc-9"}}]}`), nil
+			return response(`{"panes":[{"pane_id":"p1","workspace_id":"w9","tab_id":"t1","agent":"codex","agent_status":"blocked","foreground_cwd":"/work/orc-9","agent_session":{"value":"session-9"},"tokens":{"agent_id":"agent-9","agent_instance":"instance-9","ticket":"ORC-9","stage":"develop","worker":"builder","feature_dir":"/work/orc-9"}}]}`), nil
 		default:
 			return nil, errors.New("unexpected command: " + strings.Join(args, " "))
 		}
@@ -359,10 +359,10 @@ func TestListPanesMapsLifecycleIdentityAndExactTarget(t *testing.T) {
 		t.Fatalf("panes = %#v", panes)
 	}
 	pane := panes[0]
-	if pane.Backend != "herdr" || pane.Session != "w9" || pane.Window != "t1" || pane.ID != "p1" || pane.Lifecycle != "blocked" || pane.Attention != mux.AttentionBlocked {
+	if pane.Backend != "herdr" || pane.Session != "w9" || pane.Window != "t1" || pane.ID != "p1" || pane.Lifecycle != "blocked" || pane.LifecycleSource != "native" || pane.Attention != mux.AttentionBlocked || pane.AttentionSource != "native" {
 		t.Fatalf("pane target/lifecycle = %#v", pane)
 	}
-	if pane.Ticket != "ORC-9" || pane.Stage != "develop" || pane.Worker != "builder" || pane.ProviderSessionID != "session-9" {
+	if pane.AgentID != "agent-9" || pane.AgentInstance != "instance-9" || pane.Ticket != "ORC-9" || pane.Stage != "develop" || pane.Worker != "builder" || pane.ProviderSessionID != "session-9" {
 		t.Fatalf("pane identity = %#v", pane)
 	}
 }
@@ -533,12 +533,12 @@ func TestSetTargetMetadataPublishesSidebarTokens(t *testing.T) {
 		}
 		return response(`{}`), nil
 	}}
-	meta := mux.Metadata{Ticket: "ORC-9", Stage: "develop", Worker: "builder", Engine: "codex", FeatureDir: "/work/orc-9"}
+	meta := mux.Metadata{AgentID: "agent-9", AgentInstance: "instance-9", Ticket: "ORC-9", Stage: "develop", Worker: "builder", Engine: "codex", FeatureDir: "/work/orc-9"}
 	if err := b.SetTargetMetadata(mux.Target{Backend: "herdr", Workspace: "w9", Tab: "t1", Pane: "p1"}, meta); err != nil {
 		t.Fatal(err)
 	}
 	joined := strings.Join(calls, "\n")
-	for _, want := range []string{"workspace report-metadata w9 --source orc --token owned=1", "pane report-metadata p1 --source orc --display-agent builder", "--token ticket=ORC-9", "--token stage=develop", "--token feature_dir=/work/orc-9"} {
+	for _, want := range []string{"workspace report-metadata w9 --source orc --token owned=1", "pane report-metadata p1 --source orc --display-agent builder", "--token agent_id=agent-9", "--token agent_instance=instance-9", "--token ticket=ORC-9", "--token stage=develop", "--token feature_dir=/work/orc-9"} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("calls missing %q:\n%s", want, joined)
 		}

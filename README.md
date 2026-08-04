@@ -444,6 +444,7 @@ Live rail; `orc dashboard` starts in Live. Press `?` for navigation help.
   - `--wide` — render the wider table layout
 - `orc rail open|close|toggle` — manage one proven Orc-owned `orc watch` pane in the current tmux window; defaults to a focus-preserving 64-column right split
 - `orc rail collapse|expand|toggle-collapsed` — resize that live pane between a five-column state strip and its previous mouse-adjusted size
+- Tmux Live views use hook state first, then versioned title and bounded-screen fallback rules for presentation only; local overrides live under `agent-detection/v1/`
 - Both `orc watch` and the merged Live dashboard tab display matched provider context pressure using configurable
   green/yellow/red percentage boundaries; unknown provider limits display `n/a`.
 - `orc archive <ticket>` — archive a completed feature, remove worktrees
@@ -490,6 +491,7 @@ Deep reference lives in **[docs/reference.md](docs/reference.md)**:
 - **[STATE.yaml](docs/reference.md#stateyaml)** — the per-ticket state machine, status values, and runtime/lock semantics
 - **[Sessions](docs/sessions.md)** — live telemetry, managed/orphan classification, exact resume, and park/unpark safety
 - **[Tmux integration](docs/tmux.md)** — optional popup, split-pane, resume, and focus bindings
+- **[Tmux fallback detection](docs/agent-detection.md)** — versioned title/screen rules, local overrides, precedence, and safety boundaries
 - **[Herdr integration](docs/herdr.md)** — native workspace/agent launch, exact attach, lifecycle inventory, and sidebar tokens
 - **[Release readiness](docs/release.md)** — v1 scope, automated gates, disposable-workspace manual QA, and tag verification
 - **[Workers](docs/reference.md#workers)** — worker definition files, prompt construction, and resolution order

@@ -48,3 +48,14 @@ func TestParkingWarningKeepsRowsVisible(t *testing.T) {
 		t.Fatalf("rendered warning did not preserve row:\n%s", view)
 	}
 }
+
+func TestParkingIgnoresPresentationOnlyAttention(t *testing.T) {
+	for _, source := range []string{"screen", "title"} {
+		if got := parkingAttention(row{attention: "blocked", attentionSource: source}); got != "" {
+			t.Errorf("%s attention = %q, want empty for parking", source, got)
+		}
+	}
+	if got := parkingAttention(row{attention: "blocked", attentionSource: "hook"}); got != "blocked" {
+		t.Errorf("hook attention = %q, want blocked", got)
+	}
+}

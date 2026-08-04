@@ -32,13 +32,25 @@ func renderRailDetailAt(r row, width int, now time.Time) string {
 		b.WriteString("\n")
 		b.WriteString(mutedStyle.Render("  " + truncate(r.worker, max(1, width-2))))
 	}
+	if r.displayTitle != "" {
+		b.WriteString("\n")
+		b.WriteString(mutedStyle.Render("  " + truncate(r.displayTitle, max(1, width-2))))
+	}
 	if r.tmuxState != "" && r.tmuxState != "-" {
 		b.WriteString("\n")
 		b.WriteString(mutedStyle.Render("  " + truncate("tmux "+r.tmuxState, max(1, width-2))))
 	}
 	if r.attention != "" {
 		b.WriteString("\n")
-		b.WriteString(mutedStyle.Render("  " + truncate("attention "+r.attention, max(1, width-2))))
+		attention := "attention " + r.attention
+		if r.attentionSource != "" {
+			attention += " · " + r.attentionSource
+		}
+		b.WriteString(mutedStyle.Render("  " + truncate(attention, max(1, width-2))))
+	}
+	if r.reconciliation != "" {
+		b.WriteString("\n")
+		b.WriteString(mutedStyle.Render("  " + truncate("runtime "+r.reconciliation, max(1, width-2))))
 	}
 	if r.woken {
 		b.WriteString("\n")

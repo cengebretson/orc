@@ -8,6 +8,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Added conservative tmux fallback detection through embedded versioned Codex
+  and Claude manifests, strict workspace-local overrides, title-over-screen
+  precedence, bounded capture regions, working-to-idle debounce, and explicit
+  unknown state. Inference is presentation-only and cannot satisfy control
+  waits, notify completion, advance workflow, or wake automatic parking.
+- Added runtime reconciliation across exact live, resumable, replaced,
+  orphaned, and contradictory agent evidence. Parking now snapshots proven
+  identity and authoritative lifecycle; restoration creates a fresh instance,
+  clears inherited metadata, and waits for a provider hook before committing
+  the restored runtime target.
+- Added a managed, mouse-resizable tmux attention rail with ownership-safe
+  open, close, toggle, collapse, and expand commands; configurable age/stuck
+  rendering; conservative seen acknowledgement; and deduplicated authoritative
+  block/completion notifications.
 - Added safe exact-instance prompting for tmux through private stdin-loaded
   buffers, bracketed paste, encoded submission, and automatic cleanup. Waiting
   prompts now require an authoritative hook transition and distinguish stalls,

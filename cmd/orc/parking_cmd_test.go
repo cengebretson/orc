@@ -16,16 +16,20 @@ import (
 
 func TestParkableEntriesRequireRunningManagedResumeMetadata(t *testing.T) {
 	sessions := []sessionlist.Session{
-		{Kind: sessionlist.KindManaged, Running: true, Ticket: "ORC-1", Stage: "develop", Engine: "codex", FeatureDir: "/feature", Target: &sessionlist.Target{Session: "orc-1", Window: "develop"}, Live: &telemetry.Live{ProviderSessionID: "abc", CWD: "/work"}},
+		{Kind: sessionlist.KindManaged, Running: true, Ticket: "ORC-1", Stage: "develop", Engine: "codex", AgentID: "agent-1", AgentInstance: "instance-1", FeatureDir: "/feature", Reconciliation: sessionlist.ReconciliationLive, Lifecycle: mux.LifecycleIdle, LifecycleSource: "hook", Target: &sessionlist.Target{Backend: "tmux", Session: "orc-1", Window: "develop"}, Live: &telemetry.Live{ProviderSessionID: "abc", CWD: "/work"}},
 		{Kind: sessionlist.KindManaged, Running: true, Ticket: "ORC-2", Engine: "codex", Target: &sessionlist.Target{Session: "orc-2"}},
+		{Kind: sessionlist.KindManaged, Running: true, Ticket: "ORC-3", Engine: "codex", Reconciliation: sessionlist.ReconciliationLive, Lifecycle: mux.LifecycleIdle, LifecycleSource: "screen", Target: &sessionlist.Target{Backend: "tmux", Session: "orc-3"}, Live: &telemetry.Live{ProviderSessionID: "screen"}},
 		{Kind: sessionlist.KindUnmanaged, Running: true, Engine: "claude", Target: &sessionlist.Target{Session: "personal"}, Live: &telemetry.Live{ProviderSessionID: "def"}},
 	}
 	entries, skipped := parkableEntries(sessions)
 	if len(entries) != 1 || entries[0].Ticket != "ORC-1" || entries[0].ProviderSessionID != "abc" {
 		t.Fatalf("entries = %#v", entries)
 	}
-	if skipped != 1 {
-		t.Fatalf("skipped = %d, want 1", skipped)
+	if entries[0].AgentID != "agent-1" || entries[0].AgentInstance != "instance-1" {
+		t.Fatalf("parked identity = %+v", entries[0])
+	}
+	if skipped != 2 {
+		t.Fatalf("skipped = %d, want 2", skipped)
 	}
 }
 
@@ -76,15 +80,17 @@ func TestNextParkingAgentRuntimeReusesDurableIdentity(t *testing.T) {
 func TestRestoredPaneRequiresExactParkedIdentity(t *testing.T) {
 	entry := parking.Entry{
 		Ticket: "ORC-1", Stage: "develop", Engine: "codex", ProviderSessionID: "provider-1",
+		AgentID: "agent-1", AgentInstance: "instance-old",
 		TmuxSession: "orc-1", TmuxWindow: "develop",
 	}
 	panes := []mux.Pane{
-		{ID: "%1", Agent: true, Session: "orc-1", Window: "develop", Ticket: "ORC-1", Stage: "develop", ProviderEngine: "codex", ProviderSessionID: "other"},
-		{ID: "%2", Agent: true, Session: "orc-1", Window: "develop", Ticket: "ORC-1", Stage: "develop", ProviderEngine: "CODEX", ProviderSessionID: "provider-1"},
+		{ID: "%1", Agent: true, AgentID: "agent-1", AgentInstance: "instance-old", Session: "orc-1", Window: "develop", Ticket: "ORC-1", Stage: "develop", ProviderEngine: "codex", ProviderSessionID: "other"},
+		{ID: "%2", Agent: true, AgentID: "agent-1", AgentInstance: "instance-new", Session: "orc-1", Window: "develop", Ticket: "ORC-1", Stage: "develop", ProviderEngine: "CODEX", ProviderSessionID: "provider-1"},
+		{ID: "%3", Agent: true, AgentID: "agent-1", AgentInstance: "instance-old", Session: "orc-1", Window: "develop", Ticket: "ORC-1", Stage: "develop", ProviderEngine: "CODEX", ProviderSessionID: "provider-1"},
 	}
 
 	pane, ok := restoredPane(entry, panes)
-	if !ok || pane != "%2" {
+	if !ok || pane != "%3" {
 		t.Fatalf("restoredPane = %q, %v", pane, ok)
 	}
 }

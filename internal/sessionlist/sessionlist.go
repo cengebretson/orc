@@ -23,6 +23,14 @@ const (
 	KindUnmanaged = "unmanaged"
 )
 
+const (
+	ReconciliationLive      = "live"
+	ReconciliationResumable = "resumable"
+	ReconciliationReplaced  = "replaced"
+	ReconciliationOrphaned  = "orphaned"
+	ReconciliationUnknown   = "unknown"
+)
+
 type Target struct {
 	Backend string `json:"backend,omitempty"`
 	Session string `json:"session"`
@@ -37,32 +45,50 @@ type Repository struct {
 }
 
 type Session struct {
-	Kind           string          `json:"kind"`
-	Running        bool            `json:"running"`
-	Ticket         string          `json:"ticket,omitempty"`
-	Stage          string          `json:"stage,omitempty"`
-	Status         string          `json:"status,omitempty"`
-	Worker         string          `json:"worker,omitempty"`
-	Engine         string          `json:"engine,omitempty"`
-	FeatureDir     string          `json:"feature_dir,omitempty"`
-	Attention      string          `json:"attention,omitempty"`
-	Lifecycle      string          `json:"lifecycle,omitempty"`
-	LifecycleSince int64           `json:"lifecycle_since,omitempty"`
-	StateChangeSeq uint64          `json:"state_change_seq,omitempty"`
-	Repositories   []Repository    `json:"repositories,omitempty"`
-	Target         *Target         `json:"target,omitempty"`
-	Live           *telemetry.Live `json:"live,omitempty"`
+	Kind              string          `json:"kind"`
+	Running           bool            `json:"running"`
+	Ticket            string          `json:"ticket,omitempty"`
+	Stage             string          `json:"stage,omitempty"`
+	Status            string          `json:"status,omitempty"`
+	Worker            string          `json:"worker,omitempty"`
+	Engine            string          `json:"engine,omitempty"`
+	AgentID           string          `json:"agent_id,omitempty"`
+	AgentInstance     string          `json:"agent_instance,omitempty"`
+	FeatureDir        string          `json:"feature_dir,omitempty"`
+	Attention         string          `json:"attention,omitempty"`
+	AttentionSource   string          `json:"attention_source,omitempty"`
+	AttentionSince    int64           `json:"attention_since,omitempty"`
+	Lifecycle         string          `json:"lifecycle,omitempty"`
+	LifecycleSource   string          `json:"lifecycle_source,omitempty"`
+	ObservedLifecycle string          `json:"observed_lifecycle,omitempty"`
+	ObservationSource string          `json:"observation_source,omitempty"`
+	ObservationSince  int64           `json:"observation_since,omitempty"`
+	DisplayTitle      string          `json:"display_title,omitempty"`
+	Reconciliation    string          `json:"reconciliation,omitempty"`
+	LifecycleSince    int64           `json:"lifecycle_since,omitempty"`
+	StateChangeSeq    uint64          `json:"state_change_seq,omitempty"`
+	Repositories      []Repository    `json:"repositories,omitempty"`
+	Target            *Target         `json:"target,omitempty"`
+	Live              *telemetry.Live `json:"live,omitempty"`
 }
 
 // ManagedRuntime is the authoritative multiplexer observation for one managed
 // feature, optionally enriched with provider telemetry.
 type ManagedRuntime struct {
-	Live           telemetry.Live
-	HasTelemetry   bool
-	Attention      string
-	Lifecycle      string
-	LifecycleSince int64
-	StateChangeSeq uint64
+	Live              telemetry.Live
+	HasTelemetry      bool
+	Attention         string
+	Lifecycle         string
+	LifecycleSince    int64
+	StateChangeSeq    uint64
+	AttentionSource   string
+	AttentionSince    int64
+	LifecycleSource   string
+	ObservedLifecycle string
+	ObservationSource string
+	ObservationSince  int64
+	DisplayTitle      string
+	Reconciliation    string
 }
 
 type Options struct {
@@ -101,12 +127,19 @@ func ManagedTelemetryWithMux(root string, features []*featurelist.Feature, backe
 // ManagedRuntimeWithMux returns authoritative pane lifecycle and optional
 // provider telemetry keyed by feature directory.
 func ManagedRuntimeWithMux(root string, features []*featurelist.Feature, backend mux.Backend) map[string]ManagedRuntime {
+	result, _ := CollectManagedRuntimeWithMux(root, features, backend)
+	return result
+}
+
+// CollectManagedRuntimeWithMux is the strict runtime projection used by live
+// interfaces that must surface malformed local detection overrides.
+func CollectManagedRuntimeWithMux(root string, features []*featurelist.Feature, backend mux.Backend) (map[string]ManagedRuntime, error) {
 	if len(features) == 0 {
-		return nil
+		return nil, nil
 	}
 	sessions, err := Collect(root, Options{Features: features, Mux: backend})
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	result := make(map[string]ManagedRuntime)
 	for _, session := range sessions {
@@ -116,6 +149,11 @@ func ManagedRuntimeWithMux(root string, features []*featurelist.Feature, backend
 		observation := ManagedRuntime{
 			Attention: session.Attention, Lifecycle: session.Lifecycle,
 			LifecycleSince: session.LifecycleSince, StateChangeSeq: session.StateChangeSeq,
+			AttentionSource: session.AttentionSource, LifecycleSource: session.LifecycleSource,
+			AttentionSince:    session.AttentionSince,
+			ObservedLifecycle: session.ObservedLifecycle, ObservationSource: session.ObservationSource,
+			ObservationSince: session.ObservationSince, Reconciliation: session.Reconciliation,
+			DisplayTitle: session.DisplayTitle,
 		}
 		if session.Live != nil {
 			observation.Live = *session.Live
@@ -123,7 +161,7 @@ func ManagedRuntimeWithMux(root string, features []*featurelist.Feature, backend
 		}
 		result[filepath.Clean(session.FeatureDir)] = observation
 	}
-	return result
+	return result, nil
 }
 
 func managedTelemetryFromSessions(sessions []Session) map[string]telemetry.Live {
@@ -161,6 +199,12 @@ func Collect(root string, opts Options) ([]Session, error) {
 		if err != nil {
 			return nil, err
 		}
+		if observer, ok := backend.(mux.FallbackObservationBackend); ok {
+			panes, err = observer.ObserveFallback(root, panes)
+			if err != nil {
+				return nil, err
+			}
+		}
 	}
 	liveSessions := opts.Telemetry
 	if liveSessions == nil {
@@ -193,28 +237,61 @@ func Collect(root string, opts Options) ([]Session, error) {
 			Worker: feature.WorkerID, Engine: feature.Engine, FeatureDir: feature.FeatureDir,
 			Repositories: durableRepositories(s.Repos),
 		}
+		if entry.Engine == "" && s.Runtime.Agent != nil {
+			entry.Engine = s.Runtime.Agent.Engine
+		}
+		if s.Runtime.Agent != nil {
+			entry.AgentID = s.Runtime.Agent.ID
+			entry.AgentInstance = s.Runtime.Agent.Instance
+		}
+		entry.Reconciliation = reconcileFeature(feature, pane, liveSessions)
 		if configured {
 			entry.Target = &Target{Backend: runtimeTarget.Backend, Session: runtimeTarget.Workspace, Window: runtimeTarget.Tab, Pane: runtimeTarget.Pane}
+		}
+		usablePane := pane
+		if s.Runtime.Agent != nil && entry.Reconciliation != ReconciliationLive {
+			usablePane = nil
 		}
 		if pane != nil {
 			entry.Running = true
 			usedPanes[pane.ID] = true
-			entry.Target = &Target{Backend: pane.Backend, Session: pane.Session, Window: pane.Window, Pane: pane.ID}
-			entry.Attention = pane.Attention
-			entry.Lifecycle = pane.Lifecycle
-			entry.LifecycleSince = pane.LifecycleSince
-			entry.StateChangeSeq = pane.StateChangeSeq
-			if pane.ProviderEngine != "" {
-				entry.Engine = pane.ProviderEngine
-			} else if pane.Engine != "" {
-				entry.Engine = pane.Engine
+		}
+		if usablePane != nil {
+			entry.Target = &Target{Backend: usablePane.Backend, Session: usablePane.Session, Window: usablePane.Window, Pane: usablePane.ID}
+			entry.Attention = usablePane.Attention
+			entry.AttentionSource = usablePane.AttentionSource
+			entry.AttentionSince = usablePane.AttentionSince
+			entry.Lifecycle = usablePane.Lifecycle
+			entry.LifecycleSource = usablePane.LifecycleSource
+			entry.ObservedLifecycle = usablePane.ObservedLifecycle
+			entry.ObservationSource = usablePane.ObservationSource
+			entry.ObservationSince = usablePane.ObservationSince
+			entry.DisplayTitle = usablePane.DisplayTitle
+			entry.LifecycleSince = usablePane.LifecycleSince
+			entry.StateChangeSeq = usablePane.StateChangeSeq
+			if usablePane.ProviderEngine != "" {
+				entry.Engine = usablePane.ProviderEngine
+			} else if usablePane.Engine != "" {
+				entry.Engine = usablePane.Engine
 			}
-			if s.Stage.Worker == "" && pane.Worker != "" {
-				entry.Worker = pane.Worker
+			if s.Stage.Worker == "" && usablePane.Worker != "" {
+				entry.Worker = usablePane.Worker
 			}
 		}
-		if pane != nil {
-			if value, indices, ok := matchTelemetry(entry.Engine, feature.FeatureDir, pane, liveSessions, usedLive); ok {
+		if entry.Reconciliation == ReconciliationResumable && s.Runtime.Agent != nil {
+			index, ambiguous := uniqueTelemetryIndex(liveSessions, usedLive, func(live telemetry.Live) bool {
+				return live.ProviderSessionID == s.Runtime.Agent.ProviderSessionID && engineMatches(s.Runtime.Agent.Engine, live.Engine)
+			})
+			if !ambiguous && index >= 0 {
+				value := liveSessions[index]
+				value.Managed = true
+				value.Ticket = s.Ticket
+				entry.Live = &value
+				usedLive[index] = true
+			}
+		}
+		if usablePane != nil {
+			if value, indices, ok := matchTelemetry(entry.Engine, feature.FeatureDir, usablePane, liveSessions, usedLive); ok {
 				markTelemetryUsed(usedLive, indices)
 				value.Managed = true
 				value.Ticket = s.Ticket
@@ -233,8 +310,15 @@ func Collect(root string, opts Options) ([]Session, error) {
 		}
 		entry := Session{
 			Kind: KindOrphaned, Running: true, Ticket: pane.Ticket, Stage: pane.Stage, Worker: pane.Worker,
+			Reconciliation: ReconciliationOrphaned,
+			AgentID:        pane.AgentID, AgentInstance: pane.AgentInstance,
 			Engine: pane.Engine, FeatureDir: pane.FeatureDir, Attention: pane.Attention, Lifecycle: pane.Lifecycle,
-			LifecycleSince: pane.LifecycleSince, StateChangeSeq: pane.StateChangeSeq,
+			AttentionSource: pane.AttentionSource, LifecycleSource: pane.LifecycleSource,
+			AttentionSince:    pane.AttentionSince,
+			ObservedLifecycle: pane.ObservedLifecycle, ObservationSource: pane.ObservationSource,
+			ObservationSince: pane.ObservationSince,
+			DisplayTitle:     pane.DisplayTitle,
+			LifecycleSince:   pane.LifecycleSince, StateChangeSeq: pane.StateChangeSeq,
 			Target: &Target{Backend: pane.Backend, Session: pane.Session, Window: pane.Window, Pane: pane.ID},
 		}
 		if entry.Engine == "" {
@@ -277,6 +361,45 @@ func Collect(root string, opts Options) ([]Session, error) {
 		return lastActive(out[i]).After(lastActive(out[j]))
 	})
 	return out, nil
+}
+
+func reconcileFeature(feature *featurelist.Feature, pane *mux.Pane, liveSessions []telemetry.Live) string {
+	if feature == nil || feature.State == nil {
+		return ReconciliationUnknown
+	}
+	agent := feature.State.Runtime.Agent
+	if agent == nil || agent.ID == "" || agent.Instance == "" {
+		return ReconciliationUnknown
+	}
+	if pane != nil {
+		target, configured := feature.State.Runtime.MuxTarget(feature.State.Stage.Name)
+		if configured && (!backendMatches(target.Backend, pane.Backend) || target.Workspace != pane.Session || target.Tab != pane.Window || (target.Pane != "" && target.Pane != pane.ID)) {
+			return ReconciliationUnknown
+		}
+		if pane.AgentID == agent.ID && pane.AgentInstance == agent.Instance {
+			return ReconciliationLive
+		}
+		if pane.AgentID == "" || pane.AgentInstance == "" {
+			return ReconciliationUnknown
+		}
+		return ReconciliationReplaced
+	}
+	if agent.ProviderSessionID == "" {
+		return ReconciliationOrphaned
+	}
+	matches := 0
+	for _, live := range liveSessions {
+		if live.ProviderSessionID == agent.ProviderSessionID && engineMatches(agent.Engine, live.Engine) {
+			matches++
+		}
+	}
+	if matches == 1 {
+		return ReconciliationResumable
+	}
+	if matches > 1 {
+		return ReconciliationUnknown
+	}
+	return ReconciliationOrphaned
 }
 
 func durableRepositories(repos map[string]state.Repo) []Repository {
@@ -343,7 +466,7 @@ func matchFeaturePane(feature *featurelist.Feature, panes []mux.Pane, used map[s
 	target, configured := s.Runtime.MuxTarget(s.Stage.Name)
 	if configured && target.Pane != "" {
 		for i := range panes {
-			if !used[panes[i].ID] && panes[i].ID == target.Pane && backendMatches(target.Backend, panes[i].Backend) {
+			if !used[panes[i].ID] && panes[i].ID == target.Pane && panes[i].Session == target.Workspace && panes[i].Window == target.Tab && backendMatches(target.Backend, panes[i].Backend) {
 				return &panes[i]
 			}
 		}

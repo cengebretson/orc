@@ -80,6 +80,11 @@ sequence. State reads and captures never acknowledge it.
 Authoritative hook-published `blocked` and unseen `done` transitions use
 `settings.notify`; duplicate events and acknowledgements do not notify again.
 
+When hooks are missing, the rail can use conservative title and bounded-screen
+rules without promoting terminal text to control state. See
+[Tmux fallback detection](agent-detection.md) for precedence, local versioned
+overrides, debounce behavior, and safety boundaries.
+
 `orc sessions resume` continues the selected provider in the foreground. The
 popup therefore remains open for the resumed session's lifetime. Use a normal
 pane when that is more convenient:

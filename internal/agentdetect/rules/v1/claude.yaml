@@ -1,0 +1,26 @@
+version: 1
+engine: claude
+rules:
+  - id: title-working-spinner
+    source: title
+    lifecycle: working
+    priority: 1050
+    pattern: '[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏·✢✳✶✻✽]'
+  - id: title-idle
+    source: title
+    lifecycle: idle
+    priority: 100
+    pattern: '(?i)^claude(?: code)?$'
+  - id: screen-permission-request
+    source: screen
+    lifecycle: blocked
+    attention: blocked
+    priority: 900
+    region_lines: 24
+    pattern: '(?i)(do you want to proceed|allow this command|yes, and do not ask again)'
+  - id: screen-working
+    source: screen
+    lifecycle: working
+    priority: 500
+    region_lines: 12
+    pattern: '(?i)(esc to interrupt|ctrl[+]c to interrupt)'

@@ -184,3 +184,25 @@ writes are serialized and skipped when nothing changes; changing the policy
 invalidates obsolete decisions. If policy state cannot be read or saved, Live
 keeps every ticket visible and shows a warning. Invalid state is quarantined and
 recreated.
+
+## Runtime reconciliation
+
+Managed session inventory reports one reconciliation state for durable agent
+identity:
+
+- `live` — exact backend target and agent instance match.
+- `resumable` — no live instance matches, but the recorded provider session is available.
+- `replaced` — the target contains a different identified instance.
+- `orphaned` — neither the target nor provider resume identity is available.
+- `unknown` — identity evidence is incomplete or contradictory.
+
+Replacement panes do not contribute lifecycle, attention, or provider
+telemetry to the recorded agent. `orc ctl status` includes reconciliation
+counts alongside each session's classification.
+
+Manual parking now requires `live` reconciliation and recognized authoritative
+lifecycle state. The parking snapshot records the exact agent and instance.
+Restoration creates a fresh instance, clears inherited lifecycle and fallback
+metadata before launch, resumes the provider identity, and waits for a provider
+hook transition before updating durable runtime state. Screen-derived state is
+never sufficient to park or declare restoration successful.

@@ -1,0 +1,32 @@
+version: 1
+engine: codex
+rules:
+  - id: title-action-required
+    source: title
+    lifecycle: blocked
+    attention: blocked
+    priority: 1100
+    pattern: '(?i)action required'
+  - id: title-working-spinner
+    source: title
+    lifecycle: working
+    priority: 1050
+    pattern: '[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]'
+  - id: title-idle
+    source: title
+    lifecycle: idle
+    priority: 100
+    pattern: '(?i)^codex(?: cli)?$'
+  - id: screen-command-approval
+    source: screen
+    lifecycle: blocked
+    attention: blocked
+    priority: 900
+    region_lines: 24
+    pattern: '(?i)(would you like to run|press enter to confirm)'
+  - id: screen-working
+    source: screen
+    lifecycle: working
+    priority: 500
+    region_lines: 12
+    pattern: '(?i)(esc to interrupt|working[.]{3})'

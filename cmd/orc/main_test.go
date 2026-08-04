@@ -247,6 +247,15 @@ func TestRunCtlStatusAggregatesSessionsAndAttention(t *testing.T) {
 	}
 }
 
+func TestCtlStatusIgnoresPresentationOnlyAttention(t *testing.T) {
+	if ctlSessionNeedsAttention(sessionlist.Session{Status: "active", Attention: "blocked", AttentionSource: "screen", ObservedLifecycle: "blocked"}) {
+		t.Fatal("screen-derived attention affected structured status")
+	}
+	if !ctlSessionNeedsAttention(sessionlist.Session{Status: "active", Attention: "blocked", AttentionSource: "hook", Lifecycle: "blocked"}) {
+		t.Fatal("authoritative blocked state did not affect structured status")
+	}
+}
+
 func TestRunCtlAgentWatchEmitsOnlyTransitions(t *testing.T) {
 	resetCommandGlobals(t)
 	globalWorkspace = mutableFixtureWorkspace(t)

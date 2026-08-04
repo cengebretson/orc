@@ -74,6 +74,8 @@ type row struct {
 	pane            string
 	tmuxState       string
 	attention       string
+	attentionSource string
+	attentionSince  time.Time
 	parked          bool
 	woken           bool
 	wakeReason      string
@@ -90,6 +92,9 @@ type row struct {
 	lastActive      time.Time
 	lifecycleSince  time.Time
 	stateChangeSeq  uint64
+	lifecycleSource string
+	reconciliation  string
+	displayTitle    string
 	stuckAfter      time.Duration
 	contextTrend    []uint64
 	flashUntil      time.Time

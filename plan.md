@@ -17,6 +17,11 @@ notifications, archive cleanup, and structured `orc ctl` state, prompt, wait,
 watch, status, and terminal capture. Live views also support opt-in reversible
 parking without stopping sessions or changing worktrees.
 
+The tmux-first Super Orc plan is shipped: exact agent identity, provider hooks,
+structured lifecycle control, safe prompting, the managed attention rail,
+conservative fallback detection, and runtime reconciliation now share the same
+backend-neutral inventory.
+
 Release `v0.16.1` successfully published macOS and Linux archives plus
 checksums. See `CHANGELOG.md` for the complete shipped history.
 
@@ -24,29 +29,12 @@ checksums. See `CHANGELOG.md` for the complete shipped history.
 
 Work in this order:
 
-1. Deliver the tmux-first agent orchestration phases in `super-orc.md`:
-   identity and events, hook installation, lifecycle control, safe prompting,
-   the managed rail, and restoration/fallback hardening.
-2. Ship Orc as an additive Herdr plugin.
-3. Harden release validation so GoReleaser template failures are caught before
+1. Ship Orc as an additive Herdr plugin.
+2. Harden release validation so GoReleaser template failures are caught before
    a tag is pushed.
-4. Add `CONTEXT.md`, the project glossary.
+3. Add `CONTEXT.md`, the project glossary.
 
-The hook installer and conservative attention fallback previously listed here
-are now phases 2 and 6 of `super-orc.md`; that specification is authoritative
-for their agent identity, lifecycle, safety, and verification requirements.
-
-## 1. Deliver Super Orc
-
-Implement `super-orc.md` in its stated phase order. tmux remains Orc's portable
-default and receives the richer agent-control experience. Herdr remains an
-optional backend and behavioral reference.
-
-Do not treat this item as a single release-sized change. Each phase must retain
-backward compatibility, pass its own acceptance criteria, and leave existing
-tmux and Herdr workspaces usable.
-
-## 2. Ship Orc as a Herdr plugin
+## 1. Ship Orc as a Herdr plugin
 
 Package Orc as a thin Herdr UI adapter. The plugin must remain additive: Orc
 cannot require Herdr, and Herdr cannot become the owner of workflow state.
@@ -75,66 +63,7 @@ Acceptance:
   currently focused human view by accident.
 - A normal Orc workspace remains fully usable when Herdr is absent.
 
-### Super Orc phase 2 reference: agent hook installer
-
-tmux attention currently depends on separately installed hooks. Orc should own
-an idempotent installer for supported agent CLIs.
-
-Command surface:
-
-```text
-orc doctor --install-agent-hooks
-orc doctor --install-agent-hooks --dry-run
-```
-
-Deliverables:
-
-- Add `internal/agenthooks` integrations matching supported worker engines.
-  Each integration reports presence, detected version, install/uninstall
-  support, and observable states.
-- Emit Orc's existing `@agent_attention` values: `input`, `blocked`, `review`,
-  and `done`.
-- Resolve agent configuration locations per invocation, including
-  `CLAUDE_CONFIG_DIR`.
-- Preserve unparseable user configuration byte-for-byte and report a failure.
-- For Codex, enable the hooks feature but leave approval hashes to the user;
-  explain that state remains blank until the hooks are approved.
-- Report `installed`, `already up to date`, `skipped`, or `failed`, and surface
-  hook health in ordinary `orc doctor` output.
-
-Verification:
-
-- Unit-test config detection, idempotence, malformed inputs, and dry runs.
-- Add a manual `make verify-agents` gate that drives installed agents in an
-  isolated tmux/config environment and confirms observable transitions.
-- Treat an agent that cannot authenticate in the sandbox as skipped, not
-  failed.
-
-### Super Orc phase 6 reference: conservative attention fallback
-
-This fallback is for tmux-backed agents that provide no hook state. It is not a
-second lifecycle authority and must never advance durable workflow state.
-
-Deliverables:
-
-- Surface `@agent_attention_since` in the rail, including age and a visibly
-  stuck state for implausibly long blocks.
-- Mark inferred values with `@agent_attention_source=screen`; inferred values
-  may never overwrite hook-reported values.
-- Decide and document whether `internal/sessionlist` uses pane state or the
-  window rollup so the CLI and rail do not silently disagree.
-- Store detection rules in versioned, per-engine data files with priorities and
-  bounded screen regions. Do not hardcode UI signatures in Go.
-- Debounce working-to-idle transitions and publish explicit `unknown` when an
-  agent is present but unclassifiable.
-- Ship rules in the binary with optional workspace overrides; do not fetch a
-  detector catalog over the network.
-
-Screen-derived attention is presentation metadata only. `orc ctl`, completion,
-and stage transitions continue to use recognized backend lifecycle or durable
-state, never terminal text.
-
-## 3. Harden release validation
+## 2. Harden release validation
 
 The `v0.16.0` tag reached GitHub before GoReleaser rejected the build-date
 template. `v0.16.1` fixed the template and released successfully, but the same
@@ -156,7 +85,7 @@ Acceptance:
 - A broken GoReleaser template fails locally and in CI before a tag is created.
 - Snapshot validation cannot create or modify a GitHub release.
 
-## 4. Add the project glossary
+## 3. Add the project glossary
 
 Create `CONTEXT.md` with concise, implementation-independent definitions for
 stage, loop stage, worker, pack, feature folder, runtime, jit, park, attention,

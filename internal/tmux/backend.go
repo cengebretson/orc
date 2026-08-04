@@ -20,6 +20,7 @@ var _ mux.AgentLaunchBackend = Backend{}
 var _ mux.AgentControlBackend = Backend{}
 var _ mux.AgentAcknowledgeBackend = Backend{}
 var _ mux.TerminalCaptureBackend = Backend{}
+var _ mux.FallbackObservationBackend = Backend{}
 
 // Name identifies this backend.
 func (Backend) Name() string { return "tmux" }
@@ -43,6 +44,10 @@ func (Backend) ListSessions() []string { return ListSessions() }
 
 // ListPanes returns every live pane with its Orc metadata.
 func (Backend) ListPanes() ([]mux.Pane, error) { return ListPanesDetailed() }
+
+func (Backend) ObserveFallback(root string, panes []mux.Pane) ([]mux.Pane, error) {
+	return ObserveFallback(root, panes)
+}
 
 // ResolvePane returns the one safe pane target in a window.
 func (Backend) ResolvePane(session, window string) (string, error) {

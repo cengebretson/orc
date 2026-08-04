@@ -349,7 +349,7 @@ func (b Backend) ListPanes() ([]mux.Pane, error) {
 				Backend: "herdr", ID: pane.PaneID, Session: workspace.WorkspaceID, Window: pane.TabID,
 				CWD: firstNonEmpty(pane.ForegroundCWD, pane.CWD), Agent: pane.Agent != "",
 				Engine: pane.Agent, ProviderEngine: pane.Agent, Attention: attention,
-				Lifecycle: pane.AgentStatus,
+				AttentionSource: "native", Lifecycle: pane.AgentStatus, LifecycleSource: "native",
 			}
 			if pane.AgentSession.Value != "" {
 				entry.ProviderSessionID = pane.AgentSession.Value
@@ -358,6 +358,8 @@ func (b Backend) ListPanes() ([]mux.Pane, error) {
 			entry.Stage = pane.token("stage")
 			entry.Worker = pane.token("worker")
 			entry.FeatureDir = pane.token("feature_dir")
+			entry.AgentID = pane.token("agent_id")
+			entry.AgentInstance = pane.token("agent_instance")
 			out = append(out, entry)
 		}
 	}
@@ -809,6 +811,7 @@ func (b Backend) reportPaneMetadata(pane string, meta mux.Metadata) error {
 
 func appendTokens(args []string, meta mux.Metadata) []string {
 	values := map[string]string{
+		"agent_id": meta.AgentID, "agent_instance": meta.AgentInstance,
 		"ticket": meta.Ticket, "stage": meta.Stage, "worker": meta.Worker,
 		"engine": meta.Engine, "provider_session": meta.ProviderSessionID,
 		"feature_dir": meta.FeatureDir, "workflow": meta.Workflow,

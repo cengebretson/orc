@@ -25,6 +25,9 @@ var paneFormat = strings.Join([]string{
 	"#{@orc_agent_state_since}", "#{@orc_agent_state_source}",
 	"#{@agent_attention}", "#{@agent_attention_since}",
 	"#{@orc_agent_seen_seq}",
+	"#{pane_title}", "#{@orc_agent_observed_state}",
+	"#{@orc_agent_observed_source}", "#{@orc_agent_observed_since}",
+	"#{@orc_agent_observed_rule}", "#{@agent_attention_source}",
 }, "\t")
 
 // windowPanes returns the panes of one window. A missing server or window is
@@ -80,6 +83,17 @@ func parseDetailedPanes(out []byte) []mux.Pane {
 		if len(fields) >= 23 {
 			seenSequence, _ = strconv.ParseUint(fields[22], 10, 64)
 		}
+		title, observedLifecycle, observationSource, observationRule := "", "", "", ""
+		var observationSince int64
+		attentionSource := ""
+		if len(fields) >= 29 {
+			title = fields[23]
+			observedLifecycle = normalizeLifecycle(fields[24])
+			observationSource = fields[25]
+			observationSince, _ = strconv.ParseInt(fields[26], 10, 64)
+			observationRule = fields[27]
+			attentionSource = fields[28]
+		}
 		attention := normalizeAttention(fields[20])
 		if seenSequence >= sequence && sequence > 0 {
 			attention = ""
@@ -97,7 +111,9 @@ func parseDetailedPanes(out []byte) []mux.Pane {
 			ProviderEngine: fields[13], ProviderSessionID: fields[14],
 			FeatureDir: fields[15], Lifecycle: lifecycle,
 			StateChangeSeq: sequence, LifecycleSince: lifecycleSince, LifecycleSource: fields[19],
-			Attention: attention, AttentionSince: attentionSince, SeenSeq: seenSequence,
+			Attention: attention, AttentionSource: attentionSource, AttentionSince: attentionSince, SeenSeq: seenSequence,
+			Title: title, ObservedLifecycle: observedLifecycle, ObservationSource: observationSource,
+			ObservationSince: observationSince, ObservationRule: observationRule,
 		})
 	}
 	return panes

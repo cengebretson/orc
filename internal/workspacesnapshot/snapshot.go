@@ -29,14 +29,23 @@ type Snapshot struct {
 // Workspace interfaces. Feature contains durable state and resolved workspace
 // metadata; Live and Context contain the current runtime observation.
 type WorkItem struct {
-	Feature        *featurelist.Feature
-	Live           telemetry.Live
-	HasTelemetry   bool
-	Context        contextpressure.Pressure
-	Attention      string
-	Lifecycle      string
-	LifecycleSince time.Time
-	StateChangeSeq uint64
+	Feature           *featurelist.Feature
+	Live              telemetry.Live
+	HasTelemetry      bool
+	Context           contextpressure.Pressure
+	Attention         string
+	Lifecycle         string
+	LifecycleSince    time.Time
+	StateChangeSeq    uint64
+	HasRuntime        bool
+	AttentionSource   string
+	AttentionSince    time.Time
+	LifecycleSource   string
+	ObservedLifecycle string
+	ObservationSource string
+	ObservationSince  time.Time
+	Reconciliation    string
+	DisplayTitle      string
 }
 
 func Load(root string) (*Snapshot, error) {
@@ -78,7 +87,10 @@ func LoadItemsWithMux(root string, cfg *config.Config, allWorkers []*workers.Wor
 	if err != nil {
 		return nil, fmt.Errorf("loading features: %w", err)
 	}
-	runtimeByFeature := sessionlist.ManagedRuntimeWithMux(root, features, backend)
+	runtimeByFeature, err := sessionlist.CollectManagedRuntimeWithMux(root, features, backend)
+	if err != nil {
+		return nil, fmt.Errorf("loading live runtime: %w", err)
+	}
 	thresholds := cfg.ContextPressureThresholds()
 	items := buildItems(features, runtimeByFeature, thresholds)
 	return items, nil
@@ -89,11 +101,24 @@ func buildItems(features []*featurelist.Feature, runtimeByFeature map[string]ses
 	for _, feature := range features {
 		item := &WorkItem{Feature: feature}
 		if runtime, ok := runtimeByFeature[filepath.Clean(feature.FeatureDir)]; ok {
+			item.HasRuntime = true
 			item.Attention = runtime.Attention
+			item.AttentionSource = runtime.AttentionSource
+			if runtime.AttentionSince > 0 {
+				item.AttentionSince = time.Unix(runtime.AttentionSince, 0)
+			}
 			item.Lifecycle = runtime.Lifecycle
+			item.LifecycleSource = runtime.LifecycleSource
+			item.ObservedLifecycle = runtime.ObservedLifecycle
+			item.ObservationSource = runtime.ObservationSource
+			item.Reconciliation = runtime.Reconciliation
+			item.DisplayTitle = runtime.DisplayTitle
 			item.StateChangeSeq = runtime.StateChangeSeq
 			if runtime.LifecycleSince > 0 {
 				item.LifecycleSince = time.Unix(runtime.LifecycleSince, 0)
+			}
+			if runtime.ObservationSince > 0 {
+				item.ObservationSince = time.Unix(runtime.ObservationSince, 0)
 			}
 			if runtime.HasTelemetry {
 				item.Live = runtime.Live

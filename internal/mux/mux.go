@@ -254,11 +254,18 @@ type Pane struct {
 	ProviderSessionID string `json:"provider_session_id,omitempty"`
 	FeatureDir        string `json:"feature_dir,omitempty"`
 	Attention         string `json:"attention,omitempty"`
+	AttentionSource   string `json:"attention_source,omitempty"`
 	Lifecycle         string `json:"lifecycle,omitempty"`
 	LifecycleSource   string `json:"lifecycle_source,omitempty"`
 	StateChangeSeq    uint64 `json:"state_change_seq,omitempty"`
 	SeenSeq           uint64 `json:"seen_seq,omitempty"`
 	LifecycleSince    int64  `json:"lifecycle_since,omitempty"`
+	Title             string `json:"title,omitempty"`
+	DisplayTitle      string `json:"display_title,omitempty"`
+	ObservedLifecycle string `json:"observed_lifecycle,omitempty"`
+	ObservationSource string `json:"observation_source,omitempty"`
+	ObservationRule   string `json:"observation_rule,omitempty"`
+	ObservationSince  int64  `json:"observation_since,omitempty"`
 	// AttentionSince is when the pane entered its current attention state, in
 	// epoch seconds. Zero means the reporter did not say — treat it as unknown
 	// rather than as the epoch.
@@ -435,4 +442,12 @@ type TerminalCaptureBackend interface {
 	Backend
 
 	CaptureTarget(target Target, lines int) (string, error)
+}
+
+// FallbackObservationBackend adds presentation-only observations after the
+// authoritative pane inventory has been read.
+type FallbackObservationBackend interface {
+	Backend
+
+	ObserveFallback(root string, panes []Pane) ([]Pane, error)
 }

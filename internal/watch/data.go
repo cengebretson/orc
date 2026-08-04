@@ -11,6 +11,7 @@ import (
 	"github.com/cengebretson/orc/internal/featurelist"
 	"github.com/cengebretson/orc/internal/mux"
 	"github.com/cengebretson/orc/internal/parking"
+	"github.com/cengebretson/orc/internal/sessionlist"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/workspacesnapshot"
 	tea "github.com/charmbracelet/bubbletea"
@@ -43,18 +44,28 @@ func collectRowsWithMux(root, ticket string, backend mux.Backend) ([]row, error)
 		r := rowFromFeature(f, snapshot.Config)
 		r.stuckAfter = configuredStuckAfter(snapshot.Config)
 		r.context = item.Context
-		if item.Attention != "" {
+		if item.HasRuntime {
 			r.attention = item.Attention
+			r.attentionSource = item.AttentionSource
+			r.attentionSince = item.AttentionSince
 		}
-		if item.Lifecycle != "" {
+		if item.Lifecycle != "" && item.LifecycleSource != "launch" && item.LifecycleSource != "screen" && item.LifecycleSource != "title" {
 			r.liveState = item.Lifecycle
+			r.lifecycleSince = item.LifecycleSince
+			r.lifecycleSource = item.LifecycleSource
+		} else if item.ObservedLifecycle != "" {
+			r.liveState = item.ObservedLifecycle
+			r.lifecycleSince = item.ObservationSince
+			r.lifecycleSource = item.ObservationSource
 		}
-		r.lifecycleSince = item.LifecycleSince
 		r.stateChangeSeq = item.StateChangeSeq
+		r.reconciliation = item.Reconciliation
+		r.displayTitle = item.DisplayTitle
+		r.search = append(r.search, item.Reconciliation, r.lifecycleSource, r.attentionSource, item.DisplayTitle)
 		if item.HasTelemetry {
 			live := item.Live
 			r.providerID = live.ProviderSessionID
-			if item.Lifecycle == "" {
+			if r.liveState == "" {
 				r.liveState = live.State
 			}
 			r.model = live.Model
@@ -72,7 +83,7 @@ func collectRowsWithMux(root, ticket string, backend mux.Backend) ([]row, error)
 		}
 		observations := make([]parking.Observation, 0, len(rows))
 		for _, r := range rows {
-			observations = append(observations, parking.Observation{Ticket: r.ticket, Status: r.status, Stage: r.stageName, Attention: r.attention})
+			observations = append(observations, parking.Observation{Ticket: r.ticket, Status: r.status, Stage: r.stageName, Attention: parkingAttention(r)})
 		}
 		policyErr := applyParkingToRows(rows, path, root, parking.Policy{AutoPark: settings.AutoPark, WakeOn: settings.WakeOn}, observations, time.Now().UTC())
 		if policyErr != nil {
@@ -82,6 +93,13 @@ func collectRowsWithMux(root, ticket string, backend mux.Backend) ([]row, error)
 	}
 	sortRows(rows)
 	return filterRowsByTicket(rows, ticket), nil
+}
+
+func parkingAttention(r row) string {
+	if r.attentionSource == "screen" || r.attentionSource == "title" {
+		return ""
+	}
+	return r.attention
 }
 
 func configuredStuckAfter(cfg *config.Config) time.Duration {
@@ -331,6 +349,18 @@ func displayState(r row) (string, string) {
 	if r.loadErr != nil {
 		return "!", "error"
 	}
+	if r.agentID != "" {
+		switch r.reconciliation {
+		case sessionlist.ReconciliationReplaced:
+			return "↺", "replaced"
+		case sessionlist.ReconciliationResumable:
+			return "↻", "resumable"
+		case sessionlist.ReconciliationOrphaned:
+			return "x", "orphaned"
+		case sessionlist.ReconciliationUnknown:
+			return "?", "unknown"
+		}
+	}
 	switch r.status {
 	case "paused":
 		return "!", "blocked"
@@ -373,6 +403,10 @@ func rowPriority(r row) int {
 		return 3
 	case "stopped":
 		return 4
+	case "replaced", "orphaned", "unknown":
+		return 4
+	case "resumable":
+		return 5
 	case "ready":
 		return 5
 	case "pending":

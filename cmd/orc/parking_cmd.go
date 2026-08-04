@@ -80,6 +80,11 @@ func parkableEntries(sessions []sessionlist.Session) ([]parking.Entry, int) {
 			continue
 		}
 		seen[session.Target.Session] = true
+		if session.Reconciliation != sessionlist.ReconciliationLive || session.Lifecycle == "" || session.Lifecycle == mux.LifecycleUnknown ||
+			(session.Target.Backend == "tmux" && session.LifecycleSource != "hook") {
+			skipped++
+			continue
+		}
 		if session.Live == nil || session.Live.ProviderSessionID == "" {
 			skipped++
 			continue
@@ -95,6 +100,7 @@ func parkableEntries(sessions []sessionlist.Session) ([]parking.Entry, int) {
 		entries = append(entries, parking.Entry{
 			Ticket: session.Ticket, Stage: session.Stage, Worker: session.Worker,
 			Engine: session.Engine, ProviderSessionID: session.Live.ProviderSessionID,
+			AgentID: session.AgentID, AgentInstance: session.AgentInstance,
 			CWD: cwd, FeatureDir: session.FeatureDir,
 			TmuxSession: session.Target.Session, TmuxWindow: session.Target.Window,
 		})
@@ -245,6 +251,19 @@ func unparkEntry(entry parking.Entry) error {
 		return err
 	}
 	if agentRuntime != nil {
+		waiter, ok := muxBackend.(mux.AgentWaitBackend)
+		if !ok {
+			return fmt.Errorf("%s cannot verify restored agent registration", muxBackend.Name())
+		}
+		if _, waitErr := waiter.WaitAgent(mux.Target{
+			Backend: muxBackend.Name(), Workspace: entry.TmuxSession, Tab: entry.TmuxWindow, Pane: pane,
+			AgentID: agentRuntime.ID, AgentInstance: agentRuntime.Instance,
+		}, mux.AgentControlOptions{
+			Until:   []string{mux.LifecycleIdle, mux.LifecycleWorking, mux.LifecycleBlocked, mux.LifecycleDone},
+			Timeout: 10 * time.Second,
+		}); waitErr != nil {
+			return fmt.Errorf("restored provider did not register: %w", waitErr)
+		}
 		err = state.SetMuxAgentRuntime(entry.FeatureDir, state.MuxRuntime{
 			Backend: "tmux", Workspace: entry.TmuxSession, Tab: entry.TmuxWindow, Pane: pane,
 		}, *agentRuntime)
@@ -294,6 +313,10 @@ func restoredPane(entry parking.Entry, panes []mux.Pane) (string, bool) {
 		if !pane.Agent || pane.Session != entry.TmuxSession || pane.Window != entry.TmuxWindow ||
 			pane.Ticket != entry.Ticket || pane.Stage != entry.Stage ||
 			!strings.EqualFold(engine, entry.Engine) || pane.ProviderSessionID != entry.ProviderSessionID {
+			continue
+		}
+		if entry.AgentID != "" && entry.AgentInstance != "" &&
+			(pane.AgentID != entry.AgentID || pane.AgentInstance != entry.AgentInstance) {
 			continue
 		}
 		return pane.ID, true

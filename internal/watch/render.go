@@ -140,15 +140,23 @@ func renderRailRow(r row, selected bool, width int, now time.Time, frame int) st
 const stuckLifecycleAge = 15 * time.Minute
 
 func lifecycleAgeBadge(r row, now time.Time) string {
+	threshold := r.stuckAfter
+	if threshold <= 0 {
+		threshold = stuckLifecycleAge
+	}
+	if r.attention != "" && !r.attentionSince.IsZero() && !r.attentionSince.After(now) {
+		age := now.Sub(r.attentionSince)
+		value := humanDuration(age)
+		if age >= threshold {
+			return "stuck " + value
+		}
+		return value
+	}
 	if r.lifecycleSince.IsZero() || now.IsZero() || r.lifecycleSince.After(now) {
 		return ""
 	}
 	age := now.Sub(r.lifecycleSince)
 	value := humanDuration(age)
-	threshold := r.stuckAfter
-	if threshold <= 0 {
-		threshold = stuckLifecycleAge
-	}
 	if r.liveState == "working" && age >= threshold {
 		return "stuck " + value
 	}

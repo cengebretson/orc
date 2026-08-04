@@ -18,6 +18,8 @@ type Entry struct {
 	Worker            string `json:"worker,omitempty"`
 	Engine            string `json:"engine"`
 	ProviderSessionID string `json:"provider_session_id"`
+	AgentID           string `json:"agent_id,omitempty"`
+	AgentInstance     string `json:"agent_instance,omitempty"`
 	CWD               string `json:"cwd"`
 	FeatureDir        string `json:"feature_dir"`
 	TmuxSession       string `json:"tmux_session"`
