@@ -334,11 +334,8 @@ type detailFile struct {
 	path  string
 }
 
-func New(root string) Model {
-	return NewWithMux(root, nil)
-}
-
 // NewWithMux constructs the workspace UI with a selected multiplexer backend.
+// A nil backend selects the default tmux backend.
 func NewWithMux(root string, backend mux.Backend) Model {
 	if backend == nil {
 		backend = tmux.New()
@@ -366,13 +363,8 @@ func NewWithMux(root string, backend mux.Backend) Model {
 	}
 }
 
-// NewEmbedded constructs the Workspace section for the shared dashboard and
-// suppresses duplicated persistent navigation legends owned by the shell.
-func NewEmbedded(root string) Model {
-	return NewEmbeddedWithMux(root, nil)
-}
-
-// NewEmbeddedWithMux constructs an embedded workspace UI with backend.
+// NewEmbeddedWithMux constructs the Workspace section for the shared dashboard
+// and suppresses duplicated persistent navigation legends owned by the shell.
 func NewEmbeddedWithMux(root string, backend mux.Backend) Model {
 	m := NewWithMux(root, backend)
 	m.embedded = true

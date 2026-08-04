@@ -16,10 +16,6 @@ func (m Model) previewContent() string {
 	return mutedStyle.Render("No item selected.")
 }
 
-func renderRailDetail(r row, width int) string {
-	return renderRailDetailAt(r, width, time.Time{})
-}
-
 func renderRailDetailAt(r row, width int, now time.Time) string {
 	icon, label := displayState(r)
 	var b strings.Builder
@@ -89,10 +85,6 @@ func renderRailDetailAt(r row, width int, now time.Time) string {
 
 func stateBadge(label string) lipgloss.Style {
 	return stateStyle(label).Background(lipgloss.Color("#313244")).Bold(true).Padding(0, 1)
-}
-
-func watchSummary(rows []row) string {
-	return liveOverviewFor(rows, time.Time{}, time.Time{}).summary()
 }
 
 func renderWatchStatusLines(view liveOverviewView, width int) []string {

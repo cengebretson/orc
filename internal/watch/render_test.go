@@ -137,17 +137,19 @@ func TestParkingGroupIsVisibleExpandableAndWokenRowsAreFlagged(t *testing.T) {
 	}
 }
 
-func TestWatchSummaryDistinguishesRuntimePausedAndAttention(t *testing.T) {
+func TestLiveOverviewDistinguishesRuntimePausedAndAttention(t *testing.T) {
 	rows := []row{
 		{status: "active", tmuxState: "live"},
 		{status: "paused", tmuxState: "stopped"},
 	}
-	if got, want := watchSummary(rows), "1 running · 1 paused · 1 needs you"; got != want {
-		t.Fatalf("watchSummary() = %q, want %q", got, want)
+	view := liveOverviewFor(rows, time.Time{}, time.Time{})
+	if view.running != 1 || view.paused != 1 || view.needs != 1 {
+		t.Fatalf("counts = running %d, paused %d, needs %d; want 1, 1, 1", view.running, view.paused, view.needs)
 	}
 	rows[1].status = "active"
-	if got, want := watchSummary(rows), "1 running · 0 paused"; got != want {
-		t.Fatalf("watchSummary() = %q, want %q", got, want)
+	view = liveOverviewFor(rows, time.Time{}, time.Time{})
+	if view.running != 1 || view.paused != 0 {
+		t.Fatalf("counts = running %d, paused %d; want 1, 0", view.running, view.paused)
 	}
 }
 

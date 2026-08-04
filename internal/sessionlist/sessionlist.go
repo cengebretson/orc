@@ -105,32 +105,6 @@ type Options struct {
 	ResolveGit func(string) (gitmeta.Metadata, bool)
 }
 
-// ManagedTelemetry returns optional live provider metadata keyed by feature
-// directory. Discovery failures leave the durable feature list untouched.
-func ManagedTelemetry(root string, features []*featurelist.Feature) map[string]telemetry.Live {
-	return ManagedTelemetryWithMux(root, features, nil)
-}
-
-// ManagedTelemetryWithMux returns provider telemetry using the selected live
-// multiplexer inventory.
-func ManagedTelemetryWithMux(root string, features []*featurelist.Feature, backend mux.Backend) map[string]telemetry.Live {
-	runtime := ManagedRuntimeWithMux(root, features, backend)
-	result := make(map[string]telemetry.Live)
-	for featureDir, observation := range runtime {
-		if observation.HasTelemetry {
-			result[featureDir] = observation.Live
-		}
-	}
-	return result
-}
-
-// ManagedRuntimeWithMux returns authoritative pane lifecycle and optional
-// provider telemetry keyed by feature directory.
-func ManagedRuntimeWithMux(root string, features []*featurelist.Feature, backend mux.Backend) map[string]ManagedRuntime {
-	result, _ := CollectManagedRuntimeWithMux(root, features, backend)
-	return result
-}
-
 // CollectManagedRuntimeWithMux is the strict runtime projection used by live
 // interfaces that must surface malformed local detection overrides.
 func CollectManagedRuntimeWithMux(root string, features []*featurelist.Feature, backend mux.Backend) (map[string]ManagedRuntime, error) {
@@ -162,17 +136,6 @@ func CollectManagedRuntimeWithMux(root string, features []*featurelist.Feature, 
 		result[filepath.Clean(session.FeatureDir)] = observation
 	}
 	return result, nil
-}
-
-func managedTelemetryFromSessions(sessions []Session) map[string]telemetry.Live {
-	result := make(map[string]telemetry.Live)
-	for _, session := range sessions {
-		if session.Kind != KindManaged || session.FeatureDir == "" || session.Live == nil {
-			continue
-		}
-		result[filepath.Clean(session.FeatureDir)] = *session.Live
-	}
-	return result
 }
 
 func Collect(root string, opts Options) ([]Session, error) {

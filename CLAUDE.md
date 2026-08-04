@@ -20,32 +20,62 @@ when a definition changes.
 
 ```
 orc/
-  cmd/orc/main.go                 CLI entry point (Cobra)
+  cmd/orc/                        CLI entry point and command handlers (Cobra)
   internal/
+    ── workflow and durable state ──
     config/                       orc.yaml parsing — repos, workflows, loop stages, settings
-    doctor/                       workspace + local tool readiness checks
-    featurelist/                  shared feature collection for CLI status and Workspace rows
-    report/                       time-in-stage derivation from STATE.yaml history
-    health/                       workspace filesystem health checks
-    orchestrator/                 launch, transition, and archive services
-    runner/                       next-action resolution — worker, prompt, launch args
-    state/                        STATE.yaml parsing and mutations
+    state/                        STATE.yaml parsing and atomic mutations
     ticket/                       ticket lookup and load helpers
-    ticketview/                   single-ticket display/runtime summary
     workers/                      worker definition parsing
     stage/                        stage markdown file reading
-    resume/                       recovery prompt builder
-    validate/                     per-ticket state validation
-    tmux/                         tmux session management
-    tui/                          Bubble Tea dashboard
     workspace/                    init, work, and template embedding
       templates/                  embedded workspace scaffold templates
     workspacectx/                 loads a workspace root into a shared Context (config + workers), with a validated variant
+    orchestrator/                 launch, transition, and archive services
+    runner/                       next-action resolution — worker, prompt, launch args
+    resume/                       recovery prompt builder
+    parking/                      reversible park/restore policy for live sessions
+    ── validation and health ──
+    validate/                     per-ticket state validation
+    doctor/                       workspace + local tool readiness checks
+    health/                       workspace filesystem health checks
+    artifactcheck/                stage artifact presence and change detection
+    worktreecheck/                worktree ownership and drift checks
+    worktreesetup/                worktree creation and repo wiring
+    ── multiplexer seam ──
+    mux/                          the terminal multiplexer seam (Backend interface, Target, Metadata)
+      muxtest/                    fake backend for tests
+    tmux/                         tmux backend — sessions, panes, metadata, watch rail
+    herdr/                        Herdr backend using the herdr CLI
+    ── agent identity and lifecycle ──
+    agentidentity/                opaque IDs for durable agents and live instances
+    agenthooks/                   installs/inspects Orc-owned Codex and Claude lifecycle hooks
+    agentdetect/                  conservative, presentation-only terminal fallback rules
+    telemetry/                    provider session discovery (Claude/Codex JSONL)
+    ── read models ──
+    featurelist/                  shared feature collection for CLI status and Workspace rows
+    ticketview/                   single-ticket display/runtime summary
+    sessionlist/                  joins durable state with live sessions — managed/orphan/unmanaged
+    workspacesnapshot/            one immutable view of the workspace for a render pass
+    report/                       time-in-stage derivation from STATE.yaml history
+    gitmeta/                      bounded, best-effort repository metadata
+    contextpressure/              classifies provider context usage for presentation
+    ── terminal UI ──
+    dashboard/                    composes watch (Live) and workspaceui into one Bubble Tea shell
+    watch/                        the Live watch rail model
+    workspaceui/                  Features/Workflows/Workers/Repositories/Health models
+    sessionpicker/                interactive provider-session chooser
+    ui/                           terminal presentation primitives shared by the above
+    searchmatch/                  shared presentation-only filter matching
+    notify/                       optional user-configured command run after transitions
   scripts/
     pre-commit                    tidy → fmt → lint → test (symlink to .git/hooks/pre-commit)
+    release-check                 non-publishing release validation (make release-check)
   docs/
     workflows.md                  workspace workflow configuration reference
     reference.md                  deep reference — layout, files, orc.yaml, STATE.yaml, workers
+    sessions.md, tmux.md, herdr.md, watch.md, agent-detection.md, release.md
+  CONTEXT.md                      authoritative glossary for Orc's domain vocabulary
   go.mod
   Makefile
   plan.md                         roadmap — unshipped work only

@@ -378,6 +378,14 @@ Live rail; `orc dashboard` starts in Live. Press `?` for navigation help.
 
 ## Commands
 
+### Global flags
+
+Available on every command:
+
+- `--workspace <path>` — workspace root (default: current directory)
+- `--mux <tmux|herdr>` — terminal multiplexer backend (default: the runtime recorded in `STATE.yaml`, then tmux).
+  See **[docs/herdr.md](docs/herdr.md)**.
+
 ### Human commands
 
 - `orc init` — scaffold a new workspace
@@ -440,7 +448,8 @@ Live rail; `orc dashboard` starts in Live. Press `?` for navigation help.
   - `p` — expand or collapse automatically parked work
   - `--view pet` — start directly in the Tamagotchi-style pet view
   - `--pet-layout column` — start with one pet card per row
-  - `--tmux-toggle` — open or close the watch rail beside the current tmux pane
+  - `--tmux-toggle` — legacy alias for `orc rail toggle`; delegates to the same managed rail
+    (`--tmux-layout` and `--tmux-size` map to the rail's `--layout` and `--size`). Prefer `orc rail`.
   - `--wide` — render the wider table layout
 - `orc rail open|close|toggle` — manage one proven Orc-owned `orc watch` pane in the current tmux window; defaults to a focus-preserving 64-column right split
 - `orc rail collapse|expand|toggle-collapsed` — resize that live pane between a five-column state strip and its previous mouse-adjusted size
@@ -466,6 +475,11 @@ Agents call these commands when their durable work state changes. They are hidde
 - `orc mark <ticket> pause "<reason>"` — pause for human input, approval, or an external blocker
 - `orc mark <ticket> done` — mark active, ready, or paused work as done
 - `orc mark <ticket> jit "<summary>"` — record a jit task as complete and clear `runtime.jit`
+
+`orc agent-event` is also hidden. It is called by the Orc-owned Codex and Claude lifecycle
+hooks (installed via `orc doctor --install-agent-hooks`), not by agents directly, and records
+an authoritative lifecycle transition for an exact agent instance. See
+**[docs/agent-detection.md](docs/agent-detection.md)**.
 
 ### Structured control
 

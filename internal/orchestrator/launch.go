@@ -86,11 +86,6 @@ func NewLauncher() Launcher {
 	}
 }
 
-func Launch(opts LaunchOptions) (*LaunchResult, error) {
-	launcher := NewLauncher()
-	return launcher.Launch(opts)
-}
-
 func (l Launcher) Launch(opts LaunchOptions) (*LaunchResult, error) {
 	if opts.State == nil {
 		return nil, fmt.Errorf("state is required")

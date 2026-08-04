@@ -20,68 +20,6 @@ func healthIconStyle(s doctor.Status) (string, lipgloss.Style) {
 	}
 }
 
-// renderHealthLines renders health items grouped by their Group field.
-// Items with no group flow together on wrapped rows. Each new group gets a
-// header line and its items indented on their own wrapped rows below it.
-func (m Model) renderHealthLines(maxW int) []string {
-	sep := styleDivider.Render("  ·  ")
-	sepW := lipgloss.Width(sep)
-	indent := "  "
-	indentW := 2
-
-	flushRow := func(rows *[]string, row string) {
-		if row != "" {
-			*rows = append(*rows, row)
-		}
-	}
-
-	var rows []string
-	row := ""
-	rowW := 0
-	currentGroup := ""
-
-	for _, item := range m.data.healthItems {
-		icon, s := healthIconStyle(item.Status)
-		part := s.Render(icon + " " + strings.TrimSpace(item.Name))
-
-		// group boundary — flush current row and emit header
-		if item.Group != currentGroup {
-			flushRow(&rows, row)
-			row = ""
-			rowW = 0
-			currentGroup = item.Group
-			if currentGroup != "" {
-				rows = append(rows, styleDim.Render(currentGroup))
-			}
-		}
-
-		prefix := ""
-		prefixW := 0
-		if currentGroup != "" {
-			prefix = indent
-			prefixW = indentW
-		}
-
-		pW := lipgloss.Width(part)
-		if rowW > 0 && rowW+sepW+pW > maxW {
-			flushRow(&rows, row)
-			row = prefix
-			rowW = prefixW
-		}
-		if rowW > prefixW {
-			row += sep
-			rowW += sepW
-		} else if rowW == 0 {
-			row = prefix
-			rowW = prefixW
-		}
-		row += part
-		rowW += pW
-	}
-	flushRow(&rows, row)
-	return rows
-}
-
 // healthSummaryExtra renders a compact "N ✗  M ⚠" badge of non-OK checks for
 // the collapsed Health summary, or "" when everything is healthy.
 func (m Model) healthSummaryExtra() string {

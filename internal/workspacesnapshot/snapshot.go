@@ -48,11 +48,8 @@ type WorkItem struct {
 	DisplayTitle      string
 }
 
-func Load(root string) (*Snapshot, error) {
-	return LoadWithMux(root, nil)
-}
-
 // LoadWithMux builds a snapshot from the selected multiplexer backend.
+// A nil backend selects the default tmux backend.
 func LoadWithMux(root string, backend mux.Backend) (*Snapshot, error) {
 	ctx, err := workspacectx.Load(root)
 	if err != nil {
@@ -70,13 +67,9 @@ func LoadWithMux(root string, backend mux.Backend) (*Snapshot, error) {
 	}, nil
 }
 
-// LoadItems refreshes durable feature state and live session telemetry without
-// rerunning the slower workspace health checks used by a full Snapshot.
-func LoadItems(root string, cfg *config.Config, allWorkers []*workers.Worker) ([]*WorkItem, error) {
-	return LoadItemsWithMux(root, cfg, allWorkers, nil)
-}
-
-// LoadItemsWithMux refreshes items using the selected multiplexer backend.
+// LoadItemsWithMux refreshes durable feature state and live session telemetry
+// using the selected multiplexer backend, without rerunning the slower
+// workspace health checks used by a full Snapshot.
 func LoadItemsWithMux(root string, cfg *config.Config, allWorkers []*workers.Worker, backend mux.Backend) ([]*WorkItem, error) {
 	features, err := featurelist.Collect(root, featurelist.Options{
 		IncludeArchived: true,

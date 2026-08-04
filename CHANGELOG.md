@@ -52,6 +52,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   into an expandable `Parked (n)` group without stopping any session, while
   status, attention, or stage changes wake and visibly flag the ticket.
 
+### Fixed
+
+- `orc mark --help` and `orc help-all` now list the `jit` verb, which the
+  command has always accepted but never advertised.
+
+### Changed
+
+- Documented the global `--workspace` and `--mux` flags, the hook-invoked
+  `orc agent-event` command, and `orc watch --tmux-toggle`'s status as a legacy
+  alias for `orc rail toggle` in `README.md`.
+- Removed unreferenced internal helpers left behind by the `mux.Backend`
+  refactor (`sessionlist.ManagedTelemetry`, `watch.Focus`,
+  `workspacesnapshot.LoadItems`, `tmux.SendCommand`, `runner.ResolveWorkflow`,
+  `ticket.ResolveWithArchive`, and `health.Print`). No user-facing behavior
+  changed.
+
 ## [0.16.1] - 2026-08-02
 
 ### Fixed

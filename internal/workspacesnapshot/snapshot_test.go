@@ -18,7 +18,7 @@ func TestLoadReturnsInvalidConfigErrorInsteadOfPanicking(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "orc.yaml"), []byte("unknown_key: true\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	_, err := Load(root)
+	_, err := LoadWithMux(root, nil)
 	if err == nil || !strings.Contains(err.Error(), "unknown_key") {
 		t.Fatalf("Load error = %v, want unknown-key configuration error", err)
 	}

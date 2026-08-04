@@ -49,13 +49,6 @@ func CreateSession(slug, featureDir string, workflows []string) error {
 	return nil
 }
 
-// SendCommand sends a shell command to a window in the session, creating the window if needed.
-// runDir is the working directory the command should execute from.
-func SendCommand(session, window, featureDir, runDir string, argv []string) error {
-	_, err := SendCommandTarget(session, window, "", featureDir, runDir, argv)
-	return err
-}
-
 // SendCommandTarget sends a command to an exact pane and returns the pane id.
 // When pane is empty, a single pane (or a single pane marked @orc_agent) must
 // identify the target; ambiguous windows are rejected rather than guessed.

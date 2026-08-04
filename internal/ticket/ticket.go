@@ -27,10 +27,6 @@ func Resolve(root, query string) (string, error) {
 	return state.FindFeatureDir(root, query)
 }
 
-func ResolveWithArchive(root, query string) (string, error) {
-	return state.FindFeatureDirWithArchive(root, query)
-}
-
 func load(featureDir string) (*Ticket, error) {
 	s, err := state.Load(featureDir)
 	if err != nil {

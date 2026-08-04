@@ -44,24 +44,6 @@ func renderWorkerGroups(groups []workerGroup, maxW int) []string {
 	return lines
 }
 
-func renderWorkflowGroups(groups []workflowGroup, maxW int) []string {
-	var lines []string
-	for _, group := range groups {
-		if len(group.items) == 0 {
-			continue
-		}
-		lines = append(lines, styleDim.Render(group.name))
-		var names []string
-		for _, item := range group.items {
-			names = append(names, item.label)
-		}
-		for _, line := range renderNameList(maxW-2, names) {
-			lines = append(lines, "  "+line)
-		}
-	}
-	return lines
-}
-
 func renderWorkflowChainGroups(chains []workflowChain, maxW int) []string {
 	grouped := map[string][]workflowChain{}
 	for _, chain := range chains {

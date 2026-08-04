@@ -14,10 +14,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-func loadData(root string) tea.Cmd {
-	return loadDataWithMux(root, nil)
-}
-
 func loadDataWithMux(root string, backend mux.Backend) tea.Cmd {
 	return func() tea.Msg {
 		snapshot, err := workspacesnapshot.LoadWithMux(root, backend)

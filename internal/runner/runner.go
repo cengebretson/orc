@@ -89,13 +89,8 @@ func Compute(root, featureDir, workerOverride string) (*Plan, error) {
 	return plan, nil
 }
 
-// ResolveWorkflow returns the ticket's workflow name, using the workspace default if unset.
+// resolveWorkflow returns the ticket's workflow name, using the workspace default if unset.
 // Returns an error if the resolved workflow is not defined in orc.yaml.
-// Exported so callers that already have a config can avoid a second load.
-func ResolveWorkflow(cfg *config.Config, ticketWorkflow string) (string, error) {
-	return resolveWorkflow(cfg, ticketWorkflow)
-}
-
 func resolveWorkflow(cfg *config.Config, ticketWorkflow string) (string, error) {
 	name := ticketWorkflow
 	if name == "" {

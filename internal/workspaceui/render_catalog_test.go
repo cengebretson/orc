@@ -301,14 +301,12 @@ func TestRenderWorkflowGroups(t *testing.T) {
 		{name: "hotfix", items: []sectionItem{{label: "standard", id: "hotfix:standard"}}},
 	}
 
-	collapsed := ansi.Strip(strings.Join(renderWorkflowGroups(groups, 80), "\n"))
+	focused := ansi.Strip(strings.Join(renderGroupedWorkflowList(groups, 2), "\n"))
 	for _, want := range []string{"default", "standard", "release", "hotfix"} {
-		if !strings.Contains(collapsed, want) {
-			t.Fatalf("collapsed workflow groups missing %q:\n%s", want, collapsed)
+		if !strings.Contains(focused, want) {
+			t.Fatalf("grouped workflow list missing %q:\n%s", want, focused)
 		}
 	}
-
-	focused := ansi.Strip(strings.Join(renderGroupedWorkflowList(groups, 2), "\n"))
 	if !strings.Contains(focused, "standard (hotfix:standard)") {
 		t.Fatalf("focused workflow groups should include dim canonical id:\n%s", focused)
 	}
@@ -354,7 +352,7 @@ func firstLineContaining(s, needle string) string {
 // ── model filtering ──────────────────────────────────────────────
 
 func TestVisibleFeatures(t *testing.T) {
-	m := New("")
+	m := NewWithMux("", nil)
 	m.data.features = []*featureRow{
 		testRow("STORY-1", "active", "develop"),
 		testRow("STORY-2", "archived", "done"),

@@ -303,24 +303,24 @@ func TestWatchHelpersUseBoundary(t *testing.T) {
 
 	t.Run("find marked pane", func(t *testing.T) {
 		stubCommands(t, commandResult{output: "%1\t\t\t\n%2\t1\trail\t1\n"})
-		got, err := findWatchPane()
+		got, err := findRailPane()
 		if err != nil || got != "%2" {
-			t.Fatalf("findWatchPane() = %q, %v; want %%2, nil", got, err)
+			t.Fatalf("findRailPane() = %q, %v; want %%2, nil", got, err)
 		}
 	})
 
 	t.Run("find legacy marked pane", func(t *testing.T) {
 		stubCommands(t, commandResult{output: "%2\t\t\t1\n"})
-		got, err := findWatchPane()
+		got, err := findRailPane()
 		if err != nil || got != "%2" {
-			t.Fatalf("findWatchPane() = %q, %v; want legacy %%2, nil", got, err)
+			t.Fatalf("findRailPane() = %q, %v; want legacy %%2, nil", got, err)
 		}
 	})
 
 	t.Run("reject ambiguous ownership", func(t *testing.T) {
 		stubCommands(t, commandResult{output: "%2\t1\trail\t1\n%3\t1\trail\t1\n"})
-		if _, err := findWatchPane(); err == nil {
-			t.Fatal("findWatchPane() error = nil, want ambiguous ownership error")
+		if _, err := findRailPane(); err == nil {
+			t.Fatal("findRailPane() error = nil, want ambiguous ownership error")
 		}
 	})
 

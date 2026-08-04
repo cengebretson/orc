@@ -100,15 +100,16 @@ func TestResponsiveDashboardUsesLiveNarrowAndRestoresWideSection(t *testing.T) {
 }
 
 func TestHealthNavigationLabelShowsWarningBadge(t *testing.T) {
-	if got := navigationLabel(SectionHealth, 2); got != "HEALTH ⚠ 2" {
-		t.Fatalf("navigationLabel(Health) = %q, want warning badge", got)
-	}
 	badge := renderNavigationItem(SectionHealth, 2, false, false)
+	if !strings.Contains(badge, "HEALTH") {
+		t.Fatalf("Health nav item = %q, want HEALTH label", badge)
+	}
 	if !strings.Contains(badge, warningStyle.Render("⚠ 2")) {
 		t.Fatalf("Health warning badge is not yellow: %q", badge)
 	}
-	if got := navigationLabel(SectionHealth, 0); got != "HEALTH" {
-		t.Fatalf("navigationLabel(healthy Health) = %q, want HEALTH", got)
+	healthy := renderNavigationItem(SectionHealth, 0, false, false)
+	if strings.Contains(healthy, "⚠") {
+		t.Fatalf("healthy Health nav item = %q, want no warning badge", healthy)
 	}
 }
 

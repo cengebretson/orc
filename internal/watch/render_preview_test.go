@@ -63,32 +63,32 @@ func TestPreviewConsolidatesRuntimeDetailsIntoFeaturePanel(t *testing.T) {
 }
 
 func TestRailDetailWrapsNextAction(t *testing.T) {
-	view := renderRailDetail(row{
+	view := renderRailDetailAt(row{
 		stage:     "develop",
 		worker:    "bob",
 		status:    "active",
 		tmuxState: "live",
 		next:      "fix the failing password reset tests and hand off to review",
-	}, 18)
+	}, 18, time.Time{})
 
 	for _, want := range []string{"Next", "fix the failing", "password reset", "hand off", "review"} {
 		if !strings.Contains(view, want) {
-			t.Fatalf("renderRailDetail() missing wrapped text %q in:\n%s", want, view)
+			t.Fatalf("renderRailDetailAt() missing wrapped text %q in:\n%s", want, view)
 		}
 	}
 	if strings.Contains(view, "fix the failing password reset tests and hand off to review") {
-		t.Fatalf("renderRailDetail() should wrap, not leave next action on one line:\n%s", view)
+		t.Fatalf("renderRailDetailAt() should wrap, not leave next action on one line:\n%s", view)
 	}
 }
 
 func TestRailDetailUsesIndentedMetaAndPromptHeader(t *testing.T) {
-	view := renderRailDetail(row{
+	view := renderRailDetailAt(row{
 		stage:     "default:pr-repair",
 		worker:    "Bob (Developer)",
 		status:    "paused",
 		tmuxState: "live",
 		next:      "Need product decision on refresh token TTL",
-	}, 32)
+	}, 32, time.Time{})
 	lines := strings.Split(view, "\n")
 
 	wantOrder := []string{
@@ -101,7 +101,7 @@ func TestRailDetailUsesIndentedMetaAndPromptHeader(t *testing.T) {
 		"Need product decision on refresh",
 	}
 	if len(lines) < len(wantOrder) {
-		t.Fatalf("renderRailDetail() has too few lines:\n%s", view)
+		t.Fatalf("renderRailDetailAt() has too few lines:\n%s", view)
 	}
 	for i, want := range wantOrder {
 		if lines[i] != want {
@@ -111,12 +111,12 @@ func TestRailDetailUsesIndentedMetaAndPromptHeader(t *testing.T) {
 }
 
 func TestPromptLabelUsesBlockerForPaused(t *testing.T) {
-	blocked := renderRailDetail(row{status: "paused", next: "need product decision"}, 24)
+	blocked := renderRailDetailAt(row{status: "paused", next: "need product decision"}, 24, time.Time{})
 	if !strings.Contains(blocked, "Blocker") || strings.Contains(blocked, "Next") {
 		t.Fatalf("paused rail detail should label prompt as Blocker:\n%s", blocked)
 	}
 
-	active := renderRailDetail(row{status: "active", next: "continue implementation"}, 24)
+	active := renderRailDetailAt(row{status: "active", next: "continue implementation"}, 24, time.Time{})
 	if !strings.Contains(active, "Next") || strings.Contains(active, "Blocker") {
 		t.Fatalf("active rail detail should label prompt as Next:\n%s", active)
 	}
@@ -129,13 +129,13 @@ func TestRenderHistoryShowsMostRecentEntries(t *testing.T) {
 		{at: "2026-06-19T10:00:00Z", stage: "three", worker: "c", result: "newest"},
 	}
 
-	view := renderHistory(rows, 72, 2)
+	view := renderTimelineHistory(rows, 72, 2)
 	if strings.Contains(view, "oldest") {
-		t.Fatalf("renderHistory() should omit entries past the limit:\n%s", view)
+		t.Fatalf("renderTimelineHistory() should omit entries past the limit:\n%s", view)
 	}
-	for _, want := range []string{"2026-06-18", "older", "2026-06-19", "newest"} {
+	for _, want := range []string{"Jun 18", "older", "Jun 19", "newest"} {
 		if !strings.Contains(view, want) {
-			t.Fatalf("renderHistory() missing %q in:\n%s", want, view)
+			t.Fatalf("renderTimelineHistory() missing %q in:\n%s", want, view)
 		}
 	}
 }

@@ -69,7 +69,6 @@ Acceptance:
 ## Future backlog
 
 - Native Herdr event-stream optimization, named sessions, and remote attach.
-- Explicit, confirmed prompt sending from `orc watch` to an exact agent pane.
 - Structured confirm/choice/text human responses.
 - Explicit remote tmux-client selection for standalone watch/focus processes.
 - Durable arbitrary labels and `--label key=value` filters.

@@ -24,7 +24,7 @@ func TestDetailViewScrollsAndRestoresOnReturn(t *testing.T) {
 		})
 	}
 
-	m := New("")
+	m := NewWithMux("", nil)
 	m.width, m.height = 100, 20
 	m.data.features = []*featureRow{row}
 
@@ -67,7 +67,7 @@ func TestDetailViewScrollsAndRestoresOnReturn(t *testing.T) {
 func TestUpdateWindowSizeKeepsDetailBody(t *testing.T) {
 	row := testRow("STORY-1", "active", "develop")
 	row.featureDir = t.TempDir()
-	m := New("")
+	m := NewWithMux("", nil)
 	m.width, m.height = 120, 40
 	m.data.features = []*featureRow{row}
 	m, _ = press(t, m, "enter")

@@ -32,7 +32,7 @@ func TestRenderHealthLinesGroupsAndIcons(t *testing.T) {
 		{Group: "tools", Name: "codex", Status: doctor.Fail},
 	}}}
 
-	plain := ansi.Strip(strings.Join(m.renderHealthLines(80), "\n"))
+	plain := ansi.Strip(renderHealthReport(m.data.healthItems, 80))
 
 	for _, want := range []string{
 		"workspace", "tools",
@@ -133,7 +133,7 @@ func TestOperationalBannerAppearsOnEveryWorkspaceDestination(t *testing.T) {
 }
 
 func TestRepositoriesSectionIsCollapsedByDefault(t *testing.T) {
-	m := New(t.TempDir())
+	m := NewWithMux(t.TempDir(), nil)
 	if m.navigation.expanded[sectionRepositories] {
 		t.Fatal("Repositories section should start collapsed")
 	}

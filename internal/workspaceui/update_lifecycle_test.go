@@ -139,7 +139,7 @@ func TestRepositoryViewerRefreshesRecordedWorkInPlace(t *testing.T) {
 }
 
 func TestStaleWorkspaceTickDoesNotRestartAfterReactivation(t *testing.T) {
-	m := New(t.TempDir())
+	m := NewWithMux(t.TempDir(), nil)
 	staleEpoch := m.lifecycle.epoch
 	m = m.SetActive(false)
 	m = m.SetActive(true)

@@ -22,7 +22,7 @@ func TestBrokenRowSurfaced(t *testing.T) {
 		s:          &state.State{Ticket: "STORY-1", Slug: "STORY-1-ok", Status: "active"},
 		featureDir: "/ws/features/STORY-1-ok",
 	}
-	m := New("/ws")
+	m := NewWithMux("/ws", nil)
 	m.width = 120
 	m.data.features = []*featureRow{broken, healthy}
 
@@ -73,11 +73,11 @@ func TestLoadDataSurfacesInvalidConfigWithoutPanicking(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, config.Filename), []byte("unknown_key: true\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	msg, ok := loadData(root)().(dataMsg)
+	msg, ok := loadDataWithMux(root, nil)().(dataMsg)
 	if !ok || msg.err == nil {
 		t.Fatalf("loadData message = %#v, want configuration error", msg)
 	}
-	updated, _ := New(root).Update(msg)
+	updated, _ := NewWithMux(root, nil).Update(msg)
 	m, ok := updated.(Model)
 	if !ok {
 		t.Fatalf("updated model = %T, want workspaceui.Model", updated)
@@ -102,7 +102,7 @@ func TestBrokenRowDoesNotPanicConsumers(t *testing.T) {
 	rows := []*featureRow{broken, healthy}
 
 	// Dashboard header counts active/paused over all features.
-	m := New("/ws")
+	m := NewWithMux("/ws", nil)
 	m.width, m.height = 120, 40
 	m.data.features = rows
 	_ = m.viewDashboard()

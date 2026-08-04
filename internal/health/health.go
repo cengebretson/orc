@@ -20,17 +20,6 @@ const (
 	Empty          // exists but has no content worth noting
 )
 
-func (s Status) String() string {
-	switch s {
-	case OK:
-		return "✓"
-	case Empty:
-		return "⚠"
-	default:
-		return "✗"
-	}
-}
-
 type Result struct {
 	Name   string
 	Status Status
@@ -91,29 +80,6 @@ func Run(root string) *Report {
 	}
 
 	return report
-}
-
-// Print renders the report to stdout.
-func Print(r *Report) {
-	fmt.Printf("Workspace: %s\n\n", r.Root)
-	var currentGroup string
-	for _, res := range r.Results {
-		if res.Group != currentGroup {
-			currentGroup = res.Group
-			if currentGroup != "" {
-				fmt.Printf("\n  %s\n", currentGroup)
-			}
-		}
-		indent := "  "
-		if res.Group != "" {
-			indent = "    "
-		}
-		if res.Detail != "" {
-			fmt.Printf("%s%s  %-20s %s\n", indent, res.Status, res.Name, res.Detail)
-		} else {
-			fmt.Printf("%s%s  %s\n", indent, res.Status, res.Name)
-		}
-	}
 }
 
 func checkSetup(root string) Result {

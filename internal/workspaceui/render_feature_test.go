@@ -187,7 +187,7 @@ func TestViewDetailShowsTimingSection(t *testing.T) {
 		{At: at(2), Stage: "intake", Worker: "agent", Result: "intake done"}, // 2h in intake
 	}
 
-	m := New("")
+	m := NewWithMux("", nil)
 	m.width = 120
 	m.height = 50
 	m.detail.feature = row
@@ -224,7 +224,7 @@ func TestViewDetailShowsDimCanonicalIDs(t *testing.T) {
 	row.stageLabel = "develop"
 	row.s.Stage.Worker = "default:bob"
 
-	m := New(root)
+	m := NewWithMux(root, nil)
 	m.width = 120
 	m.height = 40
 	m.root = root
@@ -251,7 +251,7 @@ func TestViewDetailShowsRequiredArtifactChecklist(t *testing.T) {
 	row.featureDir = dir
 	row.requiredArtifacts = []string{"PLAN.md", "develop/HANDOFF.md"}
 
-	m := New("")
+	m := NewWithMux("", nil)
 	m.width = 120
 	m.height = 40
 	m.detail.feature = row
@@ -272,7 +272,7 @@ func TestViewDetailTimingKeepsLongStageName(t *testing.T) {
 		{At: base.Format(time.RFC3339), Stage: "default:qa-automation", Worker: "default:brian", Result: "started qa"},
 	}
 
-	m := New("")
+	m := NewWithMux("", nil)
 	m.width = 120
 	m.height = 50
 	m.detail.feature = row
@@ -303,7 +303,7 @@ func TestViewDetailNarrowWidthDoesNotPanic(t *testing.T) {
 		{At: "2026-06-01T09:00:00Z", Stage: "intake", Worker: "agent", Result: "a fairly long result string that would overflow a narrow column"},
 	}
 
-	m := New("")
+	m := NewWithMux("", nil)
 	m.width = 50 // innerW = 46 → history result budget innerW-72 = -26
 	m.height = 40
 	m.detail.feature = row

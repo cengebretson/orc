@@ -174,8 +174,8 @@ var (
 )
 
 var markCmd = &cobra.Command{
-	Use:   "mark <ticket> <start|resume|next|pause|done> [reason]",
-	Short: "Update ticket state — start | resume | next [--result] [--stage] [--worker] | pause <reason> | done [--result]",
+	Use:   "mark <ticket> <start|resume|next|pause|done|jit> [reason]",
+	Short: "Update ticket state — start | resume | next [--result] [--stage] [--worker] | pause <reason> | done [--result] | jit <summary>",
 	Args:  cobra.MinimumNArgs(2),
 	RunE:  runMark,
 

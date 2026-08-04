@@ -1,8 +1,6 @@
 package watch
 
 import (
-	"fmt"
-	"strings"
 	"time"
 )
 
@@ -27,12 +25,4 @@ func liveOverviewFor(rows []row, lastLoad, now time.Time) liveOverviewView {
 		}
 	}
 	return view
-}
-
-func (view liveOverviewView) summary() string {
-	parts := []string{fmt.Sprintf("%d running", view.running), fmt.Sprintf("%d paused", view.paused)}
-	if view.needs > 0 {
-		parts = append(parts, fmt.Sprintf("%d needs you", view.needs))
-	}
-	return strings.Join(parts, " · ")
 }

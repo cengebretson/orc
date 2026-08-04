@@ -75,7 +75,7 @@ func press(t *testing.T, m Model, keys ...string) (Model, tea.Cmd) {
 // sections, sized so enter handlers can construct viewports.
 func testModel(t *testing.T) Model {
 	t.Helper()
-	m := New("")
+	m := NewWithMux("", nil)
 	m.width = 100
 	m.height = 40
 	m.data.features = []*featureRow{

@@ -19,7 +19,4 @@ func TestLiveOverviewFor(t *testing.T) {
 	if view.refreshAge != "↺ 4s ago" {
 		t.Fatalf("refreshAge = %q, want %q", view.refreshAge, "↺ 4s ago")
 	}
-	if got, want := view.summary(), "1 running · 1 paused · 1 needs you"; got != want {
-		t.Fatalf("summary() = %q, want %q", got, want)
-	}
 }

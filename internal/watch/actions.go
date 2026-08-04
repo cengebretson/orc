@@ -137,12 +137,8 @@ func (m *Model) focusNext() (tea.Cmd, string) {
 	return nil, "no live session needs attention"
 }
 
-// Focus attaches to the highest-priority live Orc session that needs human attention.
-func Focus(root string) error {
-	return FocusWithMux(root, nil)
-}
-
-// FocusWithMux attaches to the highest-priority live Orc session using backend.
+// FocusWithMux attaches to the highest-priority live Orc session that needs
+// human attention, using backend.
 func FocusWithMux(root string, backend mux.Backend) error {
 	if backend == nil {
 		backend = tmux.New()

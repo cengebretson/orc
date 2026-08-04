@@ -452,14 +452,6 @@ func initialWideSection(section Section) Section {
 	return section
 }
 
-func navigationLabel(section Section, healthIssues int) string {
-	label := sectionLabel(section)
-	if section == SectionHealth && healthIssues > 0 {
-		return fmt.Sprintf("%s ⚠ %d", label, healthIssues)
-	}
-	return label
-}
-
 func renderNavigationItem(section Section, healthIssues int, selected, healthPulsing bool) string {
 	style := navStyle
 	if selected {

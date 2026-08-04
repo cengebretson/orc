@@ -253,8 +253,6 @@ func watchSplitFlag(layout string) (string, error) {
 	}
 }
 
-func findWatchPane() (string, error) { return findRailPane() }
-
 func findRailPane() (string, error) {
 	out, err := newCommand("tmux", "list-panes", "-F", "#{pane_id}\t#{@orc_rail}\t#{@orc_role}\t#{@orc_watch}").Output()
 	if err != nil {

@@ -60,11 +60,6 @@ func NewArchiver() Archiver {
 	}
 }
 
-func Archive(opts ArchiveOptions) (*ArchiveResult, error) {
-	archiver := NewArchiver()
-	return archiver.Archive(opts)
-}
-
 func (a Archiver) Archive(opts ArchiveOptions) (*ArchiveResult, error) {
 	if opts.State == nil {
 		return nil, fmt.Errorf("state is required")
