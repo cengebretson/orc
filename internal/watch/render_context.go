@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/cengebretson/orc/internal/contextpressure"
+	terminalui "github.com/cengebretson/orc/internal/ui"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -38,26 +39,7 @@ func renderContextVisual(r row, cells int) string {
 	if !r.context.Observed || !r.context.Available || len(r.contextTrend) < 2 {
 		return renderContextMeter(r.context, cells)
 	}
-	return "ctx " + stateForPressure(r.context).Render(renderContextSparkline(r.contextTrend, cells)+" "+r.context.Label())
-}
-
-func renderContextSparkline(samples []uint64, cells int) string {
-	const levels = "▁▂▃▄▅▆▇█"
-	if len(samples) == 0 {
-		return ""
-	}
-	if cells > 0 && len(samples) > cells {
-		samples = samples[len(samples)-cells:]
-	}
-	var b strings.Builder
-	for _, value := range samples {
-		if value > 100 {
-			value = 100
-		}
-		idx := int(value * 7 / 100)
-		b.WriteRune([]rune(levels)[idx])
-	}
-	return b.String()
+	return "ctx " + stateForPressure(r.context).Render(terminalui.Sparkline(r.contextTrend, cells)+" "+r.context.Label())
 }
 
 func renderWorkflowFlow(r row, width int) string {
@@ -183,16 +165,7 @@ func wrapStyledParts(parts []string, separator string, width int) string {
 }
 
 func stateForPressure(pressure contextpressure.Pressure) lipgloss.Style {
-	switch pressure.Level {
-	case contextpressure.LevelGreen:
-		return contextGreenStyle
-	case contextpressure.LevelYellow:
-		return contextYellowStyle
-	case contextpressure.LevelRed:
-		return contextRedStyle
-	default:
-		return mutedStyle
-	}
+	return contextStyles.For(pressure)
 }
 
 func activityAge(r row, now time.Time) string {

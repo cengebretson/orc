@@ -63,6 +63,7 @@ var (
 	styleHealthOK   lipgloss.Style
 	styleHealthWarn lipgloss.Style
 	styleHealthErr  lipgloss.Style
+	contextStyles   terminalui.LevelStyles
 
 	styleDetailLabel lipgloss.Style
 	styleDetailValue lipgloss.Style
@@ -103,6 +104,10 @@ func initStyles() {
 	styleHealthOK = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Green))
 	styleHealthWarn = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Yellow))
 	styleHealthErr = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Red))
+	contextStyles = terminalui.LevelStyles{
+		Unknown: styleDim, Green: styleHealthOK,
+		Yellow: styleHealthWarn, Red: styleHealthErr,
+	}
 
 	styleDetailLabel = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Subtext0))
 	styleDetailValue = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Text))
@@ -301,33 +306,7 @@ func refreshCountdown(age, interval time.Duration) string {
 }
 
 func renderContextPressure(pressure contextpressure.Pressure) string {
-	style := styleDim
-	switch pressure.Level {
-	case contextpressure.LevelGreen:
-		style = styleHealthOK
-	case contextpressure.LevelYellow:
-		style = styleHealthWarn
-	case contextpressure.LevelRed:
-		style = styleHealthErr
-	}
-	return style.Render(pressure.Label())
-}
-
-var sparkBlocks = [...]rune{'▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'}
-
-// sparkline renders a sequence of 0-100 percentages as block characters, one
-// per sample, scaled so 0% is the shortest block and 100% the tallest.
-func sparkline(samples []uint64) string {
-	if len(samples) == 0 {
-		return ""
-	}
-	runes := make([]rune, len(samples))
-	for i, v := range samples {
-		idx := int(v) * (len(sparkBlocks) - 1) / 100
-		idx = max(0, min(idx, len(sparkBlocks)-1))
-		runes[i] = sparkBlocks[idx]
-	}
-	return string(runes)
+	return contextStyles.For(pressure).Render(pressure.Label())
 }
 
 // renderContextSparkline renders the trend line for a feature's recent
@@ -339,16 +318,8 @@ func renderContextSparkline(history []uint64, pressure contextpressure.Pressure)
 	if len(history) < 2 {
 		return ""
 	}
-	style := styleDim
-	switch pressure.Level {
-	case contextpressure.LevelGreen:
-		style = styleHealthOK
-	case contextpressure.LevelYellow:
-		style = styleHealthWarn
-	case contextpressure.LevelRed:
-		style = styleHealthErr
-	}
-	return style.Render(sparkline(history)) + " " + style.Render(pressure.Label())
+	style := contextStyles.For(pressure)
+	return style.Render(terminalui.Sparkline(history, 0)) + " " + style.Render(pressure.Label())
 }
 
 // hexBlend linearly interpolates between two "#rrggbb" colors at t in [0,1]

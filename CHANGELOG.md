@@ -85,6 +85,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `readCodexJSONL`, `scanJSONL`) left behind when discovery moved to
   incremental cursors. Their coverage moved onto the live code paths. No
   user-facing behavior changed.
+- Context-pressure colouring and the trend sparkline now come from one
+  implementation in `internal/ui`, shared by the Live rail, the pet view, and
+  the Workspace tabs, instead of five copies of the level switch and two of the
+  sparkline. The pet view previously coloured a below-green-threshold reading
+  green while every other view drew it muted; it now matches. That divergence
+  was unreachable with the default thresholds (`green: 0`) and only visible in
+  workspaces configuring a non-zero green boundary.
 - Consolidated duplicated internal helpers so the copies can no longer drift
   apart. Shell quoting moved to `internal/shellquote`, which now distinguishes
   always-quote (`Quote`, required where hook commands are matched against

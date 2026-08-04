@@ -26,6 +26,7 @@ var (
 	contextGreenStyle  lipgloss.Style
 	contextYellowStyle lipgloss.Style
 	contextRedStyle    lipgloss.Style
+	contextStyles      terminalui.LevelStyles
 )
 
 func init() {
@@ -54,6 +55,10 @@ func SetTheme(theme terminalui.Theme) {
 	contextGreenStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Green))
 	contextYellowStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Yellow))
 	contextRedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(p.Red))
+	contextStyles = terminalui.LevelStyles{
+		Unknown: mutedStyle, Green: contextGreenStyle,
+		Yellow: contextYellowStyle, Red: contextRedStyle,
+	}
 }
 
 func stateStyle(label string) lipgloss.Style {
@@ -76,18 +81,5 @@ func stateStyle(label string) lipgloss.Style {
 }
 
 func renderContextPressure(pressure contextpressure.Pressure) string {
-	style := mutedStyle
-	switch pressure.Level {
-	case contextpressure.LevelGreen:
-		style = contextGreenStyle
-	case contextpressure.LevelYellow:
-		style = contextYellowStyle
-	case contextpressure.LevelRed:
-		style = contextRedStyle
-	}
-	return style.Render(pressure.Label())
-}
-
-func padStyledRight(value string, width int) string {
-	return terminalui.PadRight(value, width)
+	return contextStyles.For(pressure).Render(pressure.Label())
 }

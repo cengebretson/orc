@@ -230,9 +230,9 @@ func (m Model) renderWorkListWide(b *strings.Builder, width int) {
 			b.WriteString(style.Render(line))
 		} else {
 			b.WriteString(stateStyle(label).Render(linePrefix))
-			b.WriteString(padStyledRight(renderContextPressure(r.context), contextW))
+			b.WriteString(terminalui.PadRight(renderContextPressure(r.context), contextW))
 			b.WriteString(stateStyle(label).Render("  "))
-			b.WriteString(padStyledRight(stateStyle(label).Render(tmuxText), tmuxW))
+			b.WriteString(terminalui.PadRight(stateStyle(label).Render(tmuxText), tmuxW))
 		}
 		b.WriteString("\n")
 	}

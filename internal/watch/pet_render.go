@@ -6,7 +6,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/cengebretson/orc/internal/contextpressure"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -72,14 +71,7 @@ func renderPetContext(r row, width int) string {
 	slots := min(10, max(5, width-10))
 	filled := min(slots, int(r.context.Percent)*slots/100)
 	bar := strings.Repeat("█", filled) + strings.Repeat("░", slots-filled)
-	style := contextGreenStyle
-	switch r.context.Level {
-	case contextpressure.LevelYellow:
-		style = contextYellowStyle
-	case contextpressure.LevelRed:
-		style = contextRedStyle
-	}
-	return mutedStyle.Render("ctx ") + style.Render(bar+" "+r.context.Label())
+	return mutedStyle.Render("ctx ") + stateForPressure(r.context).Render(bar+" "+r.context.Label())
 }
 
 func renderPetCard(r row, selected bool, width, frame int) string {

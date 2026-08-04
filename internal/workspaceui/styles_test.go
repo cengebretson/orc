@@ -80,17 +80,6 @@ func TestRepoAndWorkerColorsAssignIndependently(t *testing.T) {
 	}
 }
 
-func TestSparklineScalesSamplesToBlockHeight(t *testing.T) {
-	got := sparkline([]uint64{0, 50, 100})
-	want := string([]rune{sparkBlocks[0], sparkBlocks[3], sparkBlocks[7]})
-	if got != want {
-		t.Fatalf("sparkline([0,50,100]) = %q, want %q", got, want)
-	}
-	if got := sparkline(nil); got != "" {
-		t.Fatalf("sparkline(nil) = %q, want empty", got)
-	}
-}
-
 func TestRenderContextSparklineNeedsAtLeastTwoSamples(t *testing.T) {
 	pressure := contextpressure.Pressure{Observed: true, Available: true, Percent: 42, Level: contextpressure.LevelGreen}
 	if got := renderContextSparkline(nil, pressure); got != "" {

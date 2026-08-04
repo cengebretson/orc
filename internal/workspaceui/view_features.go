@@ -95,7 +95,7 @@ func (m Model) renderTable(rows []*featureRow, w int, selectedIdx int) string {
 			// Plain unstyled text so styleRowSelected background covers the full row
 			contextText := row.context.Label()
 			if len(history) >= 2 {
-				contextText = sparkline(history) + " " + row.context.Label()
+				contextText = ui.Sparkline(history, 0) + " " + row.context.Label()
 			}
 			line := " " +
 				ui.PadRight(ticketCell, wTicket) + "  " +
