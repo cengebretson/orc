@@ -6,6 +6,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+**Breaking:** five `orc watch` flags are gone. Replace `--tmux-toggle`,
+`--tmux-layout`, and `--tmux-size` with `orc rail toggle [--layout] [--size]`;
+`--view` and `--pet-layout` have no replacement. Check tmux keybindings that
+invoke `orc watch` — an unknown flag now fails the command.
+
 ### Added
 
 - Hardened `make release-check` with a shared `VERSION`/tag/changelog contract,
@@ -52,29 +57,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   into an expandable `Parked (n)` group without stopping any session, while
   status, attention, or stage changes wake and visibly flag the ticket.
 
-### Fixed
-
-- `orc mark --help` and `orc help-all` now list the `jit` verb, which the
-  command has always accepted but never advertised.
-- Untracked the 18 MB `cmd/orc/orc` build artifact, committed by accident in
-  `69b3817`, and added it to `.gitignore` so it cannot come back. The blob
-  itself stays in history by choice: it is an ancestor of the `v0.16.0` and
-  `v0.16.1` tags, so removing it would rewrite both published releases for
-  8.3 MiB that costs nothing to keep.
-- The live tmux test now skips, rather than fails, where tmux is installed but
-  cannot start a server or spawn a shell in a temp directory — the case in
-  sandboxed and containerized environments.
-
-### Removed
-
-- Removed the little-orc pet view. `orc watch --view`, `--pet-layout`, and the
-  `v` and `l` keys are gone; the rail and its wide table are now the only Live
-  presentations.
-- Removed `orc watch --tmux-toggle`, `--tmux-layout`, and `--tmux-size`. They
-  were aliases that already delegated to the managed rail; use
-  `orc rail toggle [--layout <right|bottom>] [--size <n>]` instead. Note the
-  default size changes from 32 to the rail's 64 columns.
-
 ### Changed
 
 - Documented the global `--workspace` and `--mux` flags and the hook-invoked
@@ -106,6 +88,29 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   previously divergent pair won: an empty path is no longer "the same path" as
   another empty path, a zero timestamp renders as `-` rather than `now`, and
   whitespace-only values render as `-`.
+
+### Removed
+
+- Removed the little-orc pet view. `orc watch --view`, `--pet-layout`, and the
+  `v` and `l` keys are gone; the rail and its wide table are now the only Live
+  presentations.
+- Removed `orc watch --tmux-toggle`, `--tmux-layout`, and `--tmux-size`. They
+  were aliases that already delegated to the managed rail; use
+  `orc rail toggle [--layout <right|bottom>] [--size <n>]` instead. Note the
+  default size changes from 32 to the rail's 64 columns.
+
+### Fixed
+
+- `orc mark --help` and `orc help-all` now list the `jit` verb, which the
+  command has always accepted but never advertised.
+- Untracked the 18 MB `cmd/orc/orc` build artifact, committed by accident in
+  `69b3817`, and added it to `.gitignore` so it cannot come back. The blob
+  itself stays in history by choice: it is an ancestor of the `v0.16.0` and
+  `v0.16.1` tags, so removing it would rewrite both published releases for
+  8.3 MiB that costs nothing to keep.
+- The live tmux test now skips, rather than fails, where tmux is installed but
+  cannot start a server or spawn a shell in a temp directory — the case in
+  sandboxed and containerized environments.
 
 ## [0.16.1] - 2026-08-02
 
