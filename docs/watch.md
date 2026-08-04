@@ -30,8 +30,6 @@ orc watch --interval 2s
 orc watch --wide
 orc watch --demo
 orc watch --demo --wide
-orc watch --view pet
-orc watch --view pet --pet-layout column
 orc rail toggle
 orc rail toggle --layout bottom --size 25%
 orc dashboard
@@ -44,12 +42,8 @@ richer selected-row highlight and selected-work card around a table-like
 session view, with worker shown as a column in the session list
 rather than as a separate list. Pressing `enter` opens the selected story
 details page in both compact and wide layouts, including recent story history.
-Pressing `v` toggles the same rows and controls into an
-animated little-orc pet view; `--view pet` starts there directly. In pet mode,
-`l` toggles the responsive grid and a vertical column; the matching startup
-flag is `--pet-layout column`. To run the rail beside your work as a tmux pane,
-use `orc rail` rather than `orc watch` — see
-[Tmux integration](tmux.md#the-managed-rail).
+To run the rail beside your work as a tmux pane, use `orc rail` rather than
+`orc watch` — see [Tmux integration](tmux.md#the-managed-rail).
 
 `--demo` replaces live workspace rows with four read-only synthetic tickets so
 the complete visual language can be reviewed without manufacturing provider or
@@ -71,42 +65,6 @@ Press `/` to filter the rail without changing durable state or session
 priority. The shared matcher covers ticket, slug, workflow, stage, worker,
 engine, repository, branch, status, and attention state. Enter keeps the active
 filter; Escape clears it.
-
-## Little-orc pet view
-
-Pet mode is an additive presentation over the same selected row, filtering,
-preview, attach, focus, and refresh behavior as the rail. It never mutates
-durable state or launches an agent. The rail remains the default.
-
-Each ticket gets a deterministic green or teal little orc. Pointed ears, tusks,
-skin tone, and animation phase make the creature recognizable across refreshes.
-The compact grid automatically fits one to four pets per row as the terminal
-widens; a 100-column view fits three without dropping status or context details.
-Column layout forces one card per row, including in wide panes; it is
-presentation-only and can be toggled without restarting watch.
-Only the selected pet draws a rounded border; unselected cards retain the same
-footprint so the grid does not jump as focus moves.
-The visual state comes from Orc's existing durable and live signals:
-
-| Orc signal | Little-orc behavior |
-|---|---|
-| `pending` or `ready` | Wobbling egg |
-| Active live work | Hammering, bouncing orc |
-| Live provider reports idle/waiting | Sleeping orc |
-| Input or review attention | Alert, pulsing orc |
-| Paused or blocked | Stuck, unhappy orc |
-| Active ticket with stopped tmux | Faded offline orc |
-| Done | Celebrating orc |
-| Invalid state | Orc needing care |
-
-Yellow and red context pressure add tired and exhausted labels without replacing
-the underlying state. Narrow panes show the selected creature; wider terminals
-use a responsive card grid with repository/worktree room labels. `j`/`k`, `/`,
-`enter`, `a`, `i`, `r`, `Esc`, and `q` retain their rail meanings.
-
-Animation uses an independent low-cost terminal tick only while pet mode is
-visible. Toggling back with `v` stops that tick; the default rail keeps its
-existing data-refresh cadence.
 
 ## Narrow rail view
 
@@ -371,8 +329,6 @@ Keybindings:
 | `i` | attach to the next live session that needs attention |
 | `s` | compose, review, and explicitly confirm a prompt to the selected exact agent |
 | `n` | toggle the selected prompt preview |
-| `v` | toggle the rail and little-orc pet view |
-| `l` | toggle responsive and column pet layouts (pet view only) |
 | `r` | refresh immediately |
 | `j` / `k`, arrows | scroll while details are open |
 | `pgup` / `pgdown`, `ctrl+u` / `ctrl+d` | scroll details by page or half-page |
@@ -453,10 +409,6 @@ the resolved workspace to the spawned pane so its initial CWD does not matter.
 - Prompt preview expands inside the rail and returns with `Esc` or `enter`.
 - The compact/wide layout responds to terminal width; `--wide` forces the wider
   table.
-- The optional little-orc view is selected with `v` or `--view pet`; the rail
-  remains the default and its refresh path does not run animation ticks.
-- Pet layout is presentation-only: `l` / `--pet-layout` control responsive
-  versus column card placement.
 - `STATE.yaml` remains authoritative. `@agent_attention` is a live urgency hint,
   never durable workflow state.
 - Attach and focus target the selected ticket's recorded runtime. They never

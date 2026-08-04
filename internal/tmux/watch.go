@@ -20,16 +20,14 @@ func AttachHint(session, window string) string {
 }
 
 type WatchToggleOptions struct {
-	Root      string
-	Ticket    string
-	Interval  string
-	Wide      bool
-	View      string
-	PetLayout string
-	Demo      bool
-	Layout    string
-	Size      string
-	ExecPath  string
+	Root     string
+	Ticket   string
+	Interval string
+	Wide     bool
+	Demo     bool
+	Layout   string
+	Size     string
+	ExecPath string
 }
 
 // OpenRail opens one owned watch rail in the current tmux window. Existing
@@ -295,12 +293,6 @@ func buildWatchCommand(opts WatchToggleOptions) string {
 	}
 	if opts.Wide {
 		argv = append(argv, "--wide")
-	}
-	if opts.View != "" && opts.View != "rail" {
-		argv = append(argv, "--view", opts.View)
-	}
-	if opts.PetLayout != "" && opts.PetLayout != "responsive" {
-		argv = append(argv, "--pet-layout", opts.PetLayout)
 	}
 	if opts.Demo {
 		argv = append(argv, "--demo")

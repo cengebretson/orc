@@ -125,7 +125,6 @@ func TestStaleLifecycleTicksDoNotRestartAfterReactivation(t *testing.T) {
 	for _, msg := range []tea.Msg{
 		tickMsg{at: time.Now(), epoch: staleEpoch},
 		watchAnimationMsg{at: time.Now(), epoch: staleEpoch},
-		petTickMsg{at: time.Now(), epoch: staleEpoch},
 	} {
 		updated, cmd := m.Update(msg)
 		m = watchModel(t, updated)

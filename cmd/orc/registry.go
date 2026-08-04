@@ -47,8 +47,6 @@ func init() {
 	jitCmd.Flags().BoolVar(&jitTmux, "tmux", false, "Send to the ticket's existing tmux session instead of foreground")
 	watchCmd.Flags().StringVar(&watchInterval, "interval", "5s", "Refresh interval")
 	watchCmd.Flags().BoolVar(&watchWide, "wide", false, "Render the wider table layout")
-	watchCmd.Flags().StringVar(&watchView, "view", "rail", "Initial watch view: rail or pet")
-	watchCmd.Flags().StringVar(&watchPetLayout, "pet-layout", "responsive", "Initial pet card layout: responsive or column")
 	watchCmd.Flags().BoolVar(&watchDemo, "demo", false, "Preview watch with synthetic workflow, state, and context data")
 	railCmd.PersistentFlags().StringVar(&railLayout, "layout", "right", "Rail split layout: right or bottom")
 	railCmd.PersistentFlags().StringVar(&railSize, "size", "", "Expanded rail size in columns or rows (default: 64; expand restores the prior size)")

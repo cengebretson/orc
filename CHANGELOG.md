@@ -67,6 +67,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Removed
 
+- Removed the little-orc pet view. `orc watch --view`, `--pet-layout`, and the
+  `v` and `l` keys are gone; the rail and its wide table are now the only Live
+  presentations.
 - Removed `orc watch --tmux-toggle`, `--tmux-layout`, and `--tmux-size`. They
   were aliases that already delegated to the managed rail; use
   `orc rail toggle [--layout <right|bottom>] [--size <n>]` instead. Note the

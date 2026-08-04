@@ -22,8 +22,6 @@ type keyMap struct {
 	attach     key.Binding
 	attention  key.Binding
 	sendPrompt key.Binding
-	view       key.Binding
-	petLayout  key.Binding
 	parking    key.Binding
 }
 
@@ -44,8 +42,6 @@ var keys = keyMap{
 	attach:     key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "attach selected")),
 	attention:  key.NewBinding(key.WithKeys("i"), key.WithHelp("i", "focus attention")),
 	sendPrompt: key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "send prompt")),
-	view:       key.NewBinding(key.WithKeys("v"), key.WithHelp("v", "rail / pets")),
-	petLayout:  key.NewBinding(key.WithKeys("l"), key.WithHelp("l", "pet layout")),
 	parking:    key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "expand parked")),
 }
 
@@ -70,8 +66,6 @@ func HelpSections() []terminalui.HelpSection {
 			terminalui.HelpEntryFor(keys.refresh),
 		}},
 		{Title: "LIVE · VIEW", Entries: []terminalui.HelpEntry{
-			terminalui.HelpEntryFor(keys.view),
-			terminalui.HelpEntryFor(keys.petLayout),
 			terminalui.HelpEntryFor(keys.parking),
 			{Keys: keys.help.Help().Key + " / " + keys.back.Help().Key, Description: "close help"},
 			terminalui.HelpEntryFor(keys.quit),

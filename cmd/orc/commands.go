@@ -245,11 +245,9 @@ var watchCmd = &cobra.Command{
 }
 
 var (
-	watchInterval  string
-	watchWide      bool
-	watchView      string
-	watchPetLayout string
-	watchDemo      bool
+	watchInterval string
+	watchWide     bool
+	watchDemo     bool
 )
 
 var helpAllCmd = &cobra.Command{

@@ -134,14 +134,12 @@ func TestSetSessionEnvironmentRejectsUnsafeName(t *testing.T) {
 
 func TestBuildWatchCommandQuotesArguments(t *testing.T) {
 	cmd := buildWatchCommand(WatchToggleOptions{
-		ExecPath:  "/tmp/orc bin/orc",
-		Root:      "/tmp/work space",
-		Ticket:    "PROJ-123",
-		Interval:  "2s",
-		Wide:      true,
-		View:      "pet",
-		PetLayout: "column",
-		Demo:      true,
+		ExecPath: "/tmp/orc bin/orc",
+		Root:     "/tmp/work space",
+		Ticket:   "PROJ-123",
+		Interval: "2s",
+		Wide:     true,
+		Demo:     true,
 	})
 
 	for _, want := range []string{
@@ -150,8 +148,6 @@ func TestBuildWatchCommandQuotesArguments(t *testing.T) {
 		"watch PROJ-123",
 		"--interval 2s",
 		"--wide",
-		"--view pet",
-		"--pet-layout column",
 		"--demo",
 	} {
 		if !strings.Contains(cmd, want) {
@@ -163,15 +159,12 @@ func TestBuildWatchCommandQuotesArguments(t *testing.T) {
 	}
 }
 
-func TestBuildWatchCommandOmitsDefaultPetOptions(t *testing.T) {
-	cmd := buildWatchCommand(WatchToggleOptions{
-		ExecPath:  "orc",
-		View:      "rail",
-		PetLayout: "responsive",
-	})
-	for _, flag := range []string{"--view", "--pet-layout", "--tmux-toggle"} {
+func TestBuildWatchCommandOmitsUnsetOptions(t *testing.T) {
+	cmd := buildWatchCommand(WatchToggleOptions{ExecPath: "orc"})
+	// --tmux-toggle would make the spawned rail spawn another rail.
+	for _, flag := range []string{"--interval", "--wide", "--demo", "--tmux-toggle"} {
 		if strings.Contains(cmd, flag) {
-			t.Fatalf("buildWatchCommand() included default-only flag %q in %q", flag, cmd)
+			t.Fatalf("buildWatchCommand() included unset flag %q in %q", flag, cmd)
 		}
 	}
 }

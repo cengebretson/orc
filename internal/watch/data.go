@@ -435,3 +435,28 @@ func shortWorker(worker string) string {
 	}
 	return worker
 }
+
+// featureRoom names the place a feature's work is happening — its primary
+// repository, suffixed with the worktree directory when that differs from the
+// repository name — along with the branch. Features with no registered
+// repository live in the workspace itself.
+func featureRoom(s *state.State) (string, string) {
+	if s == nil || len(s.Repos) == 0 {
+		return "workspace", ""
+	}
+	names := make([]string, 0, len(s.Repos))
+	for name := range s.Repos {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	name := names[0]
+	repo := s.Repos[name]
+	room := name
+	if repo.Worktree != "" {
+		base := filepath.Base(filepath.Clean(repo.Worktree))
+		if base != "." && base != string(filepath.Separator) && base != name {
+			room += "/" + base
+		}
+	}
+	return room, repo.Branch
+}

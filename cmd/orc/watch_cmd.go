@@ -25,28 +25,17 @@ func runWatch(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		ticket = args[0]
 	}
-	mode, err := watch.ParseMode(watchView)
-	if err != nil {
-		return err
-	}
-	petLayout, err := watch.ParsePetLayout(watchPetLayout)
-	if err != nil {
-		return err
-	}
-
 	interval, err := time.ParseDuration(watchInterval)
 	if err != nil {
 		return err
 	}
 
 	watchOpts := watch.Options{
-		Ticket:    ticket,
-		Interval:  interval,
-		Wide:      watchWide,
-		Mode:      mode,
-		PetLayout: petLayout,
-		Demo:      watchDemo,
-		Mux:       muxBackend,
+		Ticket:   ticket,
+		Interval: interval,
+		Wide:     watchWide,
+		Demo:     watchDemo,
+		Mux:      muxBackend,
 	}
 	return dashboard.Run(root, dashboard.Options{
 		Start:     dashboard.SectionWatch,

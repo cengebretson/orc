@@ -72,7 +72,7 @@ var railToggleCollapsedCmd = &cobra.Command{
 
 func railOptions(root string) tmux.WatchToggleOptions {
 	return tmux.WatchToggleOptions{
-		Root: root, Interval: "5s", View: "rail", PetLayout: "responsive",
+		Root: root, Interval: "5s",
 		Layout: railLayout, Size: railSize,
 	}
 }

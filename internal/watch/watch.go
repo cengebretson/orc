@@ -43,13 +43,11 @@ type promptDoneMsg struct {
 }
 
 type Options struct {
-	Ticket    string
-	Interval  time.Duration
-	Wide      bool
-	Mode      Mode
-	PetLayout PetLayout
-	Demo      bool
-	Mux       mux.Backend
+	Ticket   string
+	Interval time.Duration
+	Wide     bool
+	Demo     bool
+	Mux      mux.Backend
 }
 
 type workflowStep struct {
@@ -117,7 +115,6 @@ type Model struct {
 	ticket   string
 	interval time.Duration
 	wide     bool
-	mode     Mode
 	demo     bool
 	inactive bool
 	epoch    uint64
@@ -135,9 +132,6 @@ type Model struct {
 	loadErr        error
 	loadWarning    error
 	message        string
-	petFrame       int
-	petTicking     bool
-	petLayout      PetLayout
 	parkedExpanded bool
 
 	preview   bool
@@ -162,14 +156,6 @@ func New(root string, opts Options) (Model, error) {
 	if interval <= 0 {
 		interval = defaultInterval
 	}
-	mode, err := ParseMode(string(opts.Mode))
-	if err != nil {
-		return Model{}, err
-	}
-	petLayout, err := ParsePetLayout(string(opts.PetLayout))
-	if err != nil {
-		return Model{}, err
-	}
 	searchBox := textinput.New()
 	searchBox.Placeholder = "filter sessions..."
 	searchBox.Prompt = "/ "
@@ -179,17 +165,14 @@ func New(root string, opts Options) (Model, error) {
 	promptBox.Prompt = "> "
 	promptBox.CharLimit = mux.MaxAgentPromptBytes
 	return Model{
-		root:       root,
-		ticket:     opts.Ticket,
-		interval:   interval,
-		wide:       opts.Wide,
-		mode:       mode,
-		demo:       opts.Demo,
-		petLayout:  petLayout,
-		petTicking: mode == ModePet,
-		searchBox:  searchBox,
-		promptBox:  promptBox,
-		mux:        backend,
+		root:      root,
+		ticket:    opts.Ticket,
+		interval:  interval,
+		wide:      opts.Wide,
+		demo:      opts.Demo,
+		searchBox: searchBox,
+		promptBox: promptBox,
+		mux:       backend,
 	}, nil
 }
 
@@ -207,9 +190,6 @@ func (m Model) SetActive(active bool) Model {
 	}
 	m.epoch++
 	m.inactive = !active
-	if !active {
-		m.petTicking = false
-	}
 	return m
 }
 
@@ -221,11 +201,7 @@ func (m Model) Init() tea.Cmd {
 	if m.inactive {
 		return nil
 	}
-	commands := []tea.Cmd{loadDataWithMux(m.root, m.ticket, m.demo, m.mux), tickEvery(m.interval, m.epoch), watchAnimationTick(m.epoch)}
-	if m.mode == ModePet {
-		commands = append(commands, petTick(m.epoch))
-	}
-	return tea.Batch(commands...)
+	return tea.Batch(loadDataWithMux(m.root, m.ticket, m.demo, m.mux), tickEvery(m.interval, m.epoch), watchAnimationTick(m.epoch))
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -251,14 +227,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.uiFrame++
 		m.now = msg.at
 		return m, watchAnimationTick(m.epoch)
-	case petTickMsg:
-		if m.inactive || msg.epoch != m.epoch || m.mode != ModePet {
-			m.petTicking = false
-			return m, nil
-		}
-		m.petFrame++
-		m.petTicking = true
-		return m, petTick(m.epoch)
 	case dataMsg:
 		now := time.Now()
 		selectedTicket := ""
@@ -396,30 +364,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, keys.help):
 			m.help = true
 			return m, nil
-		case key.Matches(msg, keys.view):
-			if m.preview {
-				return m, nil
-			}
-			if m.mode == ModePet {
-				m.mode = ModeRail
-				return m, nil
-			}
-			m.mode = ModePet
-			if !m.petTicking {
-				m.petTicking = true
-				return m, petTick(m.epoch)
-			}
-			return m, nil
-		case key.Matches(msg, keys.petLayout):
-			if m.preview || m.mode != ModePet {
-				return m, nil
-			}
-			if normalizePetLayout(m.petLayout) == PetLayoutColumn {
-				m.petLayout = PetLayoutResponsive
-			} else {
-				m.petLayout = PetLayoutColumn
-			}
-			return m, nil
 		case key.Matches(msg, keys.parking):
 			if m.preview || m.parkedCount() == 0 {
 				return m, nil
@@ -507,9 +451,6 @@ func (m Model) View() string {
 	}
 	if m.preview {
 		return m.renderPreview()
-	}
-	if m.mode == ModePet {
-		return m.renderPets()
 	}
 	if m.wide || m.width >= 56 {
 		return m.renderWide()
