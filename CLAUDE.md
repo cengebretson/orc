@@ -12,6 +12,10 @@ Workflow policy lives in files (`orc.yaml`, `RULES.md`, `AGENTS.md`, worker defi
 not in command handlers. `orc` enforces generic state transitions and safety rules,
 then reads, validates, renders, and updates those files.
 
+`CONTEXT.md` is the authoritative glossary for Orc's own domain vocabulary. Read
+it before introducing or changing domain terms, and update it in the same change
+when a definition changes.
+
 ## Repository Layout
 
 ```

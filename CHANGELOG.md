@@ -8,6 +8,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Added `CONTEXT.md` as the concise developer glossary for Orc's domain terms,
+  durable/live state boundaries, and stable architectural vocabulary.
 - Added conservative tmux fallback detection through embedded versioned Codex
   and Claude manifests, strict workspace-local overrides, title-over-screen
   precedence, bounded capture regions, working-to-idle debounce, and explicit
