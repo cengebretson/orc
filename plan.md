@@ -1,42 +1,13 @@
 # Orc roadmap
 
-This file is the source of truth for unshipped work. Shipped behavior belongs
-in `CHANGELOG.md`; user-facing behavior belongs in `README.md` and `docs/`.
+This file is the source of truth for unshipped work, and holds nothing else.
+`CHANGELOG.md` is the shipped history, `README.md` and `docs/` describe current
+behavior, `CONTEXT.md` defines the vocabulary, and `docs/adr/` records why the
+load-bearing decisions are what they are. Restating any of that here would only
+drift out of step with it.
 
-## Shipped baseline
-
-Orc already provides the durable workflow engine, feature state, worktree
-ownership, worker and pack resolution, stage transitions, reporting, session
-inventory/resume, watch/dashboard views, notification routing, and manual
-session parking.
-
-The live runtime is backend-neutral. tmux remains the portable default, while
-the Herdr backend supports exact opaque targets, native agent lifecycle,
-worktree create/open, task-cell layouts, attach/focus, sidebar metadata,
-notifications, archive cleanup, and structured `orc ctl` state, prompt, wait,
-watch, status, and terminal capture. Live views also support opt-in reversible
-parking without stopping sessions or changing worktrees.
-
-The tmux-first Super Orc plan is shipped: exact agent identity, provider hooks,
-structured lifecycle control, safe prompting, the managed attention rail,
-conservative fallback detection, and runtime reconciliation now share the same
-backend-neutral inventory.
-
-`CONTEXT.md` now provides the project glossary and durable terminology
-boundaries for contributors and coding agents.
-
-Release validation is pinned and non-publishing: `make release-check` verifies
-the version/changelog contract, runs disposable workspace QA, and evaluates all
-four GoReleaser platform archives plus checksums before a tag can be pushed.
-
-Releases publish macOS and Linux archives plus checksums, and carry their
-changelog section as the release body. See `CHANGELOG.md` for the shipped
-history and the current version — naming one here only goes stale.
-
-## Missing parts
-
-No active non-Herdr specification items remain. Choose a future-backlog item
-when work resumes; the additive Herdr plugin remains intentionally deferred.
+Nothing is currently in progress. Pick from the backlog below, or take up the
+deferred Herdr plugin.
 
 ## Deferred: Herdr plugin
 

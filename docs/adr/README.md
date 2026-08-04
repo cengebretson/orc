@@ -51,3 +51,5 @@ usually the most useful thing in the directory.
 | # | Title | Status |
 |---|-------|--------|
 | [0001](0001-tmux-is-the-default-backend.md) | tmux is the default backend, Herdr is additive | accepted |
+| [0002](0002-opaque-split-agent-identity.md) | Agent identity is opaque, and split from the live instance | accepted |
+| [0003](0003-ranked-lifecycle-evidence.md) | Lifecycle evidence is ranked, and only registration is authoritative | accepted |
