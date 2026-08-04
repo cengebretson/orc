@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-08-04
+
 ### Added
 
 - Added structured human responses. `orc mark <ticket> pause` now takes
@@ -675,7 +677,8 @@ invoke `orc watch` — an unknown flag now fails the command.
 - Bubble Tea TUI dashboard with health, workflow, stage, and portrait views.
 - `orc doctor --fix` to clear stale state locks.
 
-[Unreleased]: https://github.com/cengebretson/orc/compare/v0.18.0...HEAD
+[Unreleased]: https://github.com/cengebretson/orc/compare/v0.19.0...HEAD
+[0.19.0]: https://github.com/cengebretson/orc/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/cengebretson/orc/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/cengebretson/orc/compare/v0.16.1...v0.17.0
 [0.16.1]: https://github.com/cengebretson/orc/compare/v0.16.0...v0.16.1
