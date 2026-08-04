@@ -12,6 +12,30 @@ import (
 	"github.com/cengebretson/orc/internal/mux"
 )
 
+// requireTmuxServer skips when tmux is installed but cannot actually run
+// sessions here. Available() only proves tmux is on PATH; sandboxed and
+// containerized environments routinely deny the Unix socket it needs or refuse
+// to spawn a shell in an arbitrary directory. That is a missing capability
+// rather than a defect in the code under test, so it should skip, not fail.
+//
+// The probe mirrors what the test goes on to do — a detached session and a
+// second window, both rooted at dir — because those fail independently.
+func requireTmuxServer(t *testing.T, dir string) {
+	t.Helper()
+	const probe = "orc-tmux-probe"
+	defer exec.Command("tmux", "kill-session", "-t", probe).Run() //nolint:errcheck
+
+	for _, args := range [][]string{
+		{"new-session", "-d", "-s", probe, "-c", dir},
+		{"new-window", "-t", probe, "-n", "probe-window", "-c", dir},
+	} {
+		if out, err := exec.Command("tmux", args...).CombinedOutput(); err != nil {
+			t.Skipf("tmux cannot run sessions here (%s): %v: %s",
+				strings.Join(args, " "), err, strings.TrimSpace(string(out)))
+		}
+	}
+}
+
 func TestLiveTmuxWindowMetadataAttentionAndExactSend(t *testing.T) {
 	if !Available() {
 		t.Skip("tmux is not installed")
@@ -29,6 +53,8 @@ func TestLiveTmuxWindowMetadataAttentionAndExactSend(t *testing.T) {
 	defer exec.Command("tmux", "kill-server").Run() //nolint:errcheck
 
 	root := t.TempDir()
+	requireTmuxServer(t, root)
+
 	const session = "orc-live-test"
 	if err := CreateSession(session, root, []string{"develop", "review"}); err != nil {
 		t.Fatalf("CreateSession: %v", err)

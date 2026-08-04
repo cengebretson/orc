@@ -499,6 +499,7 @@ These backend-neutral JSON commands are intended for supervisors, integrations, 
 Deep reference lives in **[docs/reference.md](docs/reference.md)**:
 
 - **[Project context](CONTEXT.md)** — the authoritative Orc developer glossary and durable terminology decisions
+- **[Decision records](docs/adr/)** — why the load-bearing architectural decisions are what they are
 - **[Workspace layout](docs/reference.md#workspace-layout)** — the full file tree `orc init` scaffolds
 - **[Workspace files](docs/reference.md#workspace-files)** — owner and purpose of each root file (`AGENTS.md`, `ORC.md`, `RULES.md`, …)
 - **[Feature folder](docs/reference.md#feature-folder)** — the per-ticket context pack and who reads/writes each file
