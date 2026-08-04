@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cengebretson/orc/internal/agentidentity"
 	"github.com/cengebretson/orc/internal/config"
 	"github.com/cengebretson/orc/internal/mux"
 	"github.com/cengebretson/orc/internal/mux/muxtest"
@@ -30,6 +31,43 @@ type ctlTestBackend struct {
 	promptFunc  func(mux.Target, string, bool, mux.AgentControlOptions) (mux.AgentControlResult, error)
 	waitFunc    func(mux.Target, mux.AgentControlOptions) (mux.AgentControlResult, error)
 	captureFunc func(mux.Target, int) (string, error)
+}
+
+func TestRunAgentEventUsesInheritedPaneAndNormalizedFields(t *testing.T) {
+	resetCommandGlobals(t)
+	t.Setenv("TMUX_PANE", "%9")
+	agentEventAgentID = " agent-9 "
+	agentEventInstance = " instance-9 "
+	agentEventEngine = " CODEX "
+	agentEventProvider = " provider-9 "
+	agentEventLifecycle = " BLOCKED "
+	agentEventID = " event-9 "
+	var pane string
+	var event mux.AgentEvent
+	applyAgentEvent = func(gotPane string, gotEvent mux.AgentEvent) (mux.AgentEventResult, error) {
+		pane, event = gotPane, gotEvent
+		return mux.AgentEventResult{}, nil
+	}
+	if err := runAgentEvent(nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if pane != "%9" || event.AgentID != "agent-9" || event.AgentInstance != "instance-9" || event.Engine != "codex" || event.ProviderSessionID != "provider-9" || event.Lifecycle != "blocked" || event.EventID != "event-9" {
+		t.Fatalf("pane/event = %q / %+v", pane, event)
+	}
+}
+
+func TestRunAgentEventRejectsMissingInheritedPane(t *testing.T) {
+	resetCommandGlobals(t)
+	t.Setenv("TMUX_PANE", "")
+	agentEventAgentID = "agent-9"
+	agentEventInstance = "instance-9"
+	agentEventEngine = "codex"
+	agentEventLifecycle = "working"
+	agentEventID = "event-9"
+	applyAgentEvent = tmux.ApplyAgentEvent
+	if err := runAgentEvent(nil, nil); err == nil || !strings.Contains(err.Error(), "TMUX_PANE") {
+		t.Fatalf("runAgentEvent error = %v", err)
+	}
 }
 
 func (b *ctlTestBackend) StateAgent(target mux.Target) (mux.AgentControlResult, error) {
@@ -1690,6 +1728,15 @@ func resetCommandGlobals(t *testing.T) {
 	oldCtlCaptureTicket := ctlCaptureTicket
 	oldCtlCaptureLines := ctlCaptureLines
 	oldCollectCtlSessions := collectCtlSessions
+	oldApplyAgentEvent := applyAgentEvent
+	oldAgentEventAgentID := agentEventAgentID
+	oldAgentEventInstance := agentEventInstance
+	oldAgentEventEngine := agentEventEngine
+	oldAgentEventProvider := agentEventProvider
+	oldAgentEventLifecycle := agentEventLifecycle
+	oldAgentEventID := agentEventID
+	oldNewParkingAgentID := newParkingAgentID
+	oldNewParkingInstanceID := newParkingInstanceID
 	t.Cleanup(func() {
 		globalWorkspace = oldWorkspace
 		globalMux = oldMux
@@ -1728,6 +1775,15 @@ func resetCommandGlobals(t *testing.T) {
 		ctlCaptureTicket = oldCtlCaptureTicket
 		ctlCaptureLines = oldCtlCaptureLines
 		collectCtlSessions = oldCollectCtlSessions
+		applyAgentEvent = oldApplyAgentEvent
+		agentEventAgentID = oldAgentEventAgentID
+		agentEventInstance = oldAgentEventInstance
+		agentEventEngine = oldAgentEventEngine
+		agentEventProvider = oldAgentEventProvider
+		agentEventLifecycle = oldAgentEventLifecycle
+		agentEventID = oldAgentEventID
+		newParkingAgentID = oldNewParkingAgentID
+		newParkingInstanceID = oldNewParkingInstanceID
 	})
 
 	globalWorkspace = "."
@@ -1765,6 +1821,15 @@ func resetCommandGlobals(t *testing.T) {
 	ctlCaptureTicket = ""
 	ctlCaptureLines = 80
 	collectCtlSessions = sessionlist.Collect
+	applyAgentEvent = tmux.ApplyAgentEvent
+	agentEventAgentID = ""
+	agentEventInstance = ""
+	agentEventEngine = ""
+	agentEventProvider = ""
+	agentEventLifecycle = ""
+	agentEventID = ""
+	newParkingAgentID = agentidentity.NewAgentID
+	newParkingInstanceID = agentidentity.NewInstanceID
 }
 
 func writeCommandPack(t *testing.T, name, manifest string) string {

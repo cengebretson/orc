@@ -27,7 +27,8 @@ func TestWriteScriptCleansUpAfterCommandFailure(t *testing.T) {
 func TestParseDetailedPanesPreservesEmptyAttention(t *testing.T) {
 	row := strings.Join([]string{
 		"%1", "orc-1", "develop", "/work", "codex", "4242", "1",
-		"agent-1", "instance-1", "ORC-1", "develop", "default:bob", "codex", "codex", "provider-1", "/feature", "", "",
+		"agent-1", "instance-1", "ORC-1", "develop", "default:bob", "codex", "codex", "provider-1", "/feature",
+		"", "", "", "", "", "",
 	}, "\t") + "\n"
 
 	got := parseDetailedPanes([]byte(row))
@@ -49,7 +50,8 @@ func TestParseDetailedPanesNormalizesAttention(t *testing.T) {
 	rows := func(attention string) string {
 		return strings.Join([]string{
 			"%1", "orc-1", "develop", "/work", "codex", "4242", "1",
-			"agent-1", "instance-1", "ORC-1", "develop", "default:bob", "codex", "codex", "p1", "/feature", attention, "1700000000",
+			"agent-1", "instance-1", "ORC-1", "develop", "default:bob", "codex", "codex", "p1", "/feature",
+			"working", "7", "1699999999", "hook", attention, "1700000000",
 		}, "\t") + "\n"
 	}
 
@@ -65,6 +67,9 @@ func TestParseDetailedPanesNormalizesAttention(t *testing.T) {
 		}
 		if got[0].Attention != test.want {
 			t.Errorf("%q: Attention = %q, want %q", test.raw, got[0].Attention, test.want)
+		}
+		if got[0].Lifecycle != "working" || got[0].StateChangeSeq != 7 || got[0].LifecycleSince != 1699999999 || got[0].LifecycleSource != "hook" {
+			t.Errorf("%q: lifecycle metadata = %#v", test.raw, got[0])
 		}
 	}
 }

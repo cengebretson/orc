@@ -678,7 +678,7 @@ func TestRuntimeMutators(t *testing.T) {
 	if err := state.SetMuxAgentRuntime(
 		dir,
 		state.MuxRuntime{Backend: "tmux", Workspace: "ORC-2", Tab: "develop", Pane: "%7"},
-		state.AgentRuntime{ID: "agent-2", Instance: "instance-2", Engine: "codex", ProviderSessionID: "provider-2"},
+		state.AgentRuntime{ID: "agent-2", Instance: "instance-2", Stage: "develop", Engine: "codex", ProviderSessionID: "provider-2"},
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -686,7 +686,7 @@ func TestRuntimeMutators(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, _ = state.Load(dir)
-	if got.Runtime.Mux == nil || got.Runtime.Mux.Pane != "%7" || got.Runtime.Agent == nil || got.Runtime.Agent.ID != "agent-2" || got.Runtime.Agent.Instance != "instance-2" || got.Runtime.Agent.Engine != "codex" || got.Runtime.Agent.ProviderSessionID != "provider-2" || got.Runtime.JIT == nil || got.Runtime.JIT.Worker != "default:fred" || got.Runtime.JIT.StartedAt == "" {
+	if got.Runtime.Mux == nil || got.Runtime.Mux.Pane != "%7" || got.Runtime.Agent == nil || got.Runtime.Agent.ID != "agent-2" || got.Runtime.Agent.Instance != "instance-2" || got.Runtime.Agent.Stage != "develop" || got.Runtime.Agent.Engine != "codex" || got.Runtime.Agent.ProviderSessionID != "provider-2" || got.Runtime.JIT == nil || got.Runtime.JIT.Worker != "default:fred" || got.Runtime.JIT.StartedAt == "" {
 		t.Fatalf("runtime after target/JIT = %+v", got.Runtime)
 	}
 	if err := state.ClearJIT(dir); err != nil {

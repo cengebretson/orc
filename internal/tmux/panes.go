@@ -21,6 +21,8 @@ var paneFormat = strings.Join([]string{
 	"#{@orc_ticket}", "#{@orc_stage}",
 	"#{@orc_worker}", "#{@orc_engine}", "#{@orc_provider_engine}",
 	"#{@orc_provider_session}", "#{@orc_feature_dir}",
+	"#{@orc_agent_state}", "#{@orc_agent_state_seq}",
+	"#{@orc_agent_state_since}", "#{@orc_agent_state_source}",
 	"#{@agent_attention}", "#{@agent_attention_since}",
 }, "\t")
 
@@ -66,20 +68,32 @@ func parseDetailedPanes(out []byte) []mux.Pane {
 	for _, line := range strings.Split(text, "\n") {
 		line = strings.TrimSuffix(line, "\r")
 		fields := strings.Split(line, "\t")
-		if len(fields) < 18 || fields[0] == "" {
+		if len(fields) < 22 || fields[0] == "" {
 			continue
 		}
 		pid, _ := strconv.Atoi(fields[5])
-		since, _ := strconv.ParseInt(fields[17], 10, 64)
+		sequence, _ := strconv.ParseUint(fields[17], 10, 64)
+		lifecycleSince, _ := strconv.ParseInt(fields[18], 10, 64)
+		attentionSince, _ := strconv.ParseInt(fields[21], 10, 64)
 		panes = append(panes, mux.Pane{
 			Backend: "tmux", ID: fields[0], Session: fields[1], Window: fields[2],
 			CWD: fields[3], Command: fields[4], PID: pid, Agent: fields[6] == "1",
 			AgentID: fields[7], AgentInstance: fields[8], Ticket: fields[9],
 			Stage: fields[10], Worker: fields[11], Engine: fields[12],
 			ProviderEngine: fields[13], ProviderSessionID: fields[14],
-			FeatureDir: fields[15], Attention: normalizeAttention(fields[16]),
-			AttentionSince: since,
+			FeatureDir: fields[15], Lifecycle: normalizeLifecycle(fields[16]),
+			StateChangeSeq: sequence, LifecycleSince: lifecycleSince, LifecycleSource: fields[19],
+			Attention: normalizeAttention(fields[20]), AttentionSince: attentionSince,
 		})
 	}
 	return panes
+}
+
+func normalizeLifecycle(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case mux.LifecycleIdle, mux.LifecycleWorking, mux.LifecycleBlocked, mux.LifecycleDone, mux.LifecycleUnknown:
+		return strings.ToLower(strings.TrimSpace(value))
+	default:
+		return ""
+	}
 }

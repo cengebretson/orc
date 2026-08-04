@@ -78,6 +78,7 @@ type MuxRuntime struct {
 type AgentRuntime struct {
 	ID                string `yaml:"id"`
 	Instance          string `yaml:"instance"`
+	Stage             string `yaml:"stage,omitempty"`
 	Engine            string `yaml:"engine,omitempty"`
 	ProviderSessionID string `yaml:"provider_session,omitempty"`
 }

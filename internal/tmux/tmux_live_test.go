@@ -61,6 +61,27 @@ func TestLiveTmuxWindowMetadataAttentionAndExactSend(t *testing.T) {
 	); err != nil || resolved != pane {
 		t.Fatalf("ValidateAgentTarget = %q, %v; want %q", resolved, err, pane)
 	}
+	eventResult, err := applyAgentEventAt(pane, mux.AgentEvent{
+		AgentID: metadata.AgentID, AgentInstance: metadata.AgentInstance, Engine: metadata.Engine,
+		ProviderSessionID: metadata.ProviderSessionID, Lifecycle: mux.LifecycleWorking, EventID: "event-live-1",
+	}, time.Unix(1700000000, 0))
+	if err != nil || eventResult.StateChangeSeq != 1 {
+		t.Fatalf("ApplyAgentEvent = %+v, %v", eventResult, err)
+	}
+	panes, err := ListPanesDetailed()
+	if err != nil {
+		t.Fatalf("ListPanesDetailed: %v", err)
+	}
+	var livePane *mux.Pane
+	for i := range panes {
+		if panes[i].ID == pane {
+			livePane = &panes[i]
+			break
+		}
+	}
+	if livePane == nil || livePane.AgentID != metadata.AgentID || livePane.AgentInstance != metadata.AgentInstance || livePane.Lifecycle != mux.LifecycleWorking || livePane.StateChangeSeq != 1 || livePane.LifecycleSince != 1700000000 || livePane.LifecycleSource != "hook" {
+		t.Fatalf("live pane lifecycle = %#v", livePane)
+	}
 	withoutProviderID := metadata
 	withoutProviderID.ProviderSessionID = ""
 	if err := SetWindowMetadata(session, "review", withoutProviderID); err != nil {
@@ -102,6 +123,14 @@ func TestLiveTmuxWindowMetadataAttentionAndExactSend(t *testing.T) {
 		t.Fatalf("SessionEnvironment = %q, %v; want %q", got, err, metadata.ProviderSessionID)
 	}
 
+	// The working hook event explicitly shadows legacy window attention with an
+	// empty pane value. Remove that authoritative pane overlay before exercising
+	// compatibility with setups that publish attention only on the window.
+	for _, option := range []string{"@agent_attention", "@agent_attention_since", "@agent_attention_source"} {
+		if err := exec.Command("tmux", "set-option", "-p", "-u", "-t", pane, option).Run(); err != nil {
+			t.Fatalf("clear pane %s: %v", option, err)
+		}
+	}
 	if err := exec.Command("tmux", "set-option", "-w", "-t", session+":review", "@agent_attention", mux.AttentionInput).Run(); err != nil {
 		t.Fatalf("set attention: %v", err)
 	}

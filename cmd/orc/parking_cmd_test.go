@@ -42,6 +42,37 @@ func TestResumedLaunchArgvCarriesProviderIdentity(t *testing.T) {
 	}
 }
 
+func TestNextParkingAgentRuntimeReusesDurableIdentity(t *testing.T) {
+	featureDir := t.TempDir()
+	if err := state.Create(featureDir, &state.State{
+		Ticket: "ORC-1", Slug: "ORC-1", Status: "active",
+		Runtime: state.Runtime{Agent: &state.AgentRuntime{
+			ID: "agent-1", Instance: "instance-old", Stage: "develop", Engine: "codex", ProviderSessionID: "provider-old",
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	oldAgentID, oldInstanceID := newParkingAgentID, newParkingInstanceID
+	t.Cleanup(func() {
+		newParkingAgentID = oldAgentID
+		newParkingInstanceID = oldInstanceID
+	})
+	newParkingAgentID = func() (string, error) {
+		t.Fatal("matching engine should reuse the durable agent id")
+		return "", nil
+	}
+	newParkingInstanceID = func() (string, error) { return "instance-new", nil }
+	got, err := nextParkingAgentRuntime(parking.Entry{
+		FeatureDir: featureDir, Stage: "develop", Engine: "CODEX", ProviderSessionID: "provider-resumed",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ID != "agent-1" || got.Instance != "instance-new" || got.Stage != "develop" || got.Engine != "codex" || got.ProviderSessionID != "provider-resumed" {
+		t.Fatalf("agent runtime = %+v", got)
+	}
+}
+
 func TestRestoredPaneRequiresExactParkedIdentity(t *testing.T) {
 	entry := parking.Entry{
 		Ticket: "ORC-1", Stage: "develop", Engine: "codex", ProviderSessionID: "provider-1",

@@ -33,6 +33,20 @@ const (
 	AttentionDone    = "done"
 )
 
+const (
+	LifecycleIdle    = "idle"
+	LifecycleWorking = "working"
+	LifecycleBlocked = "blocked"
+	LifecycleDone    = "done"
+	LifecycleUnknown = "unknown"
+)
+
+const (
+	EnvAgentID       = "ORC_AGENT_ID"
+	EnvAgentInstance = "ORC_AGENT_INSTANCE"
+	EnvFeatureDir    = "ORC_FEATURE_DIR"
+)
+
 // EnvResumedFrom names the environment variable Orc sets when a session is
 // recreated from a parked snapshot, so the relaunched provider can resume its
 // own prior session rather than starting cold.
@@ -118,6 +132,26 @@ type AgentControlResult struct {
 	Name           string `json:"name,omitempty"`
 	Lifecycle      string `json:"lifecycle"`
 	StateChangeSeq uint64 `json:"state_change_seq,omitempty"`
+}
+
+// AgentEvent is one authoritative lifecycle transition emitted by a supported
+// provider hook from the exact tmux pane hosting the agent.
+type AgentEvent struct {
+	AgentID           string
+	AgentInstance     string
+	Engine            string
+	ProviderSessionID string
+	Lifecycle         string
+	EventID           string
+}
+
+// AgentEventResult reports the committed lifecycle sequence for hook
+// diagnostics and idempotence tests.
+type AgentEventResult struct {
+	Target         Target `json:"target"`
+	Lifecycle      string `json:"lifecycle"`
+	StateChangeSeq uint64 `json:"state_change_seq"`
+	Duplicate      bool   `json:"duplicate,omitempty"`
 }
 
 // AgentControlError preserves a backend's stable automation error code, such
@@ -215,6 +249,9 @@ type Pane struct {
 	FeatureDir        string `json:"feature_dir,omitempty"`
 	Attention         string `json:"attention,omitempty"`
 	Lifecycle         string `json:"lifecycle,omitempty"`
+	LifecycleSource   string `json:"lifecycle_source,omitempty"`
+	StateChangeSeq    uint64 `json:"state_change_seq,omitempty"`
+	LifecycleSince    int64  `json:"lifecycle_since,omitempty"`
 	// AttentionSince is when the pane entered its current attention state, in
 	// epoch seconds. Zero means the reporter did not say — treat it as unknown
 	// rather than as the epoch.
@@ -303,6 +340,15 @@ type TargetBackend interface {
 	SetTargetMetadata(target Target, meta Metadata) error
 	AttachTarget(target Target) error
 	AttachTargetHint(target Target) string
+}
+
+// AgentLaunchBackend can stamp an exact target and inject identity into a
+// provider process before it starts. The returned argv is backend-specific;
+// callers must pass it unchanged to SendTarget.
+type AgentLaunchBackend interface {
+	TargetBackend
+
+	PrepareAgentLaunch(target Target, tab, dir string, meta Metadata, argv []string) (Target, []string, error)
 }
 
 // WorktreeTargetBackend is an optional capability for multiplexers that can

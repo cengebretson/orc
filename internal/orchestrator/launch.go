@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"sort"
 
+	"github.com/cengebretson/orc/internal/agentidentity"
 	"github.com/cengebretson/orc/internal/config"
 	"github.com/cengebretson/orc/internal/mux"
 	"github.com/cengebretson/orc/internal/runner"
@@ -59,23 +60,29 @@ type Launcher struct {
 	// assemble a launcher from mismatched halves.
 	Mux mux.Backend
 
-	SetMuxRuntime    func(featureDir string, target state.MuxRuntime) error
-	SetRuntime       func(featureDir, tmuxSession string) error
-	SetRuntimeTarget func(featureDir, tmuxSession, pane string) error
-	RecordWorktree   func(featureDir, root string, launch worktreeLaunch) error
-	AppendHistory    func(featureDir, stage, workerID, result string) error
-	RunForeground    func(opts LaunchOptions) error
+	SetMuxRuntime      func(featureDir string, target state.MuxRuntime) error
+	SetMuxAgentRuntime func(featureDir string, target state.MuxRuntime, agent state.AgentRuntime) error
+	SetRuntime         func(featureDir, tmuxSession string) error
+	SetRuntimeTarget   func(featureDir, tmuxSession, pane string) error
+	RecordWorktree     func(featureDir, root string, launch worktreeLaunch) error
+	AppendHistory      func(featureDir, stage, workerID, result string) error
+	RunForeground      func(opts LaunchOptions) error
+	NewAgentID         func() (string, error)
+	NewInstanceID      func() (string, error)
 }
 
 func NewLauncher() Launcher {
 	return Launcher{
-		Mux:              tmux.New(),
-		SetMuxRuntime:    state.SetMuxRuntime,
-		SetRuntime:       state.SetRuntime,
-		SetRuntimeTarget: state.SetRuntimeTarget,
-		RecordWorktree:   recordWorktree,
-		AppendHistory:    state.AppendHistory,
-		RunForeground:    runForeground,
+		Mux:                tmux.New(),
+		SetMuxRuntime:      state.SetMuxRuntime,
+		SetMuxAgentRuntime: state.SetMuxAgentRuntime,
+		SetRuntime:         state.SetRuntime,
+		SetRuntimeTarget:   state.SetRuntimeTarget,
+		RecordWorktree:     recordWorktree,
+		AppendHistory:      state.AppendHistory,
+		RunForeground:      runForeground,
+		NewAgentID:         agentidentity.NewAgentID,
+		NewInstanceID:      agentidentity.NewInstanceID,
 	}
 }
 
@@ -101,6 +108,9 @@ func (l Launcher) Launch(opts LaunchOptions) (*LaunchResult, error) {
 	if l.SetMuxRuntime == nil {
 		l.SetMuxRuntime = state.SetMuxRuntime
 	}
+	if l.SetMuxAgentRuntime == nil {
+		l.SetMuxAgentRuntime = state.SetMuxAgentRuntime
+	}
 	if l.RecordWorktree == nil {
 		l.RecordWorktree = recordWorktree
 	}
@@ -109,6 +119,12 @@ func (l Launcher) Launch(opts LaunchOptions) (*LaunchResult, error) {
 	}
 	if l.RunForeground == nil {
 		l.RunForeground = runForeground
+	}
+	if l.NewAgentID == nil {
+		l.NewAgentID = agentidentity.NewAgentID
+	}
+	if l.NewInstanceID == nil {
+		l.NewInstanceID = agentidentity.NewInstanceID
 	}
 
 	result := &LaunchResult{
@@ -294,6 +310,23 @@ func (l Launcher) launchTarget(backend mux.TargetBackend, opts LaunchOptions, re
 			launchArgv = workers.LaunchArgs(opts.Plan.Worker, opts.Root, runDir, opts.Plan.Prompt)
 		}
 	}
+	metadata := windowMetadata(opts, logicalWindow)
+	var agentRuntime *state.AgentRuntime
+	if preparer, ok := backend.(mux.AgentLaunchBackend); ok && opts.Plan.Worker != nil {
+		agent, err := l.nextAgentRuntime(opts)
+		if err != nil {
+			return false, err
+		}
+		agentRuntime = &agent
+		metadata.AgentID = agent.ID
+		metadata.AgentInstance = agent.Instance
+		metadata.ProviderSessionID = agent.ProviderSessionID
+		target, launchArgv, err = preparer.PrepareAgentLaunch(target, result.Window, launchDir, metadata, launchArgv)
+		if err != nil {
+			result.addFallback(opts, fmt.Sprintf("%s agent prepare failed (%v)", backend.Name(), err))
+			return false, nil
+		}
+	}
 	sent, err := backend.SendTarget(target, result.Window, launchDir, runDir, launchArgv)
 	if err != nil {
 		result.addFallback(opts, fmt.Sprintf("%s send failed (%v)", backend.Name(), err))
@@ -303,7 +336,9 @@ func (l Launcher) launchTarget(backend mux.TargetBackend, opts LaunchOptions, re
 	result.Window = sent.Tab
 	result.Pane = sent.Pane
 
-	metadata := windowMetadata(opts, logicalWindow)
+	if agentRuntime != nil && sent.Pane != target.Pane {
+		return false, fmt.Errorf("%s agent launch moved from prepared pane %s to %s", backend.Name(), target.Pane, sent.Pane)
+	}
 	if err := backend.SetTargetMetadata(sent, metadata); err != nil {
 		result.addFallback(opts, fmt.Sprintf("warning: could not set %s metadata: %v", backend.Name(), err))
 	}
@@ -314,16 +349,58 @@ func (l Launcher) launchTarget(backend mux.TargetBackend, opts LaunchOptions, re
 			}
 		}
 	}
-	if err := l.SetMuxRuntime(opts.FeatureDir, state.MuxRuntime{
+	runtimeTarget := state.MuxRuntime{
 		Backend: sent.Backend, Workspace: sent.Workspace, Tab: sent.Tab, Pane: sent.Pane,
-	}); err != nil {
-		result.addFallback(opts, fmt.Sprintf("warning: could not write %s target to STATE.yaml: %v", backend.Name(), err))
+	}
+	var runtimeErr error
+	if agentRuntime != nil {
+		runtimeErr = l.SetMuxAgentRuntime(opts.FeatureDir, runtimeTarget, *agentRuntime)
+	} else {
+		runtimeErr = l.SetMuxRuntime(opts.FeatureDir, runtimeTarget)
+	}
+	if runtimeErr != nil {
+		result.addFallback(opts, fmt.Sprintf("warning: could not write %s target to STATE.yaml: %v", backend.Name(), runtimeErr))
 	}
 
 	result.Mode = LaunchModeTmux
 	result.AttachHint = backend.AttachTargetHint(sent)
 	l.recordLaunch(opts, result, fmt.Sprintf("launched in %s workspace %s tab %s", backend.Name(), sent.Workspace, sent.Tab))
 	return true, nil
+}
+
+func (l Launcher) nextAgentRuntime(opts LaunchOptions) (state.AgentRuntime, error) {
+	engine := ""
+	stage := opts.Plan.Stage
+	if stage == "" {
+		stage = opts.Window
+	}
+	if stage == "" && opts.State != nil {
+		stage = opts.State.Stage.Name
+	}
+	if opts.Plan.Worker != nil {
+		engine = opts.Plan.Worker.Engine
+	}
+	agentID := ""
+	providerSessionID := ""
+	if existing := opts.State.Runtime.Agent; stage != "jit" && existing != nil &&
+		(existing.Stage == "" || existing.Stage == stage) && (existing.Engine == "" || existing.Engine == engine) {
+		agentID = existing.ID
+		providerSessionID = existing.ProviderSessionID
+	}
+	if agentID == "" {
+		var err error
+		agentID, err = l.NewAgentID()
+		if err != nil {
+			return state.AgentRuntime{}, err
+		}
+	}
+	instance, err := l.NewInstanceID()
+	if err != nil {
+		return state.AgentRuntime{}, err
+	}
+	return state.AgentRuntime{
+		ID: agentID, Instance: instance, Stage: stage, Engine: engine, ProviderSessionID: providerSessionID,
+	}, nil
 }
 
 func windowMetadata(opts LaunchOptions, window string) mux.Metadata {

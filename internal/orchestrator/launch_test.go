@@ -24,6 +24,15 @@ type nativeTargetFake struct {
 	configureTaskCell    func(target mux.Target, spec mux.TaskCellSpec) error
 }
 
+type agentLaunchFake struct {
+	*nativeTargetFake
+	prepareAgentLaunch func(target mux.Target, tab, dir string, meta mux.Metadata, argv []string) (mux.Target, []string, error)
+}
+
+func (f *agentLaunchFake) PrepareAgentLaunch(target mux.Target, tab, dir string, meta mux.Metadata, argv []string) (mux.Target, []string, error) {
+	return f.prepareAgentLaunch(target, tab, dir, meta, argv)
+}
+
 func (f *nativeTargetFake) CreateTarget(name, dir string, tabs []string) (mux.Target, error) {
 	return f.createTarget(name, dir, tabs)
 }
@@ -54,6 +63,117 @@ func (f *nativeTargetFake) AttachTarget(mux.Target) error { return nil }
 
 func (f *nativeTargetFake) AttachTargetHint(target mux.Target) string {
 	return "herdr agent attach " + target.Pane
+}
+
+func TestLauncherAssignsAgentIdentityBeforeLaunchAndPersistsItAtomically(t *testing.T) {
+	target := mux.Target{Backend: "tmux", Workspace: "orc-9", Tab: "develop", Pane: "%9"}
+	s := &state.State{
+		Ticket: "ORC-9", Slug: "orc-9", Stage: state.Stage{Name: "develop"},
+		Runtime: state.Runtime{Agent: &state.AgentRuntime{
+			ID: "agent-existing", Instance: "instance-old", Engine: "codex", ProviderSessionID: "provider-9",
+		}},
+	}
+	plan := &runner.Plan{
+		CWD: "/work", LaunchArgv: []string{"codex", "build this"},
+		Worker: &workers.Worker{ID: "dev", Engine: "codex"},
+	}
+	var prepared mux.Metadata
+	var sentArgv []string
+	var persistedTarget state.MuxRuntime
+	var persistedAgent state.AgentRuntime
+	base := &nativeTargetFake{
+		Fake: &muxtest.Fake{
+			NameFunc: func() string { return "tmux" }, AvailableFunc: func() bool { return true },
+			SessionExistsFunc: func(string) bool { return false },
+		},
+		createTarget: func(string, string, []string) (mux.Target, error) { return target, nil },
+		sendTarget: func(got mux.Target, _ string, _ string, _ string, argv []string) (mux.Target, error) {
+			sentArgv = append([]string(nil), argv...)
+			return got, nil
+		},
+		setTargetMetadata: func(_ mux.Target, meta mux.Metadata) error {
+			prepared = meta
+			return nil
+		},
+	}
+	fake := &agentLaunchFake{
+		nativeTargetFake: base,
+		prepareAgentLaunch: func(got mux.Target, _ string, _ string, meta mux.Metadata, argv []string) (mux.Target, []string, error) {
+			prepared = meta
+			return got, append([]string{"prepared"}, argv...), nil
+		},
+	}
+	launcher := Launcher{
+		Mux: fake,
+		SetMuxAgentRuntime: func(_ string, gotTarget state.MuxRuntime, gotAgent state.AgentRuntime) error {
+			persistedTarget, persistedAgent = gotTarget, gotAgent
+			return nil
+		},
+		NewAgentID: func() (string, error) {
+			t.Fatal("existing durable agent id should be reused")
+			return "", nil
+		},
+		NewInstanceID: func() (string, error) { return "instance-new", nil },
+		AppendHistory: func(string, string, string, string) error { return nil },
+		RunForeground: func(LaunchOptions) error {
+			t.Fatal("foreground should not run")
+			return nil
+		},
+	}
+	result, err := launcher.Launch(LaunchOptions{FeatureDir: "/feature", State: s, Plan: plan})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Pane != "%9" || !reflect.DeepEqual(sentArgv, []string{"prepared", "codex", "build this"}) {
+		t.Fatalf("result/argv = %+v / %#v", result, sentArgv)
+	}
+	if prepared.AgentID != "agent-existing" || prepared.AgentInstance != "instance-new" || prepared.ProviderSessionID != "provider-9" {
+		t.Fatalf("prepared metadata = %+v", prepared)
+	}
+	if persistedTarget.Pane != "%9" || persistedAgent.ID != "agent-existing" || persistedAgent.Instance != "instance-new" || persistedAgent.Stage != "develop" || persistedAgent.ProviderSessionID != "provider-9" {
+		t.Fatalf("persisted target/agent = %+v / %+v", persistedTarget, persistedAgent)
+	}
+}
+
+func TestNextAgentRuntimeReplacesIdentityWhenEngineChanges(t *testing.T) {
+	launcher := Launcher{
+		NewAgentID:    func() (string, error) { return "agent-new", nil },
+		NewInstanceID: func() (string, error) { return "instance-new", nil },
+	}
+	got, err := launcher.nextAgentRuntime(LaunchOptions{
+		State: &state.State{Runtime: state.Runtime{Agent: &state.AgentRuntime{
+			ID: "agent-old", Instance: "instance-old", Engine: "claude", ProviderSessionID: "provider-old",
+		}}},
+		Plan: &runner.Plan{Worker: &workers.Worker{Engine: "codex"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ID != "agent-new" || got.Instance != "instance-new" || got.Stage != "" || got.Engine != "codex" || got.ProviderSessionID != "" {
+		t.Fatalf("next agent runtime = %+v", got)
+	}
+}
+
+func TestNextAgentRuntimeReplacesIdentityWhenStageChanges(t *testing.T) {
+	launcher := Launcher{
+		NewAgentID:    func() (string, error) { return "agent-new", nil },
+		NewInstanceID: func() (string, error) { return "instance-new", nil },
+	}
+	got, err := launcher.nextAgentRuntime(LaunchOptions{
+		State: &state.State{
+			Stage: state.Stage{Name: "review"},
+			Runtime: state.Runtime{Agent: &state.AgentRuntime{
+				ID: "agent-old", Instance: "instance-old", Stage: "develop", Engine: "codex", ProviderSessionID: "provider-old",
+			}},
+		},
+		Plan: &runner.Plan{Worker: &workers.Worker{Engine: "codex"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ID != "agent-new" || got.Instance != "instance-new" || got.Stage != "review" || got.Engine != "codex" || got.ProviderSessionID != "" {
+		t.Fatalf("next agent runtime = %+v", got)
+	}
 }
 
 func TestLauncherCreatesNativeWorktreeTarget(t *testing.T) {

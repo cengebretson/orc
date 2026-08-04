@@ -273,6 +273,47 @@ Safety requirements:
 - Dry-run reports exact intended files and logical changes without writing.
 - Codex hook enablement must not silently approve hook hashes for the user.
 
+### Porting the Herdr hook scripts
+
+Herdr ships working hook integrations for both engines Orc cares about, at
+`src/integration/assets/{claude,codex}/herdr-agent-state.sh` in that
+repository. They are roughly a hundred lines of Python each, invoked from a
+small shell wrapper, and they are worth reading before writing new ones.
+
+Only the transport differs. Herdr's scripts write one JSON-RPC line to a Unix
+socket; the tmux equivalent sets a pane or window option that `orc watch` and
+the status line already read. Everything above the transport transfers.
+
+What transfers, and is the actual value:
+
+- **Subagent filtering.** A hook payload carrying `agent_id` is a subagent
+  event. Reporting it moves the pane's state on behalf of something the user
+  is not waiting on.
+- **`SubagentStop` is not a resume.** Claude emits it from recap and
+  away-summary flows after the main turn has already stopped. Treating it as
+  durable working revives an idle pane and produces a rail that claims work is
+  happening when none is.
+- **Monotonic sequence numbers.** Nanosecond timestamps order concurrent
+  reports so a slow hook cannot overwrite a newer state.
+- **Session identity.** Session id and transcript path let a report bind to a
+  specific agent session rather than only to a pane, which matters across
+  restarts and reattachment.
+- **Silent failure.** Every script exits zero when the environment is absent.
+  A hook that errors inside the user's agent is worse than a missing state.
+
+What Orc must decide that Herdr did not have to:
+
+- Which tmux option namespace carries state, and whether it is pane-scoped or
+  window-scoped. Pane scope is more precise; window scope is what existing
+  status-line integrations already read.
+- Whether to reuse `tmux-attention`'s `@agent_attention` contract directly, or
+  define an Orc-owned option and let `tmux-attention` remain a separate
+  consumer.
+
+Screen scraping stays a fallback, not a requirement. Both target engines
+support hooks, so a first implementation can ship without any pane-content
+parsing and add it later only if gaps appear.
+
 ## tmux agent control backend
 
 After authoritative events and identity validation exist, tmux implements
@@ -360,6 +401,55 @@ Behavior:
 Suggested optional bindings belong in documentation and `docs/tmux.conf`, not
 in a mandatory installer.
 
+### Collapsing the rail
+
+Add a collapsed presentation so the rail can stay open without spending width:
+
+```text
+orc rail collapse
+orc rail expand
+orc rail toggle-collapsed
+```
+
+Collapse is a resize, not a teardown. The rail pane stays alive and keeps its
+process; only its width changes.
+
+```sh
+pane=$(tmux list-panes -F '#{pane_id} #{@orc_rail}' | awk '$2=="1"{print $1}')
+width=$(tmux display -p -t "$pane" '#{pane_width}')
+if [ "$width" -gt 10 ]; then
+    tmux resize-pane -t "$pane" -x 5
+else
+    tmux resize-pane -t "$pane" -x 64
+fi
+```
+
+`resize-pane` delivers `SIGWINCH` to the rail process, which is the whole
+mechanism. `orc watch` catches it, re-reads the terminal size, and redraws for
+the width it now has:
+
+- At full width, normal rows: state, ticket, stage, worker, title.
+- At collapsed width, one state mark per row and nothing else.
+
+Requirements:
+
+- Never tear the pane down to collapse it. A restart loses scroll position,
+  in-flight refreshes, and any selection state, and makes collapse feel
+  destructive.
+- Persist the collapsed flag on the window, for example `@orc_rail_collapsed`,
+  so other scripts and a later reattach can read it.
+- Do not force a minimum below what tmux will actually honor. Borders and
+  layout constraints mean a two-column pane is not reliably reachable; five is
+  a safe floor.
+- Render the expand affordance inside the rail's own last row, or through
+  `pane-border-format`, rather than requiring a keybinding to be discoverable.
+- Redraw must be driven by `SIGWINCH`, not polling. A rail that repaints on a
+  timer will flicker against agent output in neighbouring panes.
+
+Mouse toggling is possible through `MouseDown1Pane` with `#{mouse_x}` and
+`#{mouse_y}`, but hit-testing is manual arithmetic and should be treated as
+optional polish rather than part of the first implementation.
+
 ## Seen state and multiple clients
 
 The first version uses a conservative rule:
@@ -389,9 +479,62 @@ Authoritative transitions may route through Orc's existing notification layer:
 tmux does not need a native notification surface. Orc may use its configured
 OS, terminal, or command notification routes.
 
+## Pane observation and title inference
+
+Hooks report only for panes the user has installed them in. Agents started by
+hand in an arbitrary pane report nothing, and those are exactly the ones a
+rail is useful for. Orc should therefore discover agents by observation as
+well as by registration.
+
+tmux exposes everything required in one call:
+
+```sh
+tmux list-panes -a -F \
+  '#{session_name} #{window_index} #{pane_id} #{pane_current_command} #{pane_title}'
+```
+
+That covers the whole server, not one session, and costs a single process per
+poll rather than one per pane.
+
+### Titles carry state, not just identity
+
+Both target engines write their state into the OSC title, and it is a
+stronger signal than screen content. Herdr's own detection ranks it that way:
+in `src/detect/manifests/codex.toml`, the title rules sit at priority 1100 for
+blocked and 1050 for working, while screen-content rules sit below them. The
+title wins when both are available.
+
+The observable vocabulary:
+
+- **Working** — a braille spinner in the title, from the set
+  `⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏`. Claude also cycles `· ✢ ✳ ✶ ✻ ✽`.
+- **Blocked** — engine-specific wording; Codex writes `Action Required`.
+- **Idle** — a non-empty title with no spinner.
+- **Unknown** — no title, or a title that matches nothing.
+
+Requirements:
+
+- Poll `list-panes` on a bounded interval, not per pane, and not per frame.
+- Treat title inference as `source=title`, ranked above `source=screen` and
+  below any hook report.
+- Never let inference overwrite newer hook metadata, and never let it satisfy
+  a wait, complete work, or advance a stage.
+- Strip the leading activity glyph before using a title as a display label,
+  or the rail will flicker on every spinner frame. Herdr keeps both forms and
+  lets the row choose.
+- A pane whose title matches nothing publishes `unknown`, not a guess.
+
+### Why this comes before screen scraping
+
+Title inference needs no pane-content capture, no per-pane polling, and no
+region model. It handles the common cases for both engines Orc targets. Screen
+scraping should be treated as a third tier, reached only when hooks are absent
+*and* the title is uninformative, rather than as the primary fallback.
+
 ## Conservative screen fallback
 
-Screen fallback is implemented only after hook-backed lifecycle works.
+Screen fallback is implemented only after hook-backed lifecycle and title
+inference both work, and only for cases neither covers.
 
 - Rules live in versioned per-engine data files embedded in the binary.
 - Rules inspect bounded bottom-of-screen regions with explicit priorities.

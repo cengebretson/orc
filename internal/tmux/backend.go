@@ -16,6 +16,7 @@ func New() Backend { return Backend{} }
 
 var _ mux.Backend = Backend{}
 var _ mux.TargetBackend = Backend{}
+var _ mux.AgentLaunchBackend = Backend{}
 var _ mux.TerminalCaptureBackend = Backend{}
 
 // Name identifies this backend.

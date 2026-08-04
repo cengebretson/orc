@@ -9,12 +9,18 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cengebretson/orc/internal/agentidentity"
 	"github.com/cengebretson/orc/internal/mux"
 	"github.com/cengebretson/orc/internal/parking"
 	"github.com/cengebretson/orc/internal/sessionlist"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/telemetry"
 	"github.com/spf13/cobra"
+)
+
+var (
+	newParkingAgentID    = agentidentity.NewAgentID
+	newParkingInstanceID = agentidentity.NewInstanceID
 )
 
 func runSessionsPark(cmd *cobra.Command, args []string) error {
@@ -193,14 +199,44 @@ func unparkEntry(entry parking.Entry) error {
 		return err
 	}
 	launchArgv := resumedLaunchArgv(binary, argv, entry.ProviderSessionID)
-	pane, err := muxBackend.SendCommand(entry.TmuxSession, entry.TmuxWindow, "", entry.FeatureDir, entry.CWD, launchArgv)
-	if err != nil {
-		return err
-	}
 	metadata := mux.Metadata{
 		Ticket: entry.Ticket, Stage: entry.Stage, Worker: entry.Worker,
 		Engine: entry.Engine, ProviderSessionID: entry.ProviderSessionID,
 		FeatureDir: entry.FeatureDir,
+	}
+	var pane string
+	var agentRuntime *state.AgentRuntime
+	if preparer, ok := muxBackend.(mux.AgentLaunchBackend); ok {
+		agent, err := nextParkingAgentRuntime(entry)
+		if err != nil {
+			return err
+		}
+		agentRuntime = &agent
+		metadata.AgentID = agent.ID
+		metadata.AgentInstance = agent.Instance
+		target, preparedArgv, err := preparer.PrepareAgentLaunch(
+			mux.Target{Backend: preparer.Name(), Workspace: entry.TmuxSession, Tab: entry.TmuxWindow},
+			entry.TmuxWindow,
+			entry.FeatureDir,
+			metadata,
+			launchArgv,
+		)
+		if err != nil {
+			return err
+		}
+		sent, err := preparer.SendTarget(target, entry.TmuxWindow, entry.FeatureDir, entry.CWD, preparedArgv)
+		if err != nil {
+			return err
+		}
+		if sent.Pane != target.Pane {
+			return fmt.Errorf("tmux resumed agent moved from prepared pane %s to %s", target.Pane, sent.Pane)
+		}
+		pane = sent.Pane
+	} else {
+		pane, err = muxBackend.SendCommand(entry.TmuxSession, entry.TmuxWindow, "", entry.FeatureDir, entry.CWD, launchArgv)
+		if err != nil {
+			return err
+		}
 	}
 	if err := muxBackend.SetWindowMetadata(entry.TmuxSession, entry.TmuxWindow, metadata); err != nil {
 		return err
@@ -208,11 +244,45 @@ func unparkEntry(entry parking.Entry) error {
 	if err := muxBackend.SetPaneMetadata(pane, metadata); err != nil {
 		return err
 	}
-	if err := state.SetRuntimeTarget(entry.FeatureDir, entry.TmuxSession, pane); err != nil {
+	if agentRuntime != nil {
+		err = state.SetMuxAgentRuntime(entry.FeatureDir, state.MuxRuntime{
+			Backend: "tmux", Workspace: entry.TmuxSession, Tab: entry.TmuxWindow, Pane: pane,
+		}, *agentRuntime)
+	} else {
+		err = state.SetRuntimeTarget(entry.FeatureDir, entry.TmuxSession, pane)
+	}
+	if err != nil {
 		return err
 	}
 	created = false
 	return nil
+}
+
+func nextParkingAgentRuntime(entry parking.Entry) (state.AgentRuntime, error) {
+	s, err := state.Load(entry.FeatureDir)
+	if err != nil {
+		return state.AgentRuntime{}, err
+	}
+	agentID := ""
+	if existing := s.Runtime.Agent; existing != nil &&
+		(existing.Stage == "" || existing.Stage == entry.Stage) &&
+		(existing.Engine == "" || strings.EqualFold(existing.Engine, entry.Engine)) {
+		agentID = existing.ID
+	}
+	if agentID == "" {
+		agentID, err = newParkingAgentID()
+		if err != nil {
+			return state.AgentRuntime{}, err
+		}
+	}
+	instance, err := newParkingInstanceID()
+	if err != nil {
+		return state.AgentRuntime{}, err
+	}
+	return state.AgentRuntime{
+		ID: agentID, Instance: instance, Stage: entry.Stage,
+		Engine: strings.ToLower(entry.Engine), ProviderSessionID: entry.ProviderSessionID,
+	}, nil
 }
 
 func restoredPane(entry parking.Entry, panes []mux.Pane) (string, bool) {
