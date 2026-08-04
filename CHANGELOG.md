@@ -18,6 +18,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   matching how the interactive filters already behave.
 - `orc watch`'s `/` filter searches labels too, so `/area=api` narrows the rail
   without a separate label syntax, and `orc status <ticket>` lists them.
+- Added per-worker time attribution. `orc report --by-worker` shows total,
+  average, and median active time plus run counts per worker, ordered by total
+  so the most expensive leads; `orc report <ticket> --by-worker` breaks one
+  ticket down. It derives from the same durable history the stage report uses,
+  so it needs no new data collection.
+- Attribution reports time, not tokens or currency. Cumulative token usage is
+  not exposed alike by both providers today, and converting it would need a
+  per-model price table Orc would have to keep current — a number that looks
+  precise and is quietly wrong is worse than one that is honestly coarse.
 
 ## [0.19.0] - 2026-08-04
 

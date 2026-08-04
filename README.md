@@ -425,6 +425,7 @@ Available on every command:
   - `orc sessions unpark --dry` — preview the saved snapshot; `--yes` recreates and resumes it
 - `orc report` — time-in-stage across all tickets (avg/median active time, visit counts), derived from history
   - `orc report <ticket>` — per-stage breakdown for one ticket with total cycle time
+  - `--by-worker` — attribute time to workers instead of stages, ordered by total active time
   - `--archived` — include archived tickets in the aggregate (no-arg) report
   - `--json` — output as JSON for scripting
 - `orc artifacts <ticket>` — check required feature artifacts for the current stage

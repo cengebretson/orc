@@ -145,6 +145,7 @@ var reportCmd = &cobra.Command{
 var (
 	reportJSON     bool
 	reportArchived bool
+	reportByWorker bool
 )
 
 var artifactsCmd = &cobra.Command{

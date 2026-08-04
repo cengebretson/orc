@@ -23,6 +23,13 @@ func runReport(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		rep := report.Compute(t.State, now)
+		if reportByWorker {
+			if reportJSON {
+				return printJSON(ticketWorkerReportJSON(rep))
+			}
+			printTicketWorkerReport(rep)
+			return nil
+		}
 		if reportJSON {
 			return printJSON(ticketReportJSON(rep, t.State.Stage.Name))
 		}
@@ -41,12 +48,56 @@ func runReport(cmd *cobra.Command, args []string) error {
 		}
 		reports = append(reports, report.Compute(f.State, now))
 	}
+	if reportByWorker {
+		workers := report.AggregateWorkers(reports)
+		if reportJSON {
+			return printJSON(workerReportJSON(workers, len(reports)))
+		}
+		printWorkerReport(workers, len(reports))
+		return nil
+	}
 	aggs := report.Aggregate(reports)
 	if reportJSON {
 		return printJSON(aggregateReportJSON(aggs, len(reports)))
 	}
 	printAggregateReport(aggs, len(reports))
 	return nil
+}
+
+func printTicketWorkerReport(rep report.Report) {
+	status := "complete"
+	if rep.Open {
+		status = "in progress"
+	}
+	fmt.Printf("%s · %s · by worker\n\n", rep.Ticket, status)
+	if len(rep.Workers) == 0 {
+		fmt.Println("No worker history yet.")
+		return
+	}
+	fmt.Printf("%-24s  %-10s  %-10s  %-5s\n", "Worker", "Active", "Wall", "Runs")
+	fmt.Printf("%-24s  %-10s  %-10s  %-5s\n", "------", "------", "----", "----")
+	for _, w := range rep.Workers {
+		fmt.Printf("%-24s  %-10s  %-10s  %-5d\n",
+			w.Worker, report.Humanize(w.Active), report.Humanize(w.Wall), w.Runs)
+	}
+}
+
+func printWorkerReport(workers []report.WorkerAgg, tickets int) {
+	fmt.Printf("Worker report · %d tickets\n\n", tickets)
+	if len(workers) == 0 {
+		fmt.Println("No worker history yet.")
+		return
+	}
+	fmt.Printf("%-24s  %-8s  %-10s  %-10s  %-10s  %-5s\n", "Worker", "Tickets", "Total", "Avg", "Median", "Runs")
+	fmt.Printf("%-24s  %-8s  %-10s  %-10s  %-10s  %-5s\n", "------", "-------", "-----", "---", "------", "----")
+	for _, w := range workers {
+		fmt.Printf("%-24s  %-8d  %-10s  %-10s  %-10s  %-5d\n",
+			w.Worker, w.Tickets, report.Humanize(w.TotalActive),
+			report.Humanize(w.AvgActive), report.Humanize(w.MedActive), w.Runs)
+	}
+	fmt.Println()
+	fmt.Println("Active time is the unit: token and currency cost would need cumulative")
+	fmt.Println("usage the providers do not both expose alike, plus a price table to keep current.")
 }
 
 func printTicketReport(rep report.Report, currentStage string) {
@@ -131,3 +182,36 @@ func aggregateReportJSON(aggs []report.StageAgg, tickets int) map[string]any {
 }
 
 // loopCountSuffix returns " (N/M)" when stageName is an active loop stage with a max defined.
+
+func ticketWorkerReportJSON(rep report.Report) map[string]any {
+	workers := make([]map[string]any, 0, len(rep.Workers))
+	for _, w := range rep.Workers {
+		workers = append(workers, map[string]any{
+			"worker":         w.Worker,
+			"active_seconds": int64(w.Active.Seconds()),
+			"wall_seconds":   int64(w.Wall.Seconds()),
+			"active":         report.Humanize(w.Active),
+			"wall":           report.Humanize(w.Wall),
+			"runs":           w.Runs,
+		})
+	}
+	return map[string]any{"ticket": rep.Ticket, "open": rep.Open, "workers": workers}
+}
+
+func workerReportJSON(aggs []report.WorkerAgg, tickets int) map[string]any {
+	workers := make([]map[string]any, 0, len(aggs))
+	for _, w := range aggs {
+		workers = append(workers, map[string]any{
+			"worker":               w.Worker,
+			"tickets":              w.Tickets,
+			"total_active_seconds": int64(w.TotalActive.Seconds()),
+			"avg_active_seconds":   int64(w.AvgActive.Seconds()),
+			"med_active_seconds":   int64(w.MedActive.Seconds()),
+			"total_active":         report.Humanize(w.TotalActive),
+			"avg_active":           report.Humanize(w.AvgActive),
+			"med_active":           report.Humanize(w.MedActive),
+			"runs":                 w.Runs,
+		})
+	}
+	return map[string]any{"tickets": tickets, "workers": workers}
+}

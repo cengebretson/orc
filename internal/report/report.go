@@ -24,13 +24,27 @@ type StageStat struct {
 	Visits int           // number of times the ticket entered this stage
 }
 
-// Report is the per-ticket timing breakdown, stages in first-visit order.
-type Report struct {
-	Ticket string
-	Stages []StageStat
+// WorkerStat is time attributed to one worker on a ticket.
+//
+// Attribution comes from the same history intervals the stage stats use: each
+// entry records the worker that was active up to its timestamp. Runs counts how
+// many separate times that worker picked the ticket up, which is what makes a
+// worker that loops repeatedly visible next to one that finishes in a pass.
+type WorkerStat struct {
+	Worker string
 	Active time.Duration
 	Wall   time.Duration
-	Open   bool // ticket still in progress (current stage measured to now)
+	Runs   int
+}
+
+// Report is the per-ticket timing breakdown, stages in first-visit order.
+type Report struct {
+	Ticket  string
+	Stages  []StageStat
+	Workers []WorkerStat
+	Active  time.Duration
+	Wall    time.Duration
+	Open    bool // ticket still in progress (current stage measured to now)
 }
 
 // Compute derives per-stage timing for one ticket from its history.
@@ -50,6 +64,7 @@ func Compute(s *state.State, now time.Time) Report {
 	type point struct {
 		t      time.Time
 		stage  string
+		worker string
 		result string
 	}
 	var pts []point
@@ -58,7 +73,7 @@ func Compute(s *state.State, now time.Time) Report {
 		if err != nil {
 			continue
 		}
-		pts = append(pts, point{t: t, stage: h.Stage, result: h.Result})
+		pts = append(pts, point{t: t, stage: h.Stage, worker: h.Worker, result: h.Result})
 	}
 
 	idx := map[string]int{}
@@ -83,11 +98,44 @@ func Compute(s *state.State, now time.Time) Report {
 		}
 	}
 
+	workerIdx := map[string]int{}
+	addWorker := func(worker string, dur time.Duration, paused, newRun bool) {
+		// Entries written by a human action (a pause, an answer) carry no agent
+		// worker; attributing that time to an agent would overstate its cost.
+		if worker == "" || worker == "human" {
+			return
+		}
+		if dur < 0 {
+			dur = 0
+		}
+		i, ok := workerIdx[worker]
+		if !ok {
+			i = len(r.Workers)
+			workerIdx[worker] = i
+			r.Workers = append(r.Workers, WorkerStat{Worker: worker})
+		}
+		r.Workers[i].Wall += dur
+		if !paused {
+			r.Workers[i].Active += dur
+		}
+		if newRun {
+			r.Workers[i].Runs++
+		}
+	}
+
 	prevStage := ""
+	prevWorker := ""
 	for i := 0; i+1 < len(pts); i++ {
 		stage := pts[i+1].stage
-		add(stage, pts[i+1].t.Sub(pts[i].t), isPause(pts[i].result), stage != prevStage)
+		worker := pts[i+1].worker
+		dur := pts[i+1].t.Sub(pts[i].t)
+		paused := isPause(pts[i].result)
+		add(stage, dur, paused, stage != prevStage)
+		addWorker(worker, dur, paused, worker != prevWorker)
 		prevStage = stage
+		if worker != "" && worker != "human" {
+			prevWorker = worker
+		}
 	}
 
 	// A non-terminal ticket is still accruing time in its current stage; measure
@@ -102,7 +150,12 @@ func Compute(s *state.State, now time.Time) Report {
 			stage = last.stage
 		}
 		paused := s.Status == "paused" || isPause(last.result)
+		worker := s.Stage.Worker
+		if worker == "" {
+			worker = last.worker
+		}
 		add(stage, now.Sub(last.t), paused, stage != prevStage)
+		addWorker(worker, now.Sub(last.t), paused, worker != prevWorker)
 		r.Open = true
 	}
 
@@ -212,4 +265,62 @@ func Humanize(d time.Duration) string {
 		}
 		return fmt.Sprintf("%dd %dh", days, h)
 	}
+}
+
+// WorkerAgg aggregates one worker across multiple tickets.
+type WorkerAgg struct {
+	Worker      string
+	Tickets     int           // how many tickets this worker touched
+	TotalActive time.Duration // summed active time, the closest honest proxy for cost
+	AvgActive   time.Duration // mean active time per ticket
+	MedActive   time.Duration // median active time per ticket
+	Runs        int           // total pickups across tickets
+}
+
+// AggregateWorkers combines per-ticket reports into per-worker statistics,
+// ordered by total active time so the most expensive worker leads.
+//
+// Time is the unit deliberately. Token and currency cost would need cumulative
+// usage the providers do not both expose the same way, plus a per-model price
+// table Orc would have to keep current — a number that looks precise and is
+// quietly wrong is worse than one that is honestly coarse.
+func AggregateWorkers(reports []Report) []WorkerAgg {
+	type acc struct {
+		actives []time.Duration
+		runs    int
+	}
+	accs := map[string]*acc{}
+	for _, r := range reports {
+		for _, w := range r.Workers {
+			a, ok := accs[w.Worker]
+			if !ok {
+				a = &acc{}
+				accs[w.Worker] = a
+			}
+			a.actives = append(a.actives, w.Active)
+			a.runs += w.Runs
+		}
+	}
+	out := make([]WorkerAgg, 0, len(accs))
+	for worker, a := range accs {
+		var total time.Duration
+		for _, d := range a.actives {
+			total += d
+		}
+		out = append(out, WorkerAgg{
+			Worker:      worker,
+			Tickets:     len(a.actives),
+			TotalActive: total,
+			AvgActive:   mean(a.actives),
+			MedActive:   median(a.actives),
+			Runs:        a.runs,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].TotalActive != out[j].TotalActive {
+			return out[i].TotalActive > out[j].TotalActive
+		}
+		return out[i].Worker < out[j].Worker
+	})
+	return out
 }

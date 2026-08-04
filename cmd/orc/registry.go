@@ -31,6 +31,7 @@ func init() {
 	sessionsUnparkCmd.Flags().BoolVar(&sessionsUnparkDry, "dry", false, "Preview the saved snapshot without creating tmux sessions")
 	sessionsUnparkCmd.Flags().BoolVar(&sessionsUnparkYes, "yes", false, "Confirm recreating the listed tmux sessions")
 	reportCmd.Flags().BoolVar(&reportJSON, "json", false, "Output as JSON")
+	reportCmd.Flags().BoolVar(&reportByWorker, "by-worker", false, "Attribute time to workers instead of stages")
 	reportCmd.Flags().BoolVar(&reportArchived, "archived", false, "Include archived tickets in the aggregate (no-arg) report")
 	artifactsCmd.Flags().BoolVar(&artifactsAll, "all", false, "Check every required artifact in the ticket workflow")
 	artifactsCmd.Flags().BoolVar(&artifactsJSON, "json", false, "Output as JSON")
