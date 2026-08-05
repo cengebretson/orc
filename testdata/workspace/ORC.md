@@ -9,6 +9,12 @@ Read this file at the start of every ticket session. Also read:
 - `AGENTS.md` for shared workspace and repository command conventions
 - the current stage file under `stages/<pack>/`
 
+`RULES.md` is authoritative for permission. Stage files, worker files, launch
+prompts, and operator phrases may request an outcome, but they do not authorize
+shared, external, destructive, or difficult-to-reverse actions such as a Git
+push. Follow configured workspace exceptions when they explicitly allow
+automation; otherwise pause with the exact proposed action.
+
 ## Session Protocol
 
 1. Inspect durable state: `orc status <ticket> --json`.
@@ -36,6 +42,29 @@ request so durable state reflects who must act next.
 Use `next` only when the stage exit criteria are met. If required artifacts are
 missing, pause instead of using `--force`; that override is for humans. Use
 `done` only when the workflow is genuinely complete.
+
+## Operator Phrases
+
+The phrases below are messages an operator may send to an agent. They are
+protocol shorthand, not necessarily literal shell commands. Resolve the current
+ticket from the launch prompt and durable state, then use the real Orc commands
+required by this contract.
+
+| Operator phrase | Underlying command or action | Agent behavior |
+|---|---|---|
+| `orc status` | `orc status <ticket> --json` | Report the current stage, progress, blockers, and next action without changing state. |
+| `orc check` | `orc artifacts <ticket>`, then the current stage's validation commands | Report artifact or validation failures without changing lifecycle state. |
+| `orc handoff` | Update feature artifacts and allowed `STATE.yaml` context fields, then run `orc doctor <ticket>` | Persist progress, decisions, validation, and the next action; remain active unless another phrase requests a transition. |
+| `orc pause: <reason>` | `orc mark <ticket> pause "<reason>"` | Persist the precise blocker or human decision needed, then stop work. |
+| `orc resume` | `orc mark <ticket> resume`, then `orc status <ticket> --json` | Reload durable state and continue the current stage. |
+| `orc done` | The exact end transition supplied in the launch prompt or current stage instructions | Verify exit criteria, write the actual result summary, and perform the correct `next`, `pause`, or `done` transition. |
+| `orc help` | No lifecycle command | Briefly list these phrases and show the exact end transition for the current session. |
+
+`orc done` does not mean “mark the whole workflow done” when the current stage
+must advance or pause; the exact end transition from the launch prompt or stage
+instructions remains authoritative. `orc archive` is not conversational
+shorthand. Run it only as an explicit archival action after completion because
+it may terminate the recorded multiplexer session.
 
 ## State Ownership
 
@@ -117,8 +146,8 @@ The default pack uses friendly output folders such as `develop/`,
 not canonical resource IDs; do not create folders such as `default:develop/`.
 
 With `settings.artifact_policy: block`, `orc mark <ticket> next` rejects missing,
-empty, or unchanged template artifacts. `orc validate` reports artifact
-problems. Agents do not bypass these checks with `--force`.
+empty, or unchanged template artifacts. `orc artifacts <ticket>` reports
+artifact problems. Agents do not bypass these checks with `--force`.
 
 ## Repository Routing
 

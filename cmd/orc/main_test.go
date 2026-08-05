@@ -1082,6 +1082,84 @@ func TestRunJITDryPrintsResolvedWorkerAndPrompt(t *testing.T) {
 	}
 }
 
+func TestRunLocalCreatesLaunchesAndAttachesFeatureInTmux(t *testing.T) {
+	resetCommandGlobals(t)
+	globalWorkspace = t.TempDir()
+	if err := workspace.Init(workspace.InitOptions{Root: globalWorkspace}); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	repoPath := filepath.Join(globalWorkspace, "projects", "my-app")
+	if err := os.MkdirAll(repoPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	configPath := filepath.Join(globalWorkspace, config.Filename)
+	configData, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	configData = []byte(strings.ReplaceAll(string(configData), "/absolute/path/to/my-app", repoPath))
+	if err := os.WriteFile(configPath, configData, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runWorker = "default:bob"
+	runRepo = "my-app"
+	runAutoAttach = true
+
+	var createdSession, sentWindow, attachedSession, attachedWindow, attachedPane string
+	var createdWindows []string
+	muxBackend = &muxtest.Fake{
+		NameFunc:      func() string { return "tmux" },
+		AvailableFunc: func() bool { return true },
+		CreateSessionFunc: func(name, dir string, windows []string) error {
+			createdSession = name
+			createdWindows = append([]string(nil), windows...)
+			return nil
+		},
+		SessionExistsFunc: func(name string) bool { return name == createdSession },
+		SendCommandFunc: func(session, window, pane, dir, runDir string, argv []string) (string, error) {
+			sentWindow = window
+			return "%7", nil
+		},
+		AttachPaneFunc: func(session, window, pane string) error {
+			attachedSession, attachedWindow, attachedPane = session, window, pane
+			return nil
+		},
+	}
+
+	out, err := captureStdout(func() error {
+		return runLocal(nil, []string{"Investigate the intermittent API timeout"})
+	})
+	if err != nil {
+		t.Fatalf("runLocal: %v", err)
+	}
+	for _, want := range []string{"LOCAL-1", "default:adhoc", "Repository: my-app", "Agent launched in background"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("run output missing %q:\n%s", want, out)
+		}
+	}
+	if createdSession != "LOCAL-1-investigate-the-intermittent-api-timeout" {
+		t.Fatalf("created session = %q", createdSession)
+	}
+	if len(createdWindows) != 1 || createdWindows[0] != "default:adhoc" || sentWindow != "default:adhoc" {
+		t.Fatalf("created windows/sent window = %v / %q", createdWindows, sentWindow)
+	}
+	if attachedSession != createdSession || attachedWindow != "default:adhoc" || attachedPane != "%7" {
+		t.Fatalf("attached target = %q/%q/%q", attachedSession, attachedWindow, attachedPane)
+	}
+
+	s := loadTicketState(t, globalWorkspace, "LOCAL-1")
+	if s.Status != "active" || s.Workflow != "default:adhoc" || s.Stage.Worker != "default:bob" {
+		t.Fatalf("local state = %+v", s)
+	}
+	if s.Repos["my-app"].Main != canonicalRunPath(repoPath) || s.NextAction.CWD != canonicalRunPath(repoPath) {
+		t.Fatalf("local repository state = %+v, cwd = %q", s.Repos, s.NextAction.CWD)
+	}
+	target, ok := s.Runtime.MuxTarget(s.Stage.Name)
+	if !ok || target.Workspace != createdSession || target.Pane != "%7" {
+		t.Fatalf("local runtime target = %+v, %v", target, ok)
+	}
+}
+
 func TestRunNextDryDoesNotMutatePendingState(t *testing.T) {
 	resetCommandGlobals(t)
 	// Copy the fixture so a mutation bug can't corrupt the real testdata.
@@ -1702,8 +1780,8 @@ func TestRunPackListPrintsInstalledPacks(t *testing.T) {
 		"active",
 		"path: packs/default",
 		"source: builtin (default)",
-		"workflows: default:standard",
-		"active workflows: default:standard",
+		"workflows: default:adhoc, default:standard",
+		"active workflows: default:adhoc, default:standard",
 		"alias: default -> default:standard",
 		"alias: bob -> default:bob",
 	} {
@@ -1732,8 +1810,9 @@ func TestRunPackShowPrintsOneInstalledPack(t *testing.T) {
 		"Status: active",
 		"Source: builtin (default)",
 		"Workflows:",
+		"default:adhoc",
 		"default:standard",
-		"Active workflows: default:standard",
+		"Active workflows: default:adhoc, default:standard",
 		"Workers:",
 		"workflow default",
 	} {
@@ -1863,6 +1942,11 @@ func resetCommandGlobals(t *testing.T) {
 	oldJITDry := jitDry
 	oldJITWorker := jitWorker
 	oldJITTmux := jitTmux
+	oldRunSlug := runSlug
+	oldRunWorker := runWorker
+	oldRunRepo := runRepo
+	oldRunTmux := runTmux
+	oldRunAutoAttach := runAutoAttach
 	oldMarkWorker := markWorker
 	oldMarkResult := markResult
 	oldMarkStage := markStage
@@ -1913,6 +1997,11 @@ func resetCommandGlobals(t *testing.T) {
 		jitDry = oldJITDry
 		jitWorker = oldJITWorker
 		jitTmux = oldJITTmux
+		runSlug = oldRunSlug
+		runWorker = oldRunWorker
+		runRepo = oldRunRepo
+		runTmux = oldRunTmux
+		runAutoAttach = oldRunAutoAttach
 		markWorker = oldMarkWorker
 		markResult = oldMarkResult
 		markStage = oldMarkStage
@@ -1964,6 +2053,13 @@ func resetCommandGlobals(t *testing.T) {
 	jitDry = false
 	jitWorker = ""
 	jitTmux = false
+	runSlug = ""
+	runWorker = ""
+	runRepo = ""
+	runTmux = false
+	runAutoAttach = false
+	runInputIsTTY = isTTY
+	runChoose = chooseRunChoice
 	markWorker = ""
 	markResult = ""
 	markStage = ""

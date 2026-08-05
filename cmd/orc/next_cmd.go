@@ -149,16 +149,21 @@ func runNext(cmd *cobra.Command, args []string) error {
 }
 
 func launchPlan(root, featureDir string, s *state.State, plan *runner.Plan) error {
+	return launchPlanWithMux(root, featureDir, s, plan, true)
+}
+
+func launchPlanWithMux(root, featureDir string, s *state.State, plan *runner.Plan, useMux bool) error {
 	launcher := orchestrator.NewLauncher()
 	launcher.Mux = muxBackend
 	result, err := launcher.Launch(orchestrator.LaunchOptions{
-		Root:       root,
-		FeatureDir: featureDir,
-		State:      s,
-		Plan:       plan,
-		In:         os.Stdin,
-		Out:        os.Stdout,
-		Err:        os.Stderr,
+		Root:        root,
+		FeatureDir:  featureDir,
+		State:       s,
+		Plan:        plan,
+		In:          os.Stdin,
+		Out:         os.Stdout,
+		Err:         os.Stderr,
+		DisableTmux: !useMux,
 		OnFallback: func(message string) {
 			if strings.HasPrefix(message, "warning:") {
 				fmt.Println(message)

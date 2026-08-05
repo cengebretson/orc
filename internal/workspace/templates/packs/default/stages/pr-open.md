@@ -1,6 +1,8 @@
 # Stage: pr-open
 
-> Before starting: read `ORC.md` for state update rules and error handling.
+> Before starting: read `ORC.md` for state transitions and `RULES.md` for
+> external-action permissions. If push or PR automation is not authorized,
+> pause with the exact proposed action instead of performing it.
 
 ## Purpose
 

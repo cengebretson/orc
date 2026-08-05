@@ -3,6 +3,10 @@
 This file owns permission and approval policy. State transitions belong in
 `ORC.md`, routing in `orc.yaml`, and tool selection in `TOOLS.md`.
 
+Workflow, stage, worker, prompt, and operator instructions describe desired
+outcomes; they do not grant permission. Workspace Exceptions below may
+explicitly authorize automation that would otherwise require approval.
+
 ## Ask Before Acting
 
 Pause the ticket with the exact proposed action before asking for approval to:

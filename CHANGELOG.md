@@ -6,6 +6,41 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-08-04
+
+### Added
+
+- Added `orc run "<instruction>"` for standalone local work. It
+  allocates a durable workspace-local `LOCAL-N` ID, derives a filesystem-safe
+  slug from the instruction, creates a normal feature using the bundled
+  single-stage `default:adhoc` workflow, and launches through the same runtime,
+  rail, lifecycle, control, completion, and archive paths as tracked work.
+  `--slug` overrides the derived name; `--worker` and `--repo` skip interactive
+  selection (with repository inference from the current directory); and
+  `--tmux`, `--attach`, and `settings.auto_tmux` control multiplexer launch.
+  Non-interactive use reports the available explicit flag values instead of
+  waiting for input. Older workspaces receive the missing local workflow and
+  stage guide additively on first use.
+- Added an operator-phrase table with underlying commands to the generated
+  `ORC.md` agent contract for concise status, validation, handoff, pause, resume,
+  completion, and help requests. These phrases map to the current ticket's
+  durable protocol and are explicitly distinguished from literal shell
+  commands.
+
+### Changed
+
+- Tightened generated Markdown contracts: `SETUP.md` now identifies `ORC.md` as
+  the durable protocol owner, the final QA stage gives an explicit `orc mark
+  <ticket> done` transition instead of implying archival, and operator shorthand
+  accepts authoritative end commands from either the launch prompt or stage
+  instructions.
+- Made `RULES.md` authoritative for final external-automation decisions in the
+  PR-open and QA stages: configured workspace exceptions may permit full
+  automation, while unapproved pushes, PR creation, CI actions, or ticket
+  updates pause with the exact proposed action. The shared `AGENTS.md`, `ORC.md`,
+  and `RULES.md` templates now state this precedence explicitly so stage,
+  worker, prompt, and operator instructions cannot implicitly grant permission.
+
 ## [0.21.0] - 2026-08-04
 
 ### Changed
@@ -728,7 +763,8 @@ invoke `orc watch` — an unknown flag now fails the command.
 - Bubble Tea TUI dashboard with health, workflow, stage, and portrait views.
 - `orc doctor --fix` to clear stale state locks.
 
-[Unreleased]: https://github.com/cengebretson/orc/compare/v0.21.0...HEAD
+[Unreleased]: https://github.com/cengebretson/orc/compare/v0.22.0...HEAD
+[0.22.0]: https://github.com/cengebretson/orc/compare/v0.21.0...v0.22.0
 [0.21.0]: https://github.com/cengebretson/orc/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/cengebretson/orc/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/cengebretson/orc/compare/v0.18.0...v0.19.0

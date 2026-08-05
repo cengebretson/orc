@@ -1,6 +1,8 @@
 # Stage: qa-automation
 
-> Before starting: read `ORC.md` for state update rules and error handling.
+> Before starting: read `ORC.md` for state transitions and `RULES.md` for
+> external-action permissions. If push, CI, or ticket-update automation is not
+> authorized, pause with the exact proposed action instead of performing it.
 
 ## Purpose
 
@@ -33,5 +35,9 @@ Runs after the PR has been reviewed and the `pr-open` stage hands off here.
 
 ## Exit Criteria
 
-`qa-automation/RESULT.md` is complete with passing status, ticket is updated, and
-the ticket is marked `done`.
+`qa-automation/RESULT.md` is complete with passing status and the ticket is
+updated. Run:
+
+```sh
+orc mark <ticket> done --result "QA passed — <summary of evidence>"
+```

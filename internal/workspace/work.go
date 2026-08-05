@@ -13,15 +13,22 @@ import (
 )
 
 type WorkOptions struct {
-	Root     string
-	Ticket   string // e.g. FLYWL-123
-	Slug     string // optional override suffix, e.g. "add-user-export"
-	Workflow string // pipeline name, defaults to "default"
+	Root          string
+	Ticket        string                // e.g. FLYWL-123
+	Slug          string                // optional override suffix, e.g. "add-user-export"
+	Workflow      string                // pipeline name, defaults to "default"
+	InitialWorker string                // optional first-stage worker override
+	InitialPrompt string                // optional first-stage prompt override
+	HistoryResult string                // optional creation-history result override
+	TicketSummary string                // optional local summary written to TICKET.md
+	InitialRepos  map[string]state.Repo // optional repository selection stamped into STATE.yaml
+	InitialCWD    string                // optional first-stage cwd, relative to root or absolute
 }
 
 type WorkResult struct {
 	FeatureDir string
 	Slug       string
+	Ticket     string
 }
 
 func Work(opts WorkOptions) (*WorkResult, error) {
@@ -86,12 +93,21 @@ func Work(opts WorkOptions) (*WorkResult, error) {
 	if err := copyDir(templateDir, featureDir); err != nil {
 		return nil, fmt.Errorf("creating feature folder: %w", err)
 	}
+	if opts.TicketSummary != "" {
+		if err := writeTicketSummary(featureDir, ticket, opts.TicketSummary); err != nil {
+			return nil, fmt.Errorf("writing TICKET.md: %w", err)
+		}
+	}
 
-	if err := writeStateYAML(featureDir, ticket, slug, workflowName, firstStage, firstStageConfig.Worker); err != nil {
+	firstWorker := firstStageConfig.Worker
+	if opts.InitialWorker != "" {
+		firstWorker = opts.InitialWorker
+	}
+	if err := writeStateYAML(featureDir, ticket, slug, workflowName, firstStage, firstWorker, opts.InitialPrompt, opts.HistoryResult, opts.InitialRepos, opts.InitialCWD); err != nil {
 		return nil, fmt.Errorf("writing STATE.yaml: %w", err)
 	}
 
-	return &WorkResult{FeatureDir: featureDir, Slug: slug}, nil
+	return &WorkResult{FeatureDir: featureDir, Slug: slug, Ticket: ticket}, nil
 }
 
 // findExistingFeature returns the name of any feature folder that starts with ticket.
@@ -127,7 +143,20 @@ func buildSlug(ticket, suffix string) string {
 // the template placeholder copied into the feature dir. Uses the canonical
 // state.State schema so the scaffold can never drift from what state.Load
 // reads back.
-func writeStateYAML(featureDir, ticket, slug, workflowName, firstStage, firstWorker string) error {
+func writeStateYAML(featureDir, ticket, slug, workflowName, firstStage, firstWorker, initialPrompt, historyResult string, initialRepos map[string]state.Repo, initialCWD string) error {
+	if initialPrompt == "" {
+		initialPrompt = fmt.Sprintf("Load ticket %s and populate TICKET.md, SPEC.md, and PLAN.md. Update STATE.yaml when complete.", ticket)
+	}
+	if historyResult == "" {
+		historyResult = "feature context created by orc work"
+	}
+	if initialCWD == "" {
+		initialCWD = "."
+	}
+	repos := make(map[string]state.Repo, len(initialRepos))
+	for name, repo := range initialRepos {
+		repos[name] = repo
+	}
 	s := &state.State{
 		SchemaVersion: state.SchemaVersion,
 		Ticket:        ticket,
@@ -135,19 +164,21 @@ func writeStateYAML(featureDir, ticket, slug, workflowName, firstStage, firstWor
 		Status:        "pending",
 		Workflow:      workflowName,
 		Stage: state.Stage{
-			Name: firstStage,
+			Name:   firstStage,
+			Worker: firstWorker,
 		},
+		Repos: repos,
 		NextAction: state.NextAction{
 			Worker: firstWorker,
-			Prompt: fmt.Sprintf("Load ticket %s and populate TICKET.md, SPEC.md, and PLAN.md. Update STATE.yaml when complete.", ticket),
-			CWD:    ".",
+			Prompt: initialPrompt,
+			CWD:    initialCWD,
 		},
 		History: []state.HistoryEntry{
 			{
 				At:     time.Now().Format(time.RFC3339),
 				Stage:  firstStage,
 				Worker: "agent",
-				Result: "feature context created by orc work",
+				Result: historyResult,
 			},
 		},
 	}

@@ -10,10 +10,24 @@ Start a new ticket with:
 orc work TICKET-0000
 ```
 
+For standalone work without an external ticket, create and launch a local
+feature with:
+
+```
+orc run --worker default:bob "Investigate the intermittent API timeout"
+orc run --repo api --worker default:bob --attach "Investigate the timeout"
+```
+
+Local features receive durable sequential IDs such as `LOCAL-1`; their slug is
+derived from the instruction unless `--slug` overrides it. `--repo` selects a
+configured repository (or Orc infers one from the current directory), and
+`--attach` launches through the multiplexer and enters the new session.
+
 ## Structure
 
 ```
 features/
+  .local-sequence        durable next ID for orc run
   _template/            copied for each new ticket by orc work
   _archive/             completed features moved here by orc archive
   TICKET-0000-slug/
@@ -35,5 +49,5 @@ features/
       RESULT.md         final result and evidence
 ```
 
-Each stage writes its outputs to a subfolder matching its name. Stages create their
-own subfolder — nothing is pre-created in the template.
+Each stage writes its outputs to a subfolder matching its name. Stages create
+their own subfolder — nothing is pre-created in the template.

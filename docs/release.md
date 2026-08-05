@@ -74,7 +74,7 @@ section and comparison links. It then builds the candidate, creates disposable
 workspaces and a disposable Git repository under the system temporary
 directory, and verifies:
 
-- Default initialization reports exactly 40 created files and includes
+- Default initialization reports exactly 42 created files and includes
   `SETUP.md`.
 - The deterministic post-agent setup contract produces a valid repository,
   workflow, worker, and tool configuration.
@@ -97,11 +97,12 @@ The target intentionally does not launch Claude or Codex. When `SETUP.md`,
 also perform the user-facing agent check:
 
 ```sh
+ORC_REPO_ROOT="$(pwd)"
 QA_ROOT="$(mktemp -d /private/tmp/orc-release-qa.XXXXXX)"
-./orc --workspace "$QA_ROOT" init --force
+"$ORC_REPO_ROOT/orc" --workspace "$QA_ROOT" init --force
 cd "$QA_ROOT"
-codex "Read SETUP.md and perform the workspace setup"
-# or: claude "Read SETUP.md and perform the workspace setup"
+PATH="$ORC_REPO_ROOT:$PATH" codex "Read SETUP.md and perform the workspace setup"
+# or: PATH="$ORC_REPO_ROOT:$PATH" claude "Read SETUP.md and perform the workspace setup"
 ```
 
 ## 3. Live session QA

@@ -71,6 +71,7 @@ Apply the confirmed setup with these ownership boundaries:
 
 | File | Owns |
 |---|---|
+| `ORC.md` | Orc's durable session and state contract; keep the generated protocol unless intentionally upgrading it |
 | `orc.yaml` | repositories, purposes, ticket-metadata routing, agent hints, worktree setup, workflows, worker routing, artifact policy |
 | `TOOLS.md` | ticket retrieval, source-control identity, access method, and integration names |
 | `RULES.md` | approval requirements and external-write policy |

@@ -47,6 +47,13 @@ Acceptance:
   to keep current.
 - Optional external-tracker status mapping with write-back disabled by default.
 - User profiles for personal defaults across workspaces.
+- Remote Orc hosts over SSH, with the local CLI acting only as a control and
+  display client. The remote Orc must remain authoritative for `orc.yaml`,
+  `STATE.yaml`, tmux, provider processes, and lifecycle hooks; local commands
+  should use a stable JSON control interface for status, watch, and launch, and
+  `ssh -t` for interactive attachment. Connection loss must leave remote work
+  running and render local state as stale or unknown rather than copying or
+  editing remote workflow state.
 - Explicit remote tmux-client selection for standalone watch/focus processes.
   Only matters with several clients attached to one server; attach currently
   steers the calling client on purpose rather than guessing.

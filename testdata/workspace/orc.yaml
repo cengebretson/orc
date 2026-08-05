@@ -48,6 +48,13 @@ repos:
     # worktree_setup: "../my-app/scripts/setup-worktree.sh -b {{branch}} --path {{worktree_path}}"
 
 workflows:
+  "default:adhoc":
+    description: Standalone local work created by orc run
+    stages:
+      - name: default:adhoc
+        worker: default:bob
+        advance: auto
+
   "default:standard":
     description: General feature workflow — intake → develop → PR → QA
     stages:
@@ -89,9 +96,11 @@ workflows:
 
 aliases:
   workflows:
+    adhoc: default:adhoc
     default: default:standard
     hotfix: hotfix:standard
   stages:
+    adhoc: default:adhoc
     intake: default:intake
     develop: default:develop
     code-review: default:code-review

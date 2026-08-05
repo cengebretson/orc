@@ -19,6 +19,7 @@ my-workspace/
   projects/          preferred main repo checkouts; external paths also work
 
   features/
+    .local-sequence  durable next ID for orc run (LOCAL-N)
     _template/       copied for each new ticket
       STATE.yaml     durable state machine for the ticket
       TICKET.md      ticket summary and acceptance criteria
@@ -40,6 +41,7 @@ my-workspace/
 
   stages/
     default/
+      adhoc.md         standalone local task created by `orc run`
       intake.md        load ticket context — runs first for every ticket
       develop.md       implementation
       code-review.md   review implementation before opening PR
@@ -81,7 +83,11 @@ The root files are the shared context every agent reads before starting work. Ea
 
 ## Feature folder
 
-Every ticket is a self-contained context pack under `features/<slug>/`. Stages read what the previous one wrote and write their own outputs to a named subfolder — so any agent can pick up mid-flight without asking anyone.
+Every ticket is a self-contained context pack under `features/<slug>/`. Stages
+read what the previous one wrote and write their own outputs to a named
+subfolder — so any agent can pick up mid-flight without asking anyone. `orc
+run` uses the same structure with a durable workspace-local `LOCAL-N`
+identifier and a prompt-derived slug.
 
 ```
 features/STORY-123/

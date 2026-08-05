@@ -52,13 +52,22 @@ routing:
 
 aliases:
   workflows:
+    adhoc: default:adhoc
     default: default:standard
   stages:
+    adhoc: default:adhoc
     develop: default:develop
   workers:
     bob: default:bob
 
 workflows:
+  default:adhoc:
+    description: Standalone local work created by orc run
+    stages:
+      - name: default:adhoc
+        worker: default:bob
+        advance: auto
+
   default:standard:
     description: General feature workflow — intake → develop → PR → QA
     stages:
@@ -203,6 +212,21 @@ labels such as `default`, `develop`, and `bob`.
 `workflows` is a map of workflow names to ordered stage lists. A ticket stores
 its selected workflow in `STATE.yaml`. If the ticket omits `workflow`, `orc`
 uses `settings.default_workflow`.
+
+The bundled `default:adhoc` workflow is reserved for `orc run`. It has one
+`default:adhoc` stage and completes the generated `LOCAL-N` feature when the
+agent runs the exact
+`orc mark LOCAL-N done --result "<summary of what was done>"` command included in
+its prompt. `orc run` prompts for a worker when `--worker <id>` is omitted; the
+selected worker is stamped into the feature without changing the configured
+workflow.
+`--repo <name>` records one configured repository in `STATE.yaml`; without the
+flag, Orc selects the only configured repository or infers the checkout that
+contains the current directory. If neither is possible, interactive use prompts
+for a configured repository or the workspace root; non-interactive use fails
+with the available flag values. `--attach` implies multiplexer launch and enters
+the new session after the agent starts. Marking the feature done preserves its
+session for inspection; `orc archive LOCAL-N` performs session cleanup.
 
 Each workflow supports:
 

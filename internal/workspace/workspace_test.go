@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cengebretson/orc/internal/config"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/workspace"
 )
@@ -450,8 +451,12 @@ func TestPackInstall_BuiltInPackInstallsAfterSkipDefault(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read orc.yaml: %v", err)
 	}
-	if !strings.Contains(string(orcYAML), "default_workflow: default:standard") {
-		t.Fatalf("orc.yaml did not set installed default workflow:\n%s", string(orcYAML))
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatalf("load installed config: %v", err)
+	}
+	if got := cfg.ResolveWorkflow(cfg.DefaultWorkflow()); got != "default:standard" {
+		t.Fatalf("installed default workflow = %q, want default:standard\n%s", got, string(orcYAML))
 	}
 }
 

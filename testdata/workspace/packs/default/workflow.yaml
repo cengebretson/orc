@@ -1,4 +1,11 @@
 workflows:
+  "default:adhoc":
+    description: Standalone local work created by orc run
+    stages:
+      - name: default:adhoc
+        worker: default:bob
+        advance: auto
+
   "default:standard":
     description: General feature workflow — intake → develop → PR → QA
     stages:

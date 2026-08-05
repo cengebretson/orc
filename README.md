@@ -46,7 +46,7 @@ models — edit the file and the next session picks it up immediately.
 
 **Handoffs can be enforced.** Stages can declare `required_artifacts` such as
 `PLAN.md`, `develop/HANDOFF.md`, or `qa-automation/RESULT.md`. In the default
-`warn` mode, `orc validate` reports missing artifacts. With
+`warn` mode, `orc artifacts <ticket>` reports missing artifacts. With
 `artifact_policy: block`, `orc mark <ticket> next` refuses to advance until the
 current stage's artifacts are ready.
 
@@ -95,8 +95,16 @@ orc completion fish
 orc completion zsh
 ```
 
-Follow the printed instructions for your shell to install the generated
-completion script.
+For Fish, install and load the generated script with:
+
+```fish
+mkdir -p ~/.config/fish/completions
+orc completion fish > ~/.config/fish/completions/orc.fish
+source ~/.config/fish/completions/orc.fish
+```
+
+The Fish script asks the installed `orc` binary for completion data, so
+configured repository names and installed workers stay current automatically.
 
 ## Dependencies
 
@@ -263,7 +271,7 @@ Workers are markdown files in `workers/`. Each stage in `orc.yaml` names a worke
 `manual` — agent calls `orc mark <ticket> pause`; a human approves before continuing
 
 Stages may also declare `required_artifacts`. `orc next` reminds agents about
-them, `orc validate` reports missing or empty files, and
+them, `orc artifacts <ticket>` reports missing or empty files, and
 `settings.artifact_policy: block` makes `orc mark <ticket> next` enforce them.
 
 ---
@@ -298,6 +306,45 @@ State is always written to `STATE.yaml` before the session ends — the next age
 or human picks up exactly where the last one left off.
 
 When a session is paused (`orc mark <ticket> pause`), the reason is recorded in history and status is set to `paused`. Running `orc next <ticket>` again will show the pause reason and offer to relaunch with a recovery prompt built from the current feature context — so the agent resumes with full awareness of what was in progress and why it stopped.
+
+---
+
+### Local runs
+
+`orc run` creates and immediately launches a normal feature for work that has
+no external tracker ticket:
+
+```bash
+orc run "Investigate the intermittent API timeout"
+
+# Skip the prompts and enter the tmux session immediately.
+orc run --repo api --worker default:bob --attach "Investigate the timeout"
+```
+
+Orc assigns the next workspace-local ID (`LOCAL-1`, `LOCAL-2`, ...), derives a
+short slug from the instruction, and uses the single-stage `default:adhoc`
+workflow. The example creates
+`features/LOCAL-1-investigate-the-intermittent-api-timeout/`; the original
+instruction remains verbatim in `TICKET.md` and the launch prompt. Use `--slug`
+only when the derived name needs an override.
+
+Local features use the same state, history, lifecycle hooks, rail, attach,
+focus, prompt, resume, completion, and archive paths as tracked work. Pass
+`--tmux` to launch in the selected multiplexer, or set
+`settings.auto_tmux: true` for the workspace default.
+`--attach` implies multiplexer launch and enters the new session immediately.
+When `--worker` is omitted, Orc prompts for one. When `--repo` is omitted, Orc
+selects the only configured repository, infers the repository containing the
+current directory, or prompts with the configured repositories and a workspace
+root option. Non-interactive use requires explicit flags when a choice cannot
+be inferred.
+
+The launch prompt includes the exact completion signal,
+`orc mark LOCAL-N done --result "<summary of what was done>"`. Completion
+records the durable result; `orc archive LOCAL-N` later removes its tmux session
+and archives the feature.
+On an older workspace, the first run adds the missing workflow and stage guide
+without replacing existing workflow configuration or stage files.
 
 ---
 
@@ -402,7 +449,7 @@ Available globally:
 | Workflow | `work`, `next`, `status`, `artifacts`, `label`, `answer` | Create, launch, inspect, and update durable ticket work. |
 | History | `report`, `archive`, `delete` | Report time in stage and retire completed work. `delete` only accepts `done` or `archived` tickets. |
 | Live work | `sessions`, `attach`, `focus`, `watch`, `rail`, `dashboard` | Inventory, resume, monitor, and navigate exact live sessions. |
-| One-off work | `jit` | Run a task outside the configured stage pipeline. |
+| One-off work | `run`, `jit` | Create standalone local work or add a side task to an existing feature. |
 | Integrations | `ctl` | Read and control exact recorded agents through backend-neutral JSON commands. |
 | Discovery | `help`, `help-all` | Show human commands or the complete human-plus-agent surface. |
 

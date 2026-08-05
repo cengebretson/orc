@@ -174,6 +174,21 @@ var (
 	workWorkflow string
 )
 
+var runCmd = &cobra.Command{
+	Use:   "run \"<instruction>\"",
+	Short: "Create and launch a standalone local feature",
+	Args:  cobra.ExactArgs(1),
+	RunE:  runLocal,
+}
+
+var (
+	runSlug       string
+	runWorker     string
+	runRepo       string
+	runTmux       bool
+	runAutoAttach bool
+)
+
 var markCmd = &cobra.Command{
 	Use:   "mark <ticket> <start|resume|next|pause|done|jit> [reason]",
 	Short: "Update ticket state — start | resume | next [--result] [--stage] [--worker] | pause <reason> | done [--result] | jit <summary>",

@@ -1,10 +1,15 @@
 package main
 
 import (
-	"github.com/cengebretson/orc/internal/state"
-	"github.com/spf13/cobra"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
+
+	"github.com/cengebretson/orc/internal/config"
+	"github.com/cengebretson/orc/internal/state"
+	"github.com/cengebretson/orc/internal/workers"
+	"github.com/spf13/cobra"
 )
 
 // completeTickets returns ticket IDs from features/ (and optionally _archive/)
@@ -62,4 +67,52 @@ func ticketCompleter(statuses []string, includeArchive bool) func(*cobra.Command
 		}
 		return completeTickets(root, statuses, includeArchive), cobra.ShellCompDirectiveNoFileComp
 	}
+}
+
+func runRepoCompleter(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	root, err := resolveRoot(globalWorkspace)
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	cfg, err := config.Load(root)
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	values := make([]string, 0, len(cfg.Repos))
+	for _, repo := range cfg.Repos {
+		if !strings.HasPrefix(repo.Name, toComplete) {
+			continue
+		}
+		value := repo.Name
+		if repo.Purpose != "" {
+			value += "\t" + repo.Purpose
+		}
+		values = append(values, value)
+	}
+	sort.Strings(values)
+	return values, cobra.ShellCompDirectiveNoFileComp
+}
+
+func runWorkerCompleter(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	root, err := resolveRoot(globalWorkspace)
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	loaded, err := workers.Load(filepath.Join(root, "workers"))
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	values := make([]string, 0, len(loaded))
+	for _, worker := range loaded {
+		if !strings.HasPrefix(worker.ID, toComplete) {
+			continue
+		}
+		value := worker.ID
+		if worker.Name != "" {
+			value += "\t" + worker.Name
+		}
+		values = append(values, value)
+	}
+	sort.Strings(values)
+	return values, cobra.ShellCompDirectiveNoFileComp
 }

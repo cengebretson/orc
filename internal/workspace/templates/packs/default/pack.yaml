@@ -8,6 +8,9 @@ provides:
     - id: default:standard
       path: workflow.yaml
       description: General feature workflow
+    - id: default:adhoc
+      path: workflow.yaml
+      description: Standalone local work
   workers:
     - id: default:bob
       path: workers/bob.md
@@ -25,6 +28,9 @@ provides:
       path: workers/ada.md
       description: Architecture worker
   stages:
+    - id: default:adhoc
+      path: stages/adhoc.md
+      description: Complete a standalone local task
     - id: default:intake
       path: stages/intake.md
       description: Gather ticket context
@@ -45,6 +51,7 @@ provides:
       description: Add or run automated QA
 aliases:
   workflows:
+    adhoc: default:adhoc
     default: default:standard
   workers:
     bob: default:bob
@@ -53,6 +60,7 @@ aliases:
     brian: default:brian
     ada: default:ada
   stages:
+    adhoc: default:adhoc
     intake: default:intake
     develop: default:develop
     code-review: default:code-review

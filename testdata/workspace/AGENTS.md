@@ -15,7 +15,9 @@ stage behavior in stage files and worker-specific behavior in worker files.
   preconditions, handoffs, and worktrees.
 - `orc.yaml` owns repository definitions and routing data, workflows, stages,
   workers, and workspace settings.
-- `RULES.md` owns permission and approval boundaries.
+- `RULES.md` owns permission and approval boundaries. It remains authoritative
+  when a workflow, stage, worker, or prompt requests an external or permanent
+  action.
 - `TOOLS.md` owns verified integrations, external access, and preferred tools.
 - The current stage file owns the task, exit criteria, and required outputs.
 - Repository-local instructions own product commands and coding conventions.
