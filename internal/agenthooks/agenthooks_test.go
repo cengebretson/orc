@@ -119,14 +119,14 @@ func TestOwnedCommandRequiresCanonicalPrefix(t *testing.T) {
 	}
 }
 
-func TestInstalledHookPublishesNormalizedEventAndIgnoresSubagents(t *testing.T) {
+func TestInstalledHookForwardsPayloadToOrcWithoutPython(t *testing.T) {
 	opts := testOptions(t)
 	output := filepath.Join(t.TempDir(), "args")
 	fakeOrc := opts.OrcBinary
 	if err := os.MkdirAll(filepath.Dir(fakeOrc), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	fake := "#!/usr/bin/env bash\nprintf '%s\\n' \"$@\" > \"$FAKE_ORC_OUTPUT\"\n"
+	fake := "#!/usr/bin/env bash\nprintf '%s\\n' \"$@\" > \"$FAKE_ORC_OUTPUT\"\ncat > \"${FAKE_ORC_OUTPUT}.stdin\"\n"
 	if err := os.WriteFile(fakeOrc, []byte(fake), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -143,21 +143,23 @@ func TestInstalledHookPublishesNormalizedEventAndIgnoresSubagents(t *testing.T) 
 	}
 	got := string(args)
 	for _, want := range []string{
-		"agent-event\n", "--engine\n", "codex\n", "--agent-id\n", "agent-1\n",
-		"--instance\n", "instance-1\n", "--state\n", "blocked\n",
-		"--provider-session\n", "provider-1\n", "--event-id\n", "evt_",
+		"agent-event\n", "--hook-input\n", "--engine\n", "codex\n", "--state\n", "blocked\n",
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("hook args missing %q:\n%s", want, got)
 		}
 	}
-
-	if err := os.Remove(output); err != nil {
+	for _, unwanted := range []string{"--agent-id", "--instance", "--provider-session", "--event-id", "python3"} {
+		if strings.Contains(got, unwanted) || strings.Contains(string(hookScript), unwanted) {
+			t.Fatalf("hook still contains obsolete dependency or normalized flag %q", unwanted)
+		}
+	}
+	forwarded, err := os.ReadFile(output + ".stdin")
+	if err != nil {
 		t.Fatal(err)
 	}
-	runHook(t, hookPath, fakeOrc, output, "{\"session_id\":\"provider-1\",\"agent_id\":\"subagent-1\"}")
-	if _, err := os.Stat(output); !os.IsNotExist(err) {
-		t.Fatalf("subagent event should be ignored: %v", err)
+	if string(forwarded) != payload {
+		t.Fatalf("forwarded payload = %q, want %q", forwarded, payload)
 	}
 }
 
@@ -184,7 +186,6 @@ func runHook(t *testing.T, hookPath, fakeOrc, output, payload string) {
 		"ORC_AGENT_INSTANCE=instance-1",
 		"TMUX_PANE=%7",
 		"FAKE_ORC_OUTPUT="+output,
-		"ORC_HOOK_TIMEOUT=10",
 	)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("hook failed: %v\n%s", err, out)

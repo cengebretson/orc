@@ -102,6 +102,11 @@ of UTF-8 text into a private tmux buffer over stdin, requires bracketed paste,
 and sends Enter as an encoded key. Prompt text is never interpolated into a
 shell command or command-line argument.
 
+The installed hook is a fail-open Bash forwarder. It sends the provider JSON to
+the hidden `orc agent-event` command over stdin; the Orc binary handles JSON
+parsing, subagent filtering, provider-session extraction, and deterministic
+event IDs without requiring Python or a separate JSON utility.
+
 In `orc watch`, press `s`, compose the message, press `enter` to review, and
 press `y` to confirm. For automation, use:
 

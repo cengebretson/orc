@@ -100,11 +100,9 @@ func init() {
 	agentEventCmd.Flags().StringVar(&agentEventProvider, "provider-session", "", "Provider-native session identity when available")
 	agentEventCmd.Flags().StringVar(&agentEventLifecycle, "state", "", "Recognized lifecycle state")
 	agentEventCmd.Flags().StringVar(&agentEventID, "event-id", "", "Provider event identity used for deduplication")
-	_ = agentEventCmd.MarkFlagRequired("agent-id")
-	_ = agentEventCmd.MarkFlagRequired("instance")
+	agentEventCmd.Flags().BoolVar(&agentEventHookInput, "hook-input", false, "Read and normalize a provider hook payload from stdin")
 	_ = agentEventCmd.MarkFlagRequired("engine")
 	_ = agentEventCmd.MarkFlagRequired("state")
-	_ = agentEventCmd.MarkFlagRequired("event-id")
 
 	packCmd.AddCommand(packListCmd)
 	packCmd.AddCommand(packAvailableCmd)

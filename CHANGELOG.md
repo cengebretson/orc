@@ -6,6 +6,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.22.1] - 2026-08-05
+
+### Changed
+
+- Moved lifecycle-hook JSON parsing, subagent filtering, provider-session
+  extraction, and deterministic event-ID generation into the Orc binary. The
+  installed fail-open Bash hook now forwards provider events over stdin and no
+  longer requires Python.
+
 ## [0.22.0] - 2026-08-04
 
 ### Added
@@ -763,7 +772,8 @@ invoke `orc watch` — an unknown flag now fails the command.
 - Bubble Tea TUI dashboard with health, workflow, stage, and portrait views.
 - `orc doctor --fix` to clear stale state locks.
 
-[Unreleased]: https://github.com/cengebretson/orc/compare/v0.22.0...HEAD
+[Unreleased]: https://github.com/cengebretson/orc/compare/v0.22.1...HEAD
+[0.22.1]: https://github.com/cengebretson/orc/compare/v0.22.0...v0.22.1
 [0.22.0]: https://github.com/cengebretson/orc/compare/v0.21.0...v0.22.0
 [0.21.0]: https://github.com/cengebretson/orc/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/cengebretson/orc/compare/v0.19.0...v0.20.0

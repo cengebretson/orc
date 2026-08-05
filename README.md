@@ -207,7 +207,10 @@ a `doctor` flag because it writes into your agent configuration rather than the
 workspace — `orc doctor` reports whether the hooks are installed, and this
 installs them. Preview the exact file operations with `--dry-run` first. Codex
 requires explicit review and trust through `/hooks`; Orc never approves hook
-hashes on your behalf. Restart active Claude sessions after installation.
+hashes on your behalf. The installed fail-open Bash wrapper forwards the
+provider's JSON event to `orc agent-event`; Orc itself parses and normalizes the
+payload, so the hooks do not require Python, `jq`, or another JSON runtime.
+Restart active Claude sessions after installation.
 
 ### 4. Start working on a ticket
 

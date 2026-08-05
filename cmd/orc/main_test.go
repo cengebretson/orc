@@ -57,6 +57,85 @@ func TestRunAgentEventUsesInheritedPaneAndNormalizedFields(t *testing.T) {
 	}
 }
 
+func TestRunAgentEventNormalizesHookInputInGo(t *testing.T) {
+	resetCommandGlobals(t)
+	t.Setenv("TMUX_PANE", "%9")
+	t.Setenv("ORC_AGENT_ID", " agent-9 ")
+	t.Setenv("ORC_AGENT_INSTANCE", " instance-9 ")
+	agentEventEngine = " CODEX "
+	agentEventLifecycle = " BLOCKED "
+	agentEventHookInput = true
+	agentEventInput = strings.NewReader(`{"session_id":" provider-9 ","turn_id":"turn-1","hook_event_name":"PermissionRequest","tool_use_id":"tool-1"}`)
+	var pane string
+	var event mux.AgentEvent
+	applyAgentEvent = func(gotPane string, gotEvent mux.AgentEvent) (mux.AgentEventResult, error) {
+		pane, event = gotPane, gotEvent
+		return mux.AgentEventResult{}, nil
+	}
+	if err := runAgentEvent(nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if pane != "%9" || event.AgentID != "agent-9" || event.AgentInstance != "instance-9" || event.Engine != "codex" || event.ProviderSessionID != "provider-9" || event.Lifecycle != "blocked" {
+		t.Fatalf("pane/event = %q / %+v", pane, event)
+	}
+	if !strings.HasPrefix(event.EventID, "evt_") || len(event.EventID) != len("evt_")+32 {
+		t.Fatalf("event ID = %q", event.EventID)
+	}
+}
+
+func TestRunAgentEventIgnoresSubagentHookInput(t *testing.T) {
+	resetCommandGlobals(t)
+	t.Setenv("TMUX_PANE", "%9")
+	t.Setenv("ORC_AGENT_ID", "agent-9")
+	t.Setenv("ORC_AGENT_INSTANCE", "instance-9")
+	agentEventEngine = "codex"
+	agentEventLifecycle = "working"
+	agentEventHookInput = true
+	agentEventInput = strings.NewReader(`{"session_id":"provider-9","agent_id":"subagent-1"}`)
+	called := false
+	applyAgentEvent = func(string, mux.AgentEvent) (mux.AgentEventResult, error) {
+		called = true
+		return mux.AgentEventResult{}, nil
+	}
+	if err := runAgentEvent(nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if called {
+		t.Fatal("subagent hook input updated the primary agent")
+	}
+}
+
+func TestAgentHookEventIDIsDeterministic(t *testing.T) {
+	payload := map[string]any{
+		"session_id": "provider-9", "turn_id": "turn-1", "hook_event_name": "PostToolUse", "tool_use_id": "tool-1",
+	}
+	first, err := agentHookEventID("codex", "working", payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := agentHookEventID("codex", "working", payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first != second {
+		t.Fatalf("event IDs differ: %q != %q", first, second)
+	}
+	payload["turn_id"] = "turn-2"
+	changed, err := agentHookEventID("codex", "working", payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if changed == first {
+		t.Fatalf("different hook identities produced %q", changed)
+	}
+}
+
+func TestReadAgentHookPayloadRejectsTrailingJSON(t *testing.T) {
+	if _, _, err := readAgentHookPayload(strings.NewReader(`{} {}`)); err == nil || !strings.Contains(err.Error(), "multiple top-level values") {
+		t.Fatalf("readAgentHookPayload error = %v", err)
+	}
+}
+
 func TestRunAgentEventRejectsMissingInheritedPane(t *testing.T) {
 	resetCommandGlobals(t)
 	t.Setenv("TMUX_PANE", "")
@@ -2082,12 +2161,14 @@ func resetCommandGlobals(t *testing.T) {
 	ctlCaptureLines = 80
 	collectCtlSessions = sessionlist.Collect
 	applyAgentEvent = tmux.ApplyAgentEvent
+	agentEventInput = os.Stdin
 	agentEventAgentID = ""
 	agentEventInstance = ""
 	agentEventEngine = ""
 	agentEventProvider = ""
 	agentEventLifecycle = ""
 	agentEventID = ""
+	agentEventHookInput = false
 	newParkingAgentID = agentidentity.NewAgentID
 	newParkingInstanceID = agentidentity.NewInstanceID
 }
