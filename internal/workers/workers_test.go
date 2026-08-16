@@ -121,6 +121,41 @@ func TestLaunchCommand_Claude(t *testing.T) {
 	}
 }
 
+// A worker's args map becomes launch flags. The advisor worker relies on this
+// to carry its "advise, do not act" charter as --append-system-prompt: `orc jit`
+// builds its own prompt and never renders a worker's Prompt Template, so a
+// constraint written only in the worker's markdown body would not reach the
+// model.
+func TestLaunchArgs_ClaudeForwardsArgsAsFlags(t *testing.T) {
+	w := &workers.Worker{
+		ID:     "default:vera",
+		Engine: "claude",
+		Model:  "claude-opus-4-8",
+		Args: map[string]string{
+			"effort":               "high",
+			"append-system-prompt": "You are an ADVISOR, not an implementer.",
+		},
+	}
+
+	args := workers.LaunchArgs(w, "/workspace", "/workspace", "should I cache this?")
+
+	var flag, value string
+	for i, arg := range args {
+		if arg == "--append-system-prompt" && i+1 < len(args) {
+			flag, value = arg, args[i+1]
+		}
+	}
+	if flag == "" {
+		t.Fatalf("--append-system-prompt not forwarded: %q", args)
+	}
+	if value != "You are an ADVISOR, not an implementer." {
+		t.Errorf("charter = %q, want it passed through verbatim", value)
+	}
+	if args[len(args)-1] != "should I cache this?" {
+		t.Errorf("prompt must stay the final positional arg: %q", args)
+	}
+}
+
 func findWorker(list []*workers.Worker, id string) *workers.Worker {
 	for _, w := range list {
 		if w.ID == id {

@@ -6,6 +6,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `default:vera`, an advisor worker in the default pack, for consulting a second
+  agent without delegating the work. Runs through the existing `orc jit` path —
+  `orc jit <ticket> --worker default:vera "<question>"` — so the exchange lands
+  in `features/<slug>/jit/<timestamp>/` and outlives the session that asked.
+  Distinct from `default:ada`: Ada plans and her plan becomes the work, whereas
+  Vera answers a question and hands it back to a caller who keeps the work. Its
+  "advise, do not act" charter is carried in `args.append-system-prompt` rather
+  than the worker's body, because `orc jit` builds its own prompt and never
+  renders a worker's Prompt Template — a constraint written only in the markdown
+  would not reach the model.
+
 ### Fixed
 
 - Publish attention markers under `tmux-attention`'s own pane schema

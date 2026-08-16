@@ -27,6 +27,9 @@ provides:
     - id: default:ada
       path: workers/ada.md
       description: Architecture worker
+    - id: default:vera
+      path: workers/vera.md
+      description: Advisor worker for second opinions (consulted, never delegated to)
   stages:
     - id: default:adhoc
       path: stages/adhoc.md
