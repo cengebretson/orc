@@ -88,6 +88,70 @@ func TestParseDetailedPanesHidesAcknowledgedAttention(t *testing.T) {
 	}
 }
 
+// The format string and the parser are generated from one list, so they cannot
+// drift. A duplicate name would silently shadow an earlier field in the lookup
+// index, which is the same class of bug the positional parser used to have.
+func TestPaneFieldsAreUniqueAndDriveTheFormat(t *testing.T) {
+	seen := map[string]bool{}
+	for _, field := range paneFields {
+		if seen[field] {
+			t.Errorf("duplicate pane field %q: the later one would shadow the earlier", field)
+		}
+		seen[field] = true
+	}
+
+	if got, want := strings.Count(paneFormat, "\t"), len(paneFields)-1; got != want {
+		t.Errorf("paneFormat has %d separators, want %d — format and field list disagree", got, want)
+	}
+	for _, field := range paneFields {
+		if !strings.Contains(paneFormat, "#{"+field+"}") {
+			t.Errorf("paneFormat is missing #{%s}", field)
+		}
+	}
+	if len(paneFieldIndex) != len(paneFields) {
+		t.Errorf("index has %d entries for %d fields", len(paneFieldIndex), len(paneFields))
+	}
+}
+
+// Inserting a field mid-list used to shift every later index, so a pane's stage
+// would surface in its worker column with nothing failing. Parsing by name
+// makes position irrelevant.
+func TestParseDetailedPanesToleratesFieldOrder(t *testing.T) {
+	values := make([]string, len(paneFields))
+	for i, field := range paneFields {
+		values[i] = "v-" + field
+	}
+	set := func(field, value string) { values[paneFieldIndex[field]] = value }
+	set("pane_id", "%9")
+	set("session_name", "orc-1")
+	set("@orc_stage", "develop")
+	set("@orc_worker", "default:bob")
+	set("pane_pid", "4242")
+	set("@orc_agent", "1")
+	set("@orc_agent_state", "working")
+	set("@orc_agent_state_seq", "3")
+	set("@orc_agent_seen_seq", "0")
+	set("@agent_attention", "")
+	set("@agent_attention_since", "")
+	set("@agent_pane_attention", "review")
+	set("@agent_pane_attention_updated_at", "1700000123")
+
+	got := parseDetailedPanes([]byte(strings.Join(values, "\t") + "\n"))
+	if len(got) != 1 {
+		t.Fatalf("panes = %#v", got)
+	}
+	// Stage and Worker are the pair that silently swapped under the old parser.
+	if got[0].Stage != "develop" || got[0].Worker != "default:bob" {
+		t.Errorf("Stage/Worker = %q/%q, want develop/default:bob", got[0].Stage, got[0].Worker)
+	}
+	if got[0].ID != "%9" || got[0].PID != 4242 || !got[0].Agent {
+		t.Errorf("identity fields = %#v", got[0])
+	}
+	if got[0].Attention != "review" || got[0].AttentionSince != 1700000123 {
+		t.Errorf("attention = %q/%d, want review/1700000123", got[0].Attention, got[0].AttentionSince)
+	}
+}
+
 // tmux-attention records a marker's age as @agent_pane_attention_updated_at and
 // leaves @agent_attention_since empty. Reading only the legacy pair saw such a
 // marker's state with no age, so every age-derived display showed 0.
