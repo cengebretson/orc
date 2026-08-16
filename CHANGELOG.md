@@ -6,6 +6,37 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `orc jit --consult` for advisory runs. A ticket allows one JIT task at a time
+  because a JIT task owns `runtime.jit` until closed, which meant an agent
+  already inside one could not consult the advisor worker — exactly when advice
+  is most useful. A consult run neither claims the slot nor is blocked by one,
+  writes no runtime state, and drops the closing `orc mark <ticket> jit` step
+  since it opens no task.
+
+### Changed
+
+- `orc doctor` no longer recommends `orc hooks install` when something else
+  already owns the events Orc would claim. Orc uses SessionStart,
+  UserPromptSubmit, PermissionRequest, PostToolUse and Stop (plus Notification
+  and StopFailure on Claude); for a setup with its own hook dispatcher that is
+  nearly every event it uses, and installing over it leaves two systems writing
+  agent state on one event with last writer winning. Doctor now reports the
+  conflicting hooks and says to review instead.
+
+### Fixed
+
+- Parse tmux pane rows by field name rather than position. The format string and
+  the parser were coupled by index with nothing enforcing it, so inserting a
+  field mid-list shifted every later one and a pane's stage surfaced in its
+  worker column — wrong data with no crash and no failing test. Both are now
+  generated from one ordered list.
+- Stop `TestDetectVersionUsesFirstNonEmptyLine` failing on machine load. The
+  probe's 2s bound is wall-clock, and spawning a freshly written script under a
+  parallel `go test ./...` can exceed it; the bound is now overridable so the
+  test does not race it. The production default is unchanged.
+
 ## [0.23.0] - 2026-08-16
 
 ### Added
