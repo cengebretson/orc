@@ -179,6 +179,11 @@ workflow state, stage advancement, or session lifecycle.
 - Claude/Codex hooks that call the CLI.
 - clear-on-view behavior through tmux hooks.
 
+Orc consumes this plugin for display and never as an authority — see
+[ADR 0005](adr/0005-orc-and-tmux-attention-are-layered.md) for why the two stay
+layered, and [ADR 0004](adr/0004-authoritative-sources-are-named.md) for what a
+marker may and may not drive.
+
 **The plugin owns the option schema.** It is released and versioned, and
 `tmux-fzf-jump` already consumes it, so orc publishes into the plugin's names
 rather than defining its own:
