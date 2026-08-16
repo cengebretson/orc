@@ -6,14 +6,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-08-16
+
 ### Changed
 
 - Only named sources may drive actions. The gates deciding whether a lifecycle
-  or attention value could advance a stage, satisfy `orc ctl agent wait`, or
-  wake parked work excluded the sources known to be untrustworthy, which made
-  "authoritative" the default for anything unrecognized. `@agent_attention` is a
-  shared namespace and the `tmux-attention` CLI takes a free-text `--source`, so
-  markers written by Claude and Codex hooks — or by any script — qualified.
+  or attention value could stand as a pane's live state, satisfy an `orc ctl`
+  attention wait, or wake parked work excluded the sources known to be
+  untrustworthy, which made "authoritative" the default for anything
+  unrecognized. `@agent_attention` is a shared namespace and the
+  `tmux-attention` CLI takes a free-text `--source`, so markers written by
+  Claude and Codex hooks — or by any script — qualified.
   Authority is now a positive list of `hook` and `native`, the two channels Orc
   can verify. See [ADR 0004](docs/adr/0004-authoritative-sources-are-named.md).
 - As a result, `tmux-attention` markers no longer wake parked work or satisfy an
@@ -857,7 +860,8 @@ invoke `orc watch` — an unknown flag now fails the command.
 - Bubble Tea TUI dashboard with health, workflow, stage, and portrait views.
 - `orc doctor --fix` to clear stale state locks.
 
-[Unreleased]: https://github.com/cengebretson/orc/compare/v0.24.0...HEAD
+[Unreleased]: https://github.com/cengebretson/orc/compare/v0.25.0...HEAD
+[0.25.0]: https://github.com/cengebretson/orc/compare/v0.24.0...v0.25.0
 [0.24.0]: https://github.com/cengebretson/orc/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/cengebretson/orc/compare/v0.22.1...v0.23.0
 [0.22.1]: https://github.com/cengebretson/orc/compare/v0.22.0...v0.22.1
