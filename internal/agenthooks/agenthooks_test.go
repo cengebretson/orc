@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func testOptions(t *testing.T) Options {
@@ -163,7 +164,69 @@ func TestInstalledHookForwardsPayloadToOrcWithoutPython(t *testing.T) {
 	}
 }
 
+func TestForeignHooksFindsOnlyClaimedEventsFromOtherTools(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "settings.json")
+	hookPath := filepath.Join(dir, "hooks", "orc-agent-state.sh")
+	config := `{"hooks":{
+      "Stop":[{"hooks":[
+        {"command":"\"$HOME/hooks/dispatch.sh\" agent-turn-stop"},
+        {"command":"` + strings.ReplaceAll(hookPath, `\`, `\\`) + ` codex idle"}
+      ]}],
+      "PreToolUse":[{"hooks":[{"command":"some-unclaimed-event-hook"}]}]
+    }}`
+	if err := os.WriteFile(configPath, []byte(config), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got := ForeignHooks(Integration{
+		ConfigPath: configPath,
+		HookPath:   hookPath,
+		Events:     []string{"Stop", "UserPromptSubmit"},
+	})
+
+	if len(got) != 1 {
+		t.Fatalf("ForeignHooks = %#v, want exactly the one foreign Stop hook", got)
+	}
+	if !strings.Contains(got[0], "agent-turn-stop") {
+		t.Errorf("ForeignHooks = %q, want the dispatcher command", got[0])
+	}
+	// Orc's own hook must not count as a conflict with itself, and an event
+	// Orc does not claim is none of its business.
+	for _, entry := range got {
+		if strings.Contains(entry, hookPath) || strings.Contains(entry, "unclaimed") {
+			t.Errorf("ForeignHooks included %q", entry)
+		}
+	}
+}
+
+func TestForeignHooksIgnoresMissingOrUnreadableConfig(t *testing.T) {
+	missing := ForeignHooks(Integration{
+		ConfigPath: filepath.Join(t.TempDir(), "absent.json"),
+		Events:     []string{"Stop"},
+	})
+	if missing != nil {
+		t.Errorf("missing config = %#v, want nil", missing)
+	}
+
+	badPath := filepath.Join(t.TempDir(), "bad.json")
+	if err := os.WriteFile(badPath, []byte("not json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := ForeignHooks(Integration{ConfigPath: badPath, Events: []string{"Stop"}}); got != nil {
+		t.Errorf("unparseable config = %#v, want nil", got)
+	}
+}
+
 func TestDetectVersionUsesFirstNonEmptyLine(t *testing.T) {
+	// Spawning a just-written script while the rest of the suite compiles and
+	// runs in parallel can exceed the production default, which failed this
+	// test on machine load rather than on behavior. The probe's bound is not
+	// what is under test here.
+	previous := detectVersionTimeout
+	detectVersionTimeout = 30 * time.Second
+	t.Cleanup(func() { detectVersionTimeout = previous })
+
 	binary := filepath.Join(t.TempDir(), "agent")
 	if err := os.WriteFile(binary, []byte("#!/usr/bin/env bash\nprintf '\\nagent 1.2.3\\nextra\\n'\n"), 0o700); err != nil {
 		t.Fatal(err)

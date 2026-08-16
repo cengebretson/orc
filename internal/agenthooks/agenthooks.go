@@ -5,6 +5,7 @@ package agenthooks
 import (
 	"context"
 	_ "embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -47,6 +48,7 @@ type Integration struct {
 	HookPath        string
 	ConfigPath      string
 	SupportedStates []string
+	Events          []string
 	Changes         []Change
 	Err             error
 }
@@ -222,6 +224,7 @@ func planIntegration(def definition) Integration {
 		Engine: def.engine, Executable: def.executable, ConfigDir: def.configDir,
 		HookPath: def.hookPath, ConfigPath: def.configPath,
 		SupportedStates: []string{"idle", "working", "blocked"},
+		Events:          eventNames(def.events),
 	}
 	hookChange, err := planFile(def.hookPath, hookScript, 0o700)
 	if err != nil {
@@ -331,10 +334,82 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
+// detectVersionTimeout bounds the --version probe. Two seconds is generous for
+// a real agent CLI on an idle machine, but it is wall-clock: a test that execs
+// a freshly written script while the rest of the suite compiles and runs in
+// parallel can exceed it and fail on machine load rather than on behavior.
+// Tests override this rather than racing the default.
+var detectVersionTimeout = 2 * time.Second
+
+func eventNames(events []eventDefinition) []string {
+	names := make([]string, len(events))
+	for i, event := range events {
+		names[i] = event.name
+	}
+	return names
+}
+
+// ForeignHooks returns commands already wired to the events this integration
+// would claim, excluding Orc's own hook script.
+//
+// Orc is not the only thing that writes these files: a hand-rolled dispatcher
+// is a normal setup, and it commonly owns UserPromptSubmit and Stop — the same
+// events Orc uses to mark a turn working and idle. Installing over that leaves
+// two systems writing agent state on one event, last writer wins, with nothing
+// reporting the conflict. Doctor surfaces this instead of recommending the
+// install blindly. Unreadable or absent config is not a conflict.
+func ForeignHooks(integration Integration) []string {
+	data, err := os.ReadFile(integration.ConfigPath)
+	if err != nil {
+		return nil
+	}
+	var parsed struct {
+		Hooks map[string][]struct {
+			Hooks []struct {
+				Command string `json:"command"`
+			} `json:"hooks"`
+		} `json:"hooks"`
+	}
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		return nil
+	}
+
+	claimed := make(map[string]bool, len(integration.Events))
+	for _, event := range integration.Events {
+		claimed[event] = true
+	}
+
+	var foreign []string
+	seen := map[string]bool{}
+	for event, matchers := range parsed.Hooks {
+		if !claimed[event] {
+			continue
+		}
+		for _, matcher := range matchers {
+			for _, hook := range matcher.Hooks {
+				command := strings.TrimSpace(hook.Command)
+				// Orc's own hook is identified by its script path, which
+				// survives the quoting each provider applies to the command.
+				if command == "" || strings.Contains(command, integration.HookPath) {
+					continue
+				}
+				entry := event + ": " + command
+				if seen[entry] {
+					continue
+				}
+				seen[entry] = true
+				foreign = append(foreign, entry)
+			}
+		}
+	}
+	sort.Strings(foreign)
+	return foreign
+}
+
 // DetectVersion returns the first non-empty line from an agent CLI's bounded
 // --version probe.
 func DetectVersion(executable string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), detectVersionTimeout)
 	defer cancel()
 	out, err := exec.CommandContext(ctx, executable, "--version").CombinedOutput()
 	if ctx.Err() != nil {
