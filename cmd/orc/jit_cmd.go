@@ -31,8 +31,13 @@ func runJIT(cmd *cobra.Command, args []string) error {
 	featureDir := t.FeatureDir
 	s := t.State
 
-	if s.Runtime.JIT != nil && !jitDry {
-		return fmt.Errorf("jit task already running for %s (worker: %s, started: %s)\nRun `orc mark %s jit \"<summary>\"` to close it first",
+	// The single-slot guard exists because a JIT task owns runtime.jit until it
+	// is closed. A consultation changes nothing durable — it asks a question and
+	// returns an answer — so it neither claims the slot nor is blocked by one.
+	// Without this, an agent already inside a JIT task could not ask for advice,
+	// which is exactly when advice is most useful.
+	if s.Runtime.JIT != nil && !jitDry && !jitConsult {
+		return fmt.Errorf("jit task already running for %s (worker: %s, started: %s)\nRun `orc mark %s jit \"<summary>\"` to close it first, or pass --consult to ask for advice without taking the slot",
 			s.Ticket, s.Runtime.JIT.Worker, s.Runtime.JIT.StartedAt, s.Ticket)
 	}
 
@@ -69,8 +74,10 @@ func runJIT(cmd *cobra.Command, args []string) error {
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		return fmt.Errorf("creating jit output dir: %w", err)
 	}
-	if err := state.SetJIT(featureDir, jitWorker, instruction); err != nil {
-		return fmt.Errorf("writing runtime.jit: %w", err)
+	if !jitConsult {
+		if err := state.SetJIT(featureDir, jitWorker, instruction); err != nil {
+			return fmt.Errorf("writing runtime.jit: %w", err)
+		}
 	}
 
 	fmt.Printf("Ticket:  %s\n", s.Ticket)
@@ -120,9 +127,20 @@ func runJIT(cmd *cobra.Command, args []string) error {
 }
 
 func buildJITPrompt(s *state.State, instruction, outputDir string) string {
+	heading := "JIT task"
+	// A consultation holds no runtime slot, so there is nothing to close. Telling
+	// it to run `orc mark ... jit` would close a task it never opened — or fail
+	// outright — and it must not touch the repo either way.
+	closing := fmt.Sprintf("When you are done, run:\n  orc mark %s jit \"<summary of what you did>\"", s.Ticket)
+	if jitConsult {
+		heading = "Consultation"
+		closing = "When you are done, print your answer and stop. Do not run `orc mark` —\n" +
+			"this consultation holds no task slot, and the agent that asked keeps the work."
+	}
+
 	return fmt.Sprintf(`Before starting: read AGENTS.md and ORC.md.
 
-## JIT task: %s
+## %s: %s
 
 %s
 
@@ -138,7 +156,6 @@ Current pipeline stage: %s (do not advance — this is a one-off task outside th
 
 Write any output or notes to %s
 
-When you are done, run:
-  orc mark %s jit "<summary of what you did>"`,
-		s.Ticket, instruction, s.Slug, s.Stage.Name, outputDir, s.Ticket)
+%s`,
+		heading, s.Ticket, instruction, s.Slug, s.Stage.Name, outputDir, closing)
 }

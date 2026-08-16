@@ -80,17 +80,19 @@ args:
 Vera runs through the existing one-off task path — no new command:
 
 ```bash
-orc jit <ticket> --worker default:vera "Is a read-through cache the right fix
-for the N+1 in the billing report, or am I papering over a query problem?"
+orc jit <ticket> --consult --worker default:vera "Is a read-through cache the
+right fix for the N+1 in the billing report, or am I papering over a query
+problem?"
 ```
+
+`--consult` matters: a ticket allows one JIT task at a time, and a consultation
+changes nothing durable, so it neither claims that slot nor is blocked by one.
+Without it you could not ask for advice from inside another JIT task — which is
+exactly when advice is most useful. It also drops the closing
+`orc mark <ticket> jit` step, since there is no task to close.
 
 `orc jit` writes the exchange to `features/<slug>/jit/<timestamp>/`, so the
 advice lands in the feature folder and survives the session that asked for it.
-Close the consultation the same way as any JIT task:
-
-```bash
-orc mark <ticket> jit "<what the advice was, and what you did with it>"
-```
 
 Add `--dry` to preview the resolved worker and prompt without launching, and
 `--tmux` to send it to the ticket's session instead of the foreground.

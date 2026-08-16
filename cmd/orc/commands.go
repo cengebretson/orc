@@ -230,9 +230,10 @@ var jitCmd = &cobra.Command{
 }
 
 var (
-	jitWorker string
-	jitDry    bool
-	jitTmux   bool
+	jitWorker  string
+	jitDry     bool
+	jitTmux    bool
+	jitConsult bool
 )
 
 var attachCmd = &cobra.Command{

@@ -58,6 +58,7 @@ func init() {
 	labelCmd.Flags().StringArrayVar(&labelRemove, "remove", nil, "Remove a label by key; repeat for several")
 	jitCmd.Flags().BoolVar(&jitDry, "dry", false, "Print resolved worker and prompt without launching")
 	jitCmd.Flags().BoolVar(&jitTmux, "tmux", false, "Send to the ticket's existing tmux session instead of foreground")
+	jitCmd.Flags().BoolVar(&jitConsult, "consult", false, "Advisory run: does not occupy the ticket's single JIT slot, so it can be used from inside another JIT task")
 	watchCmd.Flags().StringVar(&watchInterval, "interval", "5s", "Refresh interval")
 	watchCmd.Flags().BoolVar(&watchWide, "wide", false, "Render the wider table layout")
 	watchCmd.Flags().BoolVar(&watchDemo, "demo", false, "Preview watch with synthetic workflow, state, and context data")
