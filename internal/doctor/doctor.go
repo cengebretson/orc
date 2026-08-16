@@ -151,12 +151,33 @@ func AppendAgentHookChecks(report *Report, plan *agenthooks.Plan, lookPath func(
 				status = OK
 			}
 		} else if integration.Err == nil {
-			detail += "; run orc hooks install"
+			// Only recommend the install when nothing else already owns these
+			// events. Installing over a hand-rolled dispatcher leaves two
+			// systems writing agent state on one event, last writer wins.
+			if foreign := agenthooks.ForeignHooks(integration); len(foreign) > 0 {
+				detail += fmt.Sprintf("; %d existing non-orc hook(s) on events orc would claim, e.g. %s",
+					len(foreign), strings.Join(summarizeForeignHooks(foreign, 2), ", "))
+				detail += "; review before running orc hooks install"
+			} else {
+				detail += "; run orc hooks install"
+			}
 		}
 		report.Checks = append(report.Checks, Check{
 			Group: "agent hooks", Name: integration.Engine, Status: status, Detail: detail,
 		})
 	}
+}
+
+// summarizeForeignHooks keeps the doctor line scannable. A setup with its own
+// dispatcher usually has one hook per event per integration, so listing them
+// all buries the finding in a wall of near-identical commands; the count is the
+// signal and a couple of examples are enough to recognize what owns them.
+func summarizeForeignHooks(foreign []string, limit int) []string {
+	if len(foreign) <= limit {
+		return foreign
+	}
+	summary := append([]string{}, foreign[:limit]...)
+	return append(summary, fmt.Sprintf("and %d more", len(foreign)-limit))
 }
 
 func appendHealth(report *Report, h *health.Report) {
