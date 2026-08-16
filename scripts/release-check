@@ -67,8 +67,12 @@ export PATH="$tool_bin:$PATH"
 step "initialize a default workspace"
 init_output="$qa_root/init.out"
 "$orc_bin" --workspace "$workspace" init --force >"$init_output"
-require_contains "$init_output" 'Done\. 42 created, 0 updated, 0 skipped\.' \
-  "default init did not report exactly 42 created files"
+# Bump this whenever the default pack gains or loses a file. A new worker or
+# stage adds two: the pack copy under packs/default/ and its installed copy.
+# `make test` does not run this script, so a stale count only surfaces here or
+# in CI -- long after the change that broke it looked green locally.
+require_contains "$init_output" 'Done\. 44 created, 0 updated, 0 skipped\.' \
+  "default init did not report exactly 44 created files"
 [[ -f "$workspace/SETUP.md" ]] || fail "default init did not create SETUP.md"
 
 step "apply the deterministic post-agent setup contract"
