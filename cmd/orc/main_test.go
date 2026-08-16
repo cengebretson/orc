@@ -1161,6 +1161,38 @@ func TestRunJITDryPrintsResolvedWorkerAndPrompt(t *testing.T) {
 	}
 }
 
+// A consultation opens no task, so it must not tell the agent to close one --
+// `orc mark <ticket> jit` would close a slot it never claimed.
+func TestRunJITConsultAsksForAnAnswerAndNotAMark(t *testing.T) {
+	resetCommandGlobals(t)
+	globalWorkspace = fixtureWorkspace()
+	jitDry = true
+	jitConsult = true
+	// Any worker: --consult changes the prompt and slot handling, not the
+	// worker resolution, and the fixture workspace carries its own worker set.
+	jitWorker = "default:bob"
+
+	out, err := captureStdout(func() error {
+		return runJIT(nil, []string{"STORY-123", "is this the right approach?"})
+	})
+	if err != nil {
+		t.Fatalf("runJIT --consult --dry: %v", err)
+	}
+
+	for _, want := range []string{
+		"## Consultation: STORY-123",
+		"is this the right approach?",
+		"print your answer and stop",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("consult output missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "orc mark STORY-123 jit") {
+		t.Fatalf("consult prompt told the agent to close a task it never opened:\n%s", out)
+	}
+}
+
 func TestRunLocalCreatesLaunchesAndAttachesFeatureInTmux(t *testing.T) {
 	resetCommandGlobals(t)
 	globalWorkspace = t.TempDir()
@@ -2021,6 +2053,7 @@ func resetCommandGlobals(t *testing.T) {
 	oldJITDry := jitDry
 	oldJITWorker := jitWorker
 	oldJITTmux := jitTmux
+	oldJITConsult := jitConsult
 	oldRunSlug := runSlug
 	oldRunWorker := runWorker
 	oldRunRepo := runRepo
@@ -2076,6 +2109,7 @@ func resetCommandGlobals(t *testing.T) {
 		jitDry = oldJITDry
 		jitWorker = oldJITWorker
 		jitTmux = oldJITTmux
+		jitConsult = oldJITConsult
 		runSlug = oldRunSlug
 		runWorker = oldRunWorker
 		runRepo = oldRunRepo
