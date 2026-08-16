@@ -6,6 +6,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Publish attention markers under `tmux-attention`'s own pane schema
+  (`@agent_pane_attention{,_updated_at,_source}`) alongside the existing
+  `@agent_attention` trio. Orc wrote only the latter, which renders the tab
+  glyph — that format resolves through pane → window → session — but left every
+  orc-set marker invisible to the plugin's CLI and absent from
+  `tmux-fzf-jump`'s attention picker, both of which read the pane-scoped
+  option. Written as plain tmux options rather than by shelling out, so orc's
+  lifecycle tracking still works without the optional plugin installed.
+- Read a marker's age from `@agent_pane_attention_updated_at`, falling back to
+  `@agent_attention_since`. The plugin records the former and leaves the latter
+  empty, so a marker set by a Claude or Codex hook was read with its state but
+  an age of zero, flattening every age-derived display in `orc watch`.
+
 ## [0.22.1] - 2026-08-05
 
 ### Changed

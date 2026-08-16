@@ -123,8 +123,8 @@ displays that as blocked/human-needed without requiring any tmux marker.
 
 - `STATE.yaml`: ticket, slug, workflow, stage, worker, status, next action.
 - tmux: session/window exists or stopped.
-- `tmux-attention`: optional live marker from `@agent_attention`, read per pane
-  and rolled up per window.
+- `tmux-attention`: optional live marker from `@agent_pane_attention` (falling
+  back to `@agent_attention`), read per pane and rolled up per window.
 - Provider telemetry: optional context usage and limit, correlated to the exact
   managed pane without changing durable state.
 
@@ -175,24 +175,55 @@ workflow state, stage advancement, or session lifecycle.
 `tmux-attention` can provide a low-level tmux notification primitive:
 
 - CLI states: `input`, `blocked`, `review`, `done`, `clear`.
-- tmux options: `@agent_attention`, and optionally `@agent_attention_since`
-  (epoch seconds) for how long that state has been held.
 - status rendering through `@tmux_attention_status`.
 - Claude/Codex hooks that call the CLI.
 - clear-on-view behavior through tmux hooks.
 
-`orc watch` reads the marker from each pane in the window:
+**The plugin owns the option schema.** It is released and versioned, and
+`tmux-fzf-jump` already consumes it, so orc publishes into the plugin's names
+rather than defining its own:
+
+| Option | Meaning |
+|---|---|
+| `@agent_pane_attention` | pane-scoped state — the authoritative marker |
+| `@agent_pane_attention_updated_at` | epoch seconds the state was last written |
+| `@agent_pane_attention_source` | what set it |
+
+Orc also writes the older `@agent_attention{,_since,_source}` trio for its own
+readers and for reporters written against earlier versions. The two timestamp
+fields are **not** interchangeable — `_updated_at` is the plugin's, `_since` was
+orc's — and writing only one is what previously let each side read the other's
+state but not its age.
+
+`orc watch` reads the marker from each pane in the window, preferring the
+plugin's fields and falling back to the legacy pair:
 
 ```sh
-tmux list-panes -t <session>:<window> -F '#{@agent_attention}	#{@agent_attention_since}'
+tmux list-panes -t <session>:<window> \
+  -F '#{@agent_pane_attention}	#{@agent_pane_attention_updated_at}'
 ```
 
-Reporters should prefer setting it on the pane they run in:
+Reporters should prefer the plugin's CLI, which writes the pane fields, derives
+the window summary, and wires up clear-on-view:
 
 ```sh
-tmux set-option -p -t "$TMUX_PANE" @agent_attention blocked \; \
-     set-option -p -t "$TMUX_PANE" @agent_attention_since "$(date +%s)"
+tmux-attention blocked --target "$TMUX_PANE" --source my-tool
 ```
+
+Setting options directly also works and needs no plugin installed — orc does
+this so its lifecycle tracking never depends on an optional tool. Write both
+schemas if you do:
+
+```sh
+tmux set-option -p -t "$TMUX_PANE" @agent_pane_attention blocked \; \
+     set-option -p -t "$TMUX_PANE" @agent_pane_attention_updated_at "$(date +%s)" \; \
+     set-option -p -t "$TMUX_PANE" @agent_attention blocked
+```
+
+Writing only `@agent_attention` renders the tab glyph — that format resolves
+through pane → window → session — but leaves the marker invisible to the
+plugin's CLI and absent from `tmux-fzf-jump`'s attention picker, which read the
+pane-scoped `@agent_pane_attention`.
 
 Setting it on the window still works — tmux resolves `@` options through
 pane → window → session, so a pane with no value of its own reports the

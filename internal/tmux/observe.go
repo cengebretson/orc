@@ -138,11 +138,11 @@ func publishObservation(pane mux.Pane) error {
 		{"@orc_agent_observed_rule", pane.ObservationRule},
 	}
 	if pane.AttentionSource != "hook" {
-		updates = append(updates,
-			[2]string{"@agent_attention", pane.Attention},
-			[2]string{"@agent_attention_since", optionalTimestamp(pane.AttentionSince)},
-			[2]string{"@agent_attention_source", pane.AttentionSource},
-		)
+		updates = append(updates, attentionUpdates(
+			pane.Attention,
+			optionalTimestamp(pane.AttentionSince),
+			pane.AttentionSource,
+		)...)
 	}
 	for _, update := range updates {
 		if err := setPaneOption(pane.ID, update[0], update[1]); err != nil {

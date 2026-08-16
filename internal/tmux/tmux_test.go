@@ -88,6 +88,78 @@ func TestParseDetailedPanesHidesAcknowledgedAttention(t *testing.T) {
 	}
 }
 
+// tmux-attention records a marker's age as @agent_pane_attention_updated_at and
+// leaves @agent_attention_since empty. Reading only the legacy pair saw such a
+// marker's state with no age, so every age-derived display showed 0.
+func TestParseDetailedPanesPrefersPluginAttentionFields(t *testing.T) {
+	// Legacy state/since empty (fields 20/21) as a plugin-set marker leaves
+	// them; the plugin's own pane fields carry the marker.
+	row := strings.Join([]string{
+		"%1", "orc-1", "develop", "/work", "codex", "4242", "1",
+		"agent-1", "instance-1", "ORC-1", "develop", "default:bob", "codex", "codex", "p1", "/feature",
+		"working", "0", "1699999999", "hook", "", "", "0",
+		"title", "working", "hook", "1699999999", "rule", "claude",
+		"blocked", "1700000042",
+	}, "\t") + "\n"
+
+	got := parseDetailedPanes([]byte(row))
+	if len(got) != 1 {
+		t.Fatalf("panes = %#v", got)
+	}
+	if got[0].Attention != "blocked" {
+		t.Errorf("Attention = %q, want %q from the plugin field", got[0].Attention, "blocked")
+	}
+	if got[0].AttentionSince != 1700000042 {
+		t.Errorf("AttentionSince = %d, want 1700000042 from @agent_pane_attention_updated_at", got[0].AttentionSince)
+	}
+}
+
+// Orc's own writes still populate the legacy pair, and a row carrying no plugin
+// marker must keep using them rather than being blanked by the empty field.
+func TestParseDetailedPanesFallsBackToLegacyAttention(t *testing.T) {
+	row := strings.Join([]string{
+		"%1", "orc-1", "develop", "/work", "codex", "4242", "1",
+		"agent-1", "instance-1", "ORC-1", "develop", "default:bob", "codex", "codex", "p1", "/feature",
+		"working", "0", "1699999999", "hook", "review", "1700000000", "0",
+		"title", "working", "hook", "1699999999", "rule", "orc",
+		"", "",
+	}, "\t") + "\n"
+
+	got := parseDetailedPanes([]byte(row))
+	if len(got) != 1 {
+		t.Fatalf("panes = %#v", got)
+	}
+	if got[0].Attention != "review" || got[0].AttentionSince != 1700000000 {
+		t.Fatalf("legacy attention not preserved: %#v", got[0])
+	}
+}
+
+// Both schemas are published for every state change: the plugin's pane fields
+// so its CLI, clear-on-view, and tmux-fzf-jump's attention view see the marker,
+// and orc's original names for its own readers.
+func TestAttentionUpdatesWritesBothSchemas(t *testing.T) {
+	got := map[string]string{}
+	for _, update := range attentionUpdates("blocked", "1700000000", "hook") {
+		got[update[0]] = update[1]
+	}
+
+	for name, want := range map[string]string{
+		"@agent_pane_attention":            "blocked",
+		"@agent_pane_attention_updated_at": "1700000000",
+		"@agent_pane_attention_source":     "hook",
+		"@agent_attention":                 "blocked",
+		"@agent_attention_since":           "1700000000",
+		"@agent_attention_source":          "hook",
+	} {
+		if got[name] != want {
+			t.Errorf("%s = %q, want %q", name, got[name], want)
+		}
+	}
+	if len(got) != 6 {
+		t.Errorf("wrote %d options, want 6: %#v", len(got), got)
+	}
+}
+
 func TestWriteScriptQuotesArguments(t *testing.T) {
 	runDir := t.TempDir()
 	script, err := writeScript(runDir, []string{"printf", "%s", "value with 'quotes'"})

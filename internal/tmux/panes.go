@@ -28,6 +28,10 @@ var paneFormat = strings.Join([]string{
 	"#{pane_title}", "#{@orc_agent_observed_state}",
 	"#{@orc_agent_observed_source}", "#{@orc_agent_observed_since}",
 	"#{@orc_agent_observed_rule}", "#{@agent_attention_source}",
+	// tmux-attention's authoritative pane schema. Appended rather than placed
+	// next to the legacy pair because the parser is positional -- inserting
+	// mid-list shifts every index after it.
+	"#{@agent_pane_attention}", "#{@agent_pane_attention_updated_at}",
 }, "\t")
 
 // windowPanes returns the panes of one window. A missing server or window is
@@ -93,6 +97,18 @@ func parseDetailedPanes(out []byte) []mux.Pane {
 			observationSince, _ = strconv.ParseInt(fields[26], 10, 64)
 			observationRule = fields[27]
 			attentionSource = fields[28]
+		}
+		// Prefer tmux-attention's own pane fields when present. A marker set by
+		// the plugin records its timestamp as @agent_pane_attention_updated_at
+		// and leaves @agent_attention_since empty, so reading only the legacy
+		// pair saw the state with no age at all.
+		if len(fields) >= 31 {
+			if pluginAttention := normalizeAttention(fields[29]); pluginAttention != "" {
+				fields[20] = fields[29]
+				if pluginSince, err := strconv.ParseInt(fields[30], 10, 64); err == nil && pluginSince > 0 {
+					attentionSince = pluginSince
+				}
+			}
 		}
 		attention := normalizeAttention(fields[20])
 		if seenSequence >= sequence && sequence > 0 {

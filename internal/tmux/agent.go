@@ -74,10 +74,8 @@ func initializeAgentLifecycle(pane string, at time.Time) error {
 		{"@orc_agent_observed_source", "launch"},
 		{"@orc_agent_observed_since", strconv.FormatInt(at.Unix(), 10)},
 		{"@orc_agent_observed_rule", ""},
-		{"@agent_attention", ""},
-		{"@agent_attention_since", ""},
-		{"@agent_attention_source", "launch"},
 	}
+	updates = append(updates, attentionUpdates("", "", "launch")...)
 	for _, update := range updates {
 		if err := setPaneOption(pane, update[0], update[1]); err != nil {
 			return fmt.Errorf("initialize tmux agent lifecycle: %w", err)
@@ -173,11 +171,11 @@ func applyAgentEventAt(pane string, event mux.AgentEvent, at time.Time) (mux.Age
 		updates = append(updates, [2]string{"@orc_provider_session", event.ProviderSessionID})
 	}
 	attention := lifecycleAttentionState(event.Lifecycle)
-	updates = append(updates,
-		[2]string{"@agent_attention", attention},
-		[2]string{"@agent_attention_since", attentionTimestamp(attention, since)},
-		[2]string{"@agent_attention_source", attentionSource(attention)},
-	)
+	updates = append(updates, attentionUpdates(
+		attention,
+		attentionTimestamp(attention, since),
+		attentionSource(attention),
+	)...)
 	for _, update := range updates {
 		if err := setPaneOption(pane, update[0], update[1]); err != nil {
 			return mux.AgentEventResult{}, err
