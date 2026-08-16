@@ -299,7 +299,9 @@ func TestRunCtlStatusAggregatesSessionsAndAttention(t *testing.T) {
 			t.Fatalf("root=%q options=%#v", root, options)
 		}
 		return []sessionlist.Session{
-			{Kind: sessionlist.KindManaged, Ticket: "HOT-42", Attention: "blocked"},
+			// Source is explicit: only a registered marker counts toward
+			// needs_attention, and no real writer emits attention without one.
+			{Kind: sessionlist.KindManaged, Ticket: "HOT-42", Attention: "blocked", AttentionSource: "hook"},
 			{Kind: sessionlist.KindManaged, Ticket: "PAUSED-1", Status: "paused"},
 			{Kind: sessionlist.KindManaged, Ticket: "CALM-1"},
 			{Kind: sessionlist.KindUnmanaged, Lifecycle: "working"},
@@ -330,8 +332,17 @@ func TestCtlStatusIgnoresPresentationOnlyAttention(t *testing.T) {
 	if ctlSessionNeedsAttention(sessionlist.Session{Status: "active", Attention: "blocked", AttentionSource: "screen", ObservedLifecycle: "blocked"}) {
 		t.Fatal("screen-derived attention affected structured status")
 	}
-	if !ctlSessionNeedsAttention(sessionlist.Session{Status: "active", Attention: "blocked", AttentionSource: "hook", Lifecycle: "blocked"}) {
-		t.Fatal("authoritative blocked state did not affect structured status")
+	// Anything Orc did not register, including a marker the tmux-attention CLI
+	// wrote with a free-text --source, must not satisfy an automation wait.
+	for _, source := range []string{"title", "launch", "claude", "codex", "orc", ""} {
+		if ctlSessionNeedsAttention(sessionlist.Session{Status: "active", Attention: "blocked", AttentionSource: source}) {
+			t.Errorf("source %q attention affected structured status", source)
+		}
+	}
+	for _, source := range []string{"hook", "native"} {
+		if !ctlSessionNeedsAttention(sessionlist.Session{Status: "active", Attention: "blocked", AttentionSource: source}) {
+			t.Errorf("registered source %q did not affect structured status", source)
+		}
 	}
 }
 

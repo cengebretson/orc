@@ -494,7 +494,9 @@ func ctlAgentTickets(ticketArg string) ([]string, error) {
 
 func ctlSessionNeedsAttention(session sessionlist.Session) bool {
 	values := []string{session.Status, session.Lifecycle}
-	if session.AttentionSource != "screen" && session.AttentionSource != "title" {
+	// ctl is the automation surface, so a marker Orc did not register must not
+	// be able to satisfy a wait. See ADR-0004.
+	if mux.IsRegisteredSource(session.AttentionSource) {
 		values = append(values, session.Attention)
 	}
 	for _, value := range values {

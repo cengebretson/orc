@@ -16,8 +16,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   markers written by Claude and Codex hooks — or by any script — qualified.
   Authority is now a positive list of `hook` and `native`, the two channels Orc
   can verify. See [ADR 0004](docs/adr/0004-authoritative-sources-are-named.md).
-- As a result, `tmux-attention` markers no longer wake parked work. Orc still
-  reads and displays them; it no longer acts on a report it cannot confirm.
+- As a result, `tmux-attention` markers no longer wake parked work or satisfy an
+  `orc ctl` attention wait. Orc still reads and displays them; it no longer acts
+  on a report it cannot confirm. Attention carrying no source at all is likewise
+  display-only — no writer emits that today, but it was previously actionable.
+  Stage advancement is unaffected: that happens when an agent or a human runs
+  `orc mark <ticket> next`, and no signal gated here can move a pipeline.
 
 ### Added
 

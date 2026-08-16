@@ -53,9 +53,14 @@ const (
 	SourceScreen = "screen" // inferred from pane content
 )
 
-// IsRegisteredSource reports whether a source may drive actions rather than
-// only presentation — advancing a stage, satisfying `orc ctl agent wait`,
-// waking parked work, or announcing completion.
+// IsRegisteredSource reports whether a value may be acted on rather than only
+// displayed: satisfying an `orc ctl` wait, waking parked work, and standing as
+// a pane's live lifecycle.
+//
+// Not stage advancement. A stage advances when an agent or a human runs
+// `orc mark <ticket> next`; a stage's `advance: auto|manual` declares which of
+// those the stage docs should ask for, and no signal gated here can move a
+// pipeline on its own.
 //
 // Deliberately a positive list. The gates this replaces named the sources known
 // to be untrustworthy, which made "authoritative" the default for anything

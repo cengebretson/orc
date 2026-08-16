@@ -26,9 +26,14 @@ Under exclusion, every one of those qualified as authoritative — they are not
 marker Orc never registered could wake parked work.
 
 The failure is quiet and asymmetric. Adding a source anywhere — a new backend, a
-plugin release, a user's script — silently granted it the power to advance a
-stage or satisfy `orc ctl agent wait`, with no change to Orc and nothing to
-review.
+plugin release, a user's script — silently granted it the power to satisfy an
+`orc ctl` wait or wake parked work, with no change to Orc and nothing to review.
+
+This does **not** reach stage advancement, which nothing here gates. A stage
+advances when an agent or a human runs `orc mark <ticket> next`; a stage's
+`advance: auto|manual` declares which of those its docs should ask for, and is
+read only for display. No lifecycle or attention signal moves a pipeline on its
+own, whatever its source.
 
 ## Decision
 
@@ -47,6 +52,10 @@ agents Orc launched.
 
 Everything else — inference, Orc's own `launch` reset, and any source arriving
 from outside Orc — is presentation. It renders, it sorts, it never acts.
+
+The predicate gates three call sites: which lifecycle stands as a pane's live
+state, whether attention wakes parked work, and whether `orc ctl` counts a
+session as needing attention.
 
 A self-asserted string cannot be a trust boundary. `--source claude` is a label
 the caller chose, not evidence that Claude reported anything, so no amount of
