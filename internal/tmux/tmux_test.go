@@ -152,6 +152,31 @@ func TestParseDetailedPanesToleratesFieldOrder(t *testing.T) {
 	}
 }
 
+// Only an explicit "1" means a turn is running. Empty is the plugin not being
+// installed, and "0" is a finished turn -- neither is evidence Orc should settle
+// a pane on, so both must leave ContextActive false and fall through to the
+// other evidence.
+func TestParseDetailedPanesReadsContextActiveOnlyWhenSet(t *testing.T) {
+	row := func(value string) string {
+		values := make([]string, len(paneFields))
+		values[paneFieldIndex["pane_id"]] = "%1"
+		values[paneFieldIndex["session_name"]] = "s"
+		values[paneFieldIndex["window_name"]] = "w"
+		values[paneFieldIndex["@agent_pane_context_active"]] = value
+		return strings.Join(values, "\t") + "\n"
+	}
+
+	for value, want := range map[string]bool{"1": true, "0": false, "": false, "true": false} {
+		got := parseDetailedPanes([]byte(row(value)))
+		if len(got) != 1 {
+			t.Fatalf("%q: panes = %#v", value, got)
+		}
+		if got[0].ContextActive != want {
+			t.Errorf("@agent_pane_context_active=%q -> ContextActive %v, want %v", value, got[0].ContextActive, want)
+		}
+	}
+}
+
 // tmux-attention records a marker's age as @agent_pane_attention_updated_at and
 // leaves @agent_attention_since empty. Reading only the legacy pair saw such a
 // marker's state with no age, so every age-derived display showed 0.

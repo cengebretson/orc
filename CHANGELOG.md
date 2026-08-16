@@ -6,6 +6,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Read `tmux-attention`'s `@agent_pane_context_active` as a `context`
+  observation source, ranked above title and screen inference. An agent hook
+  reported the running turn, so it beats guessing from a picture — and it lets
+  Orc show `working` for a managed pane whose agent reports through the plugin
+  rather than through Orc's own hooks, which it previously could not see at all.
+  It remains an observation: Orc cannot verify who wrote it, so it never
+  satisfies a registered-source check. Only an explicit `1` counts; empty means
+  the plugin is absent and a cleared value is a finished turn.
+- [ADR 0005](docs/adr/0005-orc-and-tmux-attention-are-layered.md) recording why
+  Orc and `tmux-attention` stay layered and neither absorbs the other.
+
 ## [0.25.0] - 2026-08-16
 
 ### Changed

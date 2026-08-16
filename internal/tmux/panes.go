@@ -38,6 +38,8 @@ var paneFields = []string{
 	"@orc_agent_observed_rule", "@agent_attention_source",
 	// tmux-attention's authoritative pane schema.
 	"@agent_pane_attention", "@agent_pane_attention_updated_at",
+	// Its active-turn signal, set between turn-start and turn-done.
+	"@agent_pane_context_active",
 }
 
 var paneFormat = buildPaneFormat(paneFields)
@@ -175,6 +177,11 @@ func parseDetailedPanes(out []byte) []mux.Pane {
 			ObservationSource: record.get("@orc_agent_observed_source"),
 			ObservationSince:  record.int64("@orc_agent_observed_since"),
 			ObservationRule:   record.get("@orc_agent_observed_rule"),
+			// Only an explicit "1" means a turn is running. An empty value is
+			// the plugin not installed, and a cleared one is not proof of idle
+			// -- both must fall through to the other evidence rather than
+			// settle the pane.
+			ContextActive: record.get("@agent_pane_context_active") == "1",
 		})
 	}
 	return panes

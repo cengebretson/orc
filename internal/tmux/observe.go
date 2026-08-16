@@ -28,6 +28,22 @@ func ObserveFallback(root string, panes []mux.Pane) ([]mux.Pane, error) {
 		if pane.Backend != "tmux" || !pane.Agent || pane.LifecycleSource == "hook" {
 			continue
 		}
+		// tmux-attention says a turn is running. That is the agent reporting
+		// through its own hook rather than a guess about a picture, so it beats
+		// both inference tiers and skips the screen capture entirely. It stays
+		// an observation because Orc cannot verify who wrote it.
+		if pane.ContextActive {
+			before := *pane
+			applyObservation(pane, agentdetect.Result{
+				Lifecycle: mux.LifecycleWorking, Source: mux.SourceContext,
+			}, time.Now())
+			if observationChanged(before, *pane) {
+				if err := publishObservation(*pane); err != nil {
+					return nil, err
+				}
+			}
+			continue
+		}
 		engine := strings.ToLower(firstValue(pane.ProviderEngine, pane.Engine))
 		if engine != "codex" && engine != "claude" {
 			before := *pane

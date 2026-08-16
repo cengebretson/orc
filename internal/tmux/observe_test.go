@@ -20,6 +20,38 @@ func resetObservationDebounce(t *testing.T) {
 	})
 }
 
+// tmux-attention's active-turn signal is a report from the agent's own hook,
+// not a guess about a picture, so it outranks both inference tiers and skips the
+// screen capture. It stays an observation: Orc cannot verify who wrote it, so it
+// must not read as a registered source.
+func TestObserveFallbackPrefersContextActiveOverInference(t *testing.T) {
+	resetObservationDebounce(t)
+	calls := stubCommands(t)
+	panes, err := ObserveFallback(t.TempDir(), []mux.Pane{{
+		Backend: "tmux", ID: "%7", Agent: true, AgentInstance: "instance-1",
+		ProviderEngine: "codex", Lifecycle: "unknown", LifecycleSource: "launch",
+		// A title that would otherwise infer blocked; the running turn wins.
+		Title: "⠋ Action Required", ContextActive: true,
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(panes) != 1 {
+		t.Fatalf("panes = %+v", panes)
+	}
+	if panes[0].ObservedLifecycle != mux.LifecycleWorking || panes[0].ObservationSource != mux.SourceContext {
+		t.Fatalf("observed = %q/%q, want working/context", panes[0].ObservedLifecycle, panes[0].ObservationSource)
+	}
+	if mux.IsRegisteredSource(panes[0].ObservationSource) {
+		t.Error("context source must not count as registration")
+	}
+	for _, call := range *calls {
+		if len(call.args) > 0 && call.args[0] == "capture-pane" {
+			t.Fatalf("a reported turn should not capture the screen: %#v", call.args)
+		}
+	}
+}
+
 func TestObserveFallbackPrefersTitleAndPublishesPresentationMetadata(t *testing.T) {
 	resetObservationDebounce(t)
 	calls := stubCommands(t)

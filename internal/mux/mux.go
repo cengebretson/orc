@@ -51,6 +51,10 @@ const (
 	SourceLaunch = "launch" // Orc's reset when it starts an agent, not a report
 	SourceTitle  = "title"  // inferred from the terminal title
 	SourceScreen = "screen" // inferred from pane content
+	// SourceContext is tmux-attention's active-turn signal. An agent hook
+	// reported it, so it beats inference — but Orc cannot verify who wrote it,
+	// so it ranks as observation rather than registration (ADR-0004, ADR-0005).
+	SourceContext = "context"
 )
 
 // IsRegisteredSource reports whether a value may be acted on rather than only
@@ -301,6 +305,11 @@ type Pane struct {
 	// epoch seconds. Zero means the reporter did not say — treat it as unknown
 	// rather than as the epoch.
 	AttentionSince int64 `json:"attention_since,omitempty"`
+	// ContextActive is true when tmux-attention reports an agent turn running
+	// in this pane. It is a report rather than a guess about a picture, so it
+	// outranks title and screen inference — but it is unverified, so it stays
+	// an observation and never satisfies IsRegisteredSource.
+	ContextActive bool `json:"context_active,omitempty"`
 }
 
 // Backend is a terminal multiplexer Orc can drive.

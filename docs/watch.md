@@ -193,6 +193,14 @@ rather than defining its own:
 | `@agent_pane_attention` | pane-scoped state — the authoritative marker |
 | `@agent_pane_attention_updated_at` | epoch seconds the state was last written |
 | `@agent_pane_attention_source` | what set it |
+| `@agent_pane_context_active` | `1` while an agent turn is running |
+
+`@agent_pane_context_active` is read as the `context` observation source and
+outranks title and screen inference: an agent hook reported it, rather than Orc
+guessing from a picture. Only an explicit `1` counts — empty means the plugin is
+not installed, and a cleared value is a finished turn, and neither is evidence
+Orc should settle a pane on. It stays an observation regardless, because Orc
+cannot verify who wrote it.
 
 Orc also writes the older `@agent_attention{,_since,_source}` trio for its own
 readers and for reporters written against earlier versions. The two timestamp
