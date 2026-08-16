@@ -118,3 +118,21 @@ func TestRollUpAttentionTimeFollowsTheWinningState(t *testing.T) {
 		t.Fatalf("since = %d, want 900 — the blocked pane's own time", since)
 	}
 }
+
+// The predicate is a positive list on purpose: an unrecognized source must not
+// inherit authority just because Orc has not heard of it yet.
+func TestIsRegisteredSourceDefaultsToUnauthoritative(t *testing.T) {
+	for _, source := range []string{mux.SourceHook, mux.SourceNative} {
+		if !mux.IsRegisteredSource(source) {
+			t.Errorf("IsRegisteredSource(%q) = false, want true", source)
+		}
+	}
+	for _, source := range []string{
+		mux.SourceLaunch, mux.SourceTitle, mux.SourceScreen,
+		"claude", "codex", "turn", "event", "orc", "", "HOOK",
+	} {
+		if mux.IsRegisteredSource(source) {
+			t.Errorf("IsRegisteredSource(%q) = true, want false", source)
+		}
+	}
+}

@@ -6,6 +6,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Only named sources may drive actions. The gates deciding whether a lifecycle
+  or attention value could advance a stage, satisfy `orc ctl agent wait`, or
+  wake parked work excluded the sources known to be untrustworthy, which made
+  "authoritative" the default for anything unrecognized. `@agent_attention` is a
+  shared namespace and the `tmux-attention` CLI takes a free-text `--source`, so
+  markers written by Claude and Codex hooks — or by any script — qualified.
+  Authority is now a positive list of `hook` and `native`, the two channels Orc
+  can verify. See [ADR 0004](docs/adr/0004-authoritative-sources-are-named.md).
+- As a result, `tmux-attention` markers no longer wake parked work. Orc still
+  reads and displays them; it no longer acts on a report it cannot confirm.
+
+### Added
+
+- `orc jit --consult` regression coverage, and `jitConsult` is now saved and
+  restored by the test globals helper so it cannot leak between tests.
+
 ## [0.24.0] - 2026-08-16
 
 ### Added

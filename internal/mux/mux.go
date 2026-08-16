@@ -42,6 +42,32 @@ const (
 	LifecycleUnknown = "unknown"
 )
 
+// Where a lifecycle or attention value came from. Per ADR-0003 only
+// registration is authoritative: the agent reported its own state, either
+// through Orc's provider hooks or a backend's native agent API.
+const (
+	SourceHook   = "hook"   // Orc's provider lifecycle hooks
+	SourceNative = "native" // a backend's own agent API (herdr)
+	SourceLaunch = "launch" // Orc's reset when it starts an agent, not a report
+	SourceTitle  = "title"  // inferred from the terminal title
+	SourceScreen = "screen" // inferred from pane content
+)
+
+// IsRegisteredSource reports whether a source may drive actions rather than
+// only presentation — advancing a stage, satisfying `orc ctl agent wait`,
+// waking parked work, or announcing completion.
+//
+// Deliberately a positive list. The gates this replaces named the sources known
+// to be untrustworthy, which made "authoritative" the default for anything
+// unrecognized: a marker written by tmux-attention, a future backend, or a user
+// script silently qualified. Sources do arrive from outside Orc — the
+// tmux-attention CLI takes a free-text --source, so the value is self-asserted
+// and cannot serve as a trust boundary. Naming the two Orc can actually verify
+// keeps the default safe as new ones appear.
+func IsRegisteredSource(source string) bool {
+	return source == SourceHook || source == SourceNative
+}
+
 const (
 	EnvAgentID       = "ORC_AGENT_ID"
 	EnvAgentInstance = "ORC_AGENT_INSTANCE"

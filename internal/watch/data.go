@@ -49,7 +49,7 @@ func collectRowsWithMux(root, ticket string, backend mux.Backend) ([]row, error)
 			r.attentionSource = item.AttentionSource
 			r.attentionSince = item.AttentionSince
 		}
-		if item.Lifecycle != "" && item.LifecycleSource != "launch" && item.LifecycleSource != "screen" && item.LifecycleSource != "title" {
+		if item.Lifecycle != "" && mux.IsRegisteredSource(item.LifecycleSource) {
 			r.liveState = item.Lifecycle
 			r.lifecycleSince = item.LifecycleSince
 			r.lifecycleSource = item.LifecycleSource
@@ -95,8 +95,12 @@ func collectRowsWithMux(root, ticket string, backend mux.Backend) ([]row, error)
 	return filterRowsByTicket(rows, ticket), nil
 }
 
+// parkingAttention returns the attention state only when it may wake parked
+// work. Waking is an action, so it needs a registered source: a marker Orc did
+// not register — inferred from the screen, or written by any tool that can call
+// the tmux-attention CLI — must not restart parked work on its own.
 func parkingAttention(r row) string {
-	if r.attentionSource == "screen" || r.attentionSource == "title" {
+	if !mux.IsRegisteredSource(r.attentionSource) {
 		return ""
 	}
 	return r.attention

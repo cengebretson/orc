@@ -50,12 +50,20 @@ func TestParkingWarningKeepsRowsVisible(t *testing.T) {
 }
 
 func TestParkingIgnoresPresentationOnlyAttention(t *testing.T) {
-	for _, source := range []string{"screen", "title"} {
+	// Inference, Orc's own launch reset, and anything Orc did not register --
+	// "claude" and "codex" are what the tmux-attention CLI records when an agent
+	// hook sets a marker, and its --source is free text, so any tool or person
+	// can write one. None of these may wake parked work.
+	for _, source := range []string{"screen", "title", "launch", "claude", "codex", "orc", ""} {
 		if got := parkingAttention(row{attention: "blocked", attentionSource: source}); got != "" {
-			t.Errorf("%s attention = %q, want empty for parking", source, got)
+			t.Errorf("source %q attention = %q, want empty for parking", source, got)
 		}
 	}
-	if got := parkingAttention(row{attention: "blocked", attentionSource: "hook"}); got != "blocked" {
-		t.Errorf("hook attention = %q, want blocked", got)
+	// Registration: the agent reported its own state through a channel Orc
+	// verifies.
+	for _, source := range []string{"hook", "native"} {
+		if got := parkingAttention(row{attention: "blocked", attentionSource: source}); got != "blocked" {
+			t.Errorf("source %q attention = %q, want blocked", source, got)
+		}
 	}
 }

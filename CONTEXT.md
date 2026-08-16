@@ -128,6 +128,8 @@ deleting it by label.
 - Feature folders are the durable handoff boundary.
 - Backend target IDs and agent instance IDs require exact matching.
 - Terminal text is diagnostic or presentational, never authoritative lifecycle.
+- Sources that may drive actions are named explicitly; anything else renders but
+  never acts ([ADR 0004](docs/adr/0004-authoritative-sources-are-named.md)).
 - tmux remains the portable default; Herdr is an optional additive backend
   ([ADR 0001](docs/adr/0001-tmux-is-the-default-backend.md)).
 - Repeatedly reopened architectural decisions belong in short records under
