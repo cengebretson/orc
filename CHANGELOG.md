@@ -6,6 +6,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- A live contract test against the real `tmux-attention` CLI. Every other test
+  asserts option names Orc hardcodes, which is how the two projects silently
+  disagreed: Orc read `@agent_attention_since` while the plugin wrote
+  `@agent_pane_attention_updated_at`, and both suites stayed green because
+  neither ever saw the other's output. The new test drives the plugin and reads
+  the result back through `ListPanesDetailed`, so a rename on either side fails.
+  Verified by renaming the option in a copy of the plugin: the contract test
+  fails while the unit tests still pass. Skips when the plugin is absent, since
+  it is an optional dependency ([ADR 0005](docs/adr/0005-orc-and-tmux-attention-are-layered.md));
+  `ORC_TMUX_ATTENTION_CLI` points it at a specific copy.
+
 ## [0.26.0] - 2026-08-16
 
 ### Added

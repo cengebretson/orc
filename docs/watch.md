@@ -179,6 +179,11 @@ workflow state, stage advancement, or session lifecycle.
 - Claude/Codex hooks that call the CLI.
 - clear-on-view behavior through tmux hooks.
 
+`TestLiveAttentionPluginContract` in `internal/tmux` drives the real CLI and
+asserts Orc reads back what it wrote, so a rename on either side fails a test
+instead of silently breaking the integration. It skips when the plugin is not
+installed, and `ORC_TMUX_ATTENTION_CLI` points it at a specific copy.
+
 Orc consumes this plugin for display and never as an authority — see
 [ADR 0005](adr/0005-orc-and-tmux-attention-are-layered.md) for why the two stay
 layered, and [ADR 0004](adr/0004-authoritative-sources-are-named.md) for what a
