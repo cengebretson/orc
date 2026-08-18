@@ -74,6 +74,7 @@ type liveTickMsg struct {
 type quoteRotateTickMsg struct {
 	epoch uint64
 }
+type noticeClearMsg struct{ epoch uint64 }
 
 // quoteRotateInterval is how often the idle empty-Features quote changes.
 const quoteRotateInterval = 8 * time.Second
@@ -302,7 +303,9 @@ type searchState struct {
 }
 
 type effectsState struct {
-	quote string
+	quote       string
+	notice      string
+	noticeEpoch uint64
 
 	// easter egg: type "orc" on the dashboard to trigger rainbow logo
 	keyBuffer   [3]string

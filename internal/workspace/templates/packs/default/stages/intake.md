@@ -21,7 +21,9 @@ orc work <ticket>
 
 1. Read `TOOLS.md` for the verified ticket retrieval method and fetch the ticket.
 2. If the ticket cannot be found, run `orc mark <ticket> pause "<explanation>"` and stop.
-3. Populate `TICKET.md` with the ticket summary, description, and acceptance criteria.
+3. Populate `TICKET.md` with the ticket summary, description, acceptance
+   criteria, and canonical ticket URL in its `Links` section. Leave the PR link
+   empty until a pull request exists.
 4. Resolve the repository-routing precondition from `ORC.md` proactively by
    identifying every target repository:
    - honor explicit repository names in trusted ticket metadata;
@@ -75,7 +77,7 @@ Missing context: none
 
 ## Exit Criteria
 
-`TICKET.md`, `SPEC.md`, and `PLAN.md` are populated.
+`TICKET.md`, including its ticket link, `SPEC.md`, and `PLAN.md` are populated.
 
 When done, run:
 ```

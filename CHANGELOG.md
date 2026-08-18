@@ -18,6 +18,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   fails while the unit tests still pass. Skips when the plugin is absent, since
   it is an optional dependency ([ADR 0005](docs/adr/0005-orc-and-tmux-attention-are-layered.md));
   `ORC_TMUX_ATTENTION_CLI` points it at a specific copy.
+- The MIT license and a comparison guide that defines Orc as the durable
+  workflow layer rather than a terminal, multiplexer, tracker, or IDE.
+- `orc demo`, a zero-setup entry point for the synthetic Live dashboard, with
+  the dashboard preview promoted near the README quick start.
+- `orc events` with optional follow and JSONL output for deterministic feature,
+  attention, session, and stage changes from immutable workspace snapshots.
+- Feature-detail actions to open or copy canonical ticket and PR links from
+  `TICKET.md` and show pull-request checks through the GitHub CLI.
+
+### Changed
+
+- Reframed the README around durable plans, decisions, state, and handoffs,
+  with multiplexers documented as execution backends rather than the product.
 
 ## [0.26.0] - 2026-08-16
 

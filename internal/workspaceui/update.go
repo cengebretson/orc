@@ -1,6 +1,7 @@
 package workspaceui
 
 import (
+	"strings"
 	"time"
 
 	"github.com/cengebretson/orc/internal/config"
@@ -127,6 +128,33 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.view == viewDetail {
 			m.reRenderDetail()
+		}
+		return m, nil
+
+	case linkActionMsg:
+		m.effects.noticeEpoch++
+		if msg.err != nil {
+			m.effects.notice = msg.err.Error()
+		} else {
+			m.effects.notice = msg.message
+		}
+		return m, clearNoticeAfter(m.effects.noticeEpoch)
+
+	case ciChecksMsg:
+		content := strings.TrimSpace(msg.output)
+		if content == "" {
+			content = "No CI check output was returned."
+		}
+		if msg.err != nil {
+			content += "\n\n" + styleHealthErr.Render(msg.err.Error())
+		}
+		m.detail.scroll = m.viewer.viewport.YOffset
+		m.openViewer(func(int) string { return content }, "CI checks", msg.ticket, viewDetail)
+		return m, nil
+
+	case noticeClearMsg:
+		if msg.epoch == m.effects.noticeEpoch {
+			m.effects.notice = ""
 		}
 		return m, nil
 

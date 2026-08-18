@@ -36,9 +36,15 @@ func (m Model) viewDetail() string {
 			combinedBindingHelp("scroll", keys.up, keys.down, keys.pageUp, keys.pageDown),
 			bindingHelp(keys.open),
 			bindingHelp(keys.attach),
+			bindingHelp(keys.openLink),
+			bindingHelp(keys.copyLink),
+			bindingHelp(keys.checks),
 			bindingHelp(keys.back),
 			bindingHelp(keys.quit),
 		}, "  ")
+		if m.effects.notice != "" {
+			help += "  " + styleSubtext.Render(m.effects.notice)
+		}
 		b.WriteString("\n" + styleHelp.Render(" "+help))
 	}
 	return b.String()

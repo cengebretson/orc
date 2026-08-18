@@ -1,6 +1,13 @@
 # orc
 
-Keep feature work moving across agents, sessions, and repos — without losing context.
+**The durable workflow layer for coding agents.**
+
+Keep plans, decisions, state, and handoffs alive across agents, sessions, and
+repositories. Orc coordinates the work in portable files; tmux and Herdr are
+execution backends, not the source of truth.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/cengebretson/orc)](https://github.com/cengebretson/orc/releases/latest)
 
 ```
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
@@ -19,6 +26,18 @@ Keep feature work moving across agents, sessions, and repos — without losing c
 
 orc · workspace orchestrator
 ```
+
+See the dashboard with no setup or workspace required:
+
+```bash
+orc demo
+```
+
+![Orc unified dashboard showing features, workflows, workers, and repositories](docs/dashboard.png)
+
+The screenshot shows the unified dashboard's Workspace section. `orc demo`
+starts in Live with synthetic work, so you can explore without creating a
+workspace or launching an agent.
 
 ## What it does
 
@@ -64,6 +83,9 @@ continues when you're ready.
 
 **Agent-agnostic by design.** Works with Claude, Codex, or anything that can read
 a file and run a shell command. No SDK dependency, no lock-in.
+
+See [How Orc compares](docs/comparison.md) for the boundary between Orc and
+agent platforms, terminal control planes, multiplexers, and IDEs.
 
 ## Install
 
@@ -415,8 +437,6 @@ Or use the Claude Desktop settings UI. Requires a GitHub PAT with `repo` and `pu
 
 ### Dashboard (`orc dashboard`)
 
-![orc dashboard — workspace view showing features, workflows, workers, and repositories](docs/dashboard.png)
-
 The dashboard keeps Live operations and workspace exploration in one Bubble Tea
 application with top-level Live, Workflows, Workers, Repositories, and
 Health tabs. `[`/`]` cycles tabs and `1`–`5` jumps directly to one without
@@ -451,9 +471,9 @@ Available globally:
 | Setup | `init`, `pack`, `doctor`, `hooks install`, `completion`, `version` | Create and validate workspaces, manage packs, install lifecycle hooks, and inspect the build. |
 | Workflow | `work`, `next`, `status`, `artifacts`, `label`, `answer` | Create, launch, inspect, and update durable ticket work. |
 | History | `report`, `archive`, `delete` | Report time in stage and retire completed work. `delete` only accepts `done` or `archived` tickets. |
-| Live work | `sessions`, `attach`, `focus`, `watch`, `rail`, `dashboard` | Inventory, resume, monitor, and navigate exact live sessions. |
+| Live work | `sessions`, `attach`, `focus`, `watch`, `rail`, `dashboard`, `demo` | Inventory, resume, monitor, navigate exact live sessions, or preview synthetic work. |
 | One-off work | `run`, `jit` | Create standalone local work or add a side task to an existing feature. |
-| Integrations | `ctl` | Read and control exact recorded agents through backend-neutral JSON commands. |
+| Integrations | `ctl`, `events` | Read and control exact recorded agents or follow workspace changes as JSONL. |
 | Discovery | `help`, `help-all` | Show human commands or the complete human-plus-agent surface. |
 
 High-value references:
@@ -463,6 +483,10 @@ High-value references:
 - [Sessions](docs/sessions.md) covers inventory, exact resume, and park/unpark.
 - [Watch and rail](docs/watch.md) covers live filtering, prompts, attach/focus, and
   tmux presentation.
+- [Events](docs/events.md) covers the feature, attention, session, and stage
+  change stream.
+- [Comparison](docs/comparison.md) defines Orc's scope relative to adjacent
+  agent and terminal tools.
 - [Tmux](docs/tmux.md), [Herdr](docs/herdr.md), and
   [agent detection](docs/agent-detection.md) document backend behavior.
 
@@ -486,6 +510,7 @@ Deep reference lives in **[docs/reference.md](docs/reference.md)**:
 - **[Tmux integration](docs/tmux.md)** — optional popup, split-pane, resume, and focus bindings
 - **[Tmux fallback detection](docs/agent-detection.md)** — versioned title/screen rules, local overrides, precedence, and safety boundaries
 - **[Herdr integration](docs/herdr.md)** — native workspace/agent launch, exact attach, lifecycle inventory, and sidebar tokens
+- **[Events](docs/events.md)** — followable feature, attention, session, and stage changes with a JSONL schema
 - **[Release readiness](docs/release.md)** — pinned non-publishing snapshot validation, disposable-workspace QA, and tag verification
 - **[Workers](docs/reference.md#workers)** — worker definition files, prompt construction, and resolution order
 

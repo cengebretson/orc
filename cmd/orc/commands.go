@@ -94,6 +94,19 @@ var sessionsCmd = &cobra.Command{
 	RunE:  runSessions,
 }
 
+var eventsCmd = &cobra.Command{
+	Use:   "events",
+	Short: "Emit workspace feature, stage, attention, and session changes",
+	Args:  cobra.NoArgs,
+	RunE:  runEvents,
+}
+
+var (
+	eventsFollow   bool
+	eventsJSON     bool
+	eventsInterval string
+)
+
 var (
 	sessionsJSON   bool
 	sessionsAll    bool
@@ -255,6 +268,13 @@ var dashboardCmd = &cobra.Command{
 	Short: "Open the unified workspace and live-operations dashboard",
 	Args:  cobra.NoArgs,
 	RunE:  runDashboard,
+}
+
+var demoCmd = &cobra.Command{
+	Use:   "demo",
+	Short: "Preview Orc with synthetic workflow and agent activity",
+	Args:  cobra.NoArgs,
+	RunE:  runDemo,
 }
 
 var watchCmd = &cobra.Command{

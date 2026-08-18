@@ -30,11 +30,12 @@ writes the PR description, opens the PR, and hands off for human review.
 9. Write a PR body: what changed and why (link ticket), domain or repo-context
    impact, how to test, migration or deployment notes.
 10. Open the PR via the source control MCP server (see `TOOLS.md`).
-11. Write the PR URL and status to `pr-open/PR.md`.
+11. Write the PR URL and status to `pr-open/PR.md`, then put the same canonical
+    PR URL in the `Links` section of `TICKET.md`.
 
 ## Exit Criteria
 
-PR is open and `pr-open/PR.md` has the URL.
+PR is open, `pr-open/PR.md` has the URL, and `TICKET.md` links to the PR.
 
 When done, run:
 ```

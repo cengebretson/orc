@@ -31,6 +31,9 @@ type keyMap struct {
 	previous        key.Binding
 	next            key.Binding
 	open            key.Binding
+	openLink        key.Binding
+	copyLink        key.Binding
+	checks          key.Binding
 	archive         key.Binding
 	attach          key.Binding
 	character       key.Binding
@@ -73,6 +76,9 @@ var keys = keyMap{
 	previous:        key.NewBinding(key.WithKeys("left", "h"), key.WithHelp("← / h", "previous")),
 	next:            key.NewBinding(key.WithKeys("right", "l"), key.WithHelp("→ / l", "next")),
 	open:            key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "open")),
+	openLink:        key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open PR / ticket")),
+	copyLink:        key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "copy PR / ticket")),
+	checks:          key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "show CI checks")),
 	archive:         key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "show / hide archived")),
 	attach:          key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "attach")),
 	character:       key.NewBinding(key.WithKeys("!"), key.WithHelp("!", "worker character sheet")),
@@ -94,6 +100,7 @@ func HelpSections() []terminalui.HelpSection {
 		{Title: "WORKSPACE · ACT", Entries: []terminalui.HelpEntry{
 			terminalui.HelpEntryFor(keys.filter),
 			terminalui.HelpEntryFor(keys.attach),
+			{Keys: "o / y / c", Description: "open / copy links / CI in feature details"},
 			terminalui.HelpEntryFor(keys.character),
 			terminalui.HelpEntryFor(keys.back),
 			terminalui.HelpEntryFor(keys.quit),

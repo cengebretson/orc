@@ -30,6 +30,12 @@ func (m Model) handleDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m, attachMux(m.mux, target)
 			}
 		}
+	case key.Matches(msg, keys.openLink):
+		return m, featureLinkCommand(m.detail.feature, linkActionOpen)
+	case key.Matches(msg, keys.copyLink):
+		return m, featureLinkCommand(m.detail.feature, linkActionCopy)
+	case key.Matches(msg, keys.checks):
+		return m, featureLinkCommand(m.detail.feature, linkActionChecks)
 	case key.Matches(msg, keys.open):
 		if m.detail.fileIndex < len(m.detail.files) {
 			f := m.detail.files[m.detail.fileIndex]
