@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-08-19
+
 ### Added
 
 - Publish each Orc-launched tmux pane's exact ticket and concise feature slug
@@ -913,7 +915,8 @@ invoke `orc watch` — an unknown flag now fails the command.
 - Bubble Tea TUI dashboard with health, workflow, stage, and portrait views.
 - `orc doctor --fix` to clear stale state locks.
 
-[Unreleased]: https://github.com/cengebretson/orc/compare/v0.27.0...HEAD
+[Unreleased]: https://github.com/cengebretson/orc/compare/v0.28.0...HEAD
+[0.28.0]: https://github.com/cengebretson/orc/compare/v0.27.0...v0.28.0
 [0.27.0]: https://github.com/cengebretson/orc/compare/v0.26.0...v0.27.0
 [0.26.0]: https://github.com/cengebretson/orc/compare/v0.25.0...v0.26.0
 [0.25.0]: https://github.com/cengebretson/orc/compare/v0.24.0...v0.25.0
