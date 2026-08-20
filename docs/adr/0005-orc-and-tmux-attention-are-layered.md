@@ -77,6 +77,12 @@ rather than assumed.
 Orc stays useful with no plugin installed, and the plugin stays useful with no
 Orc installed. Neither degrades the other's core loop.
 
+Orc may publish the durable ticket and feature slug it already knows through
+the plugin-owned pane context options and worktree-local metadata contract. That
+flow remains one-directional and display-only: Orc does not invoke the plugin or
+read its context as workflow authority, while the plugin does not learn Orc's
+private `@orc_*` schema. A failed metadata write warns but cannot block launch.
+
 Some duplication is accepted and is not a defect: `orc focus` and a pane picker
 answer a similar question over different scopes. That is a UX question about
 which to reach for, not an argument that one layer should own both.

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/cengebretson/orc/internal/mux"
+	"github.com/cengebretson/orc/internal/tmuxattention"
 )
 
 // SetWindowMetadata stamps Orc identity onto a tmux window using user options.
@@ -22,6 +23,7 @@ func SetWindowMetadata(session, window string, metadata mux.Metadata) error {
 		{"@orc_provider_engine", metadata.Engine},
 		{"@orc_provider_session", metadata.ProviderSessionID},
 		{"@orc_feature_dir", metadata.FeatureDir},
+		{"@orc_feature_slug", metadata.FeatureSlug},
 	}
 	for _, option := range options {
 		if option.value == "" {
@@ -56,6 +58,9 @@ func SetPaneMetadata(pane string, metadata mux.Metadata) error {
 		{name: "@orc_provider_engine", value: metadata.Engine, clearWhenEmpty: true},
 		{name: "@orc_provider_session", value: metadata.ProviderSessionID, clearWhenEmpty: true},
 		{name: "@orc_feature_dir", value: metadata.FeatureDir},
+		{name: "@orc_feature_slug", value: metadata.FeatureSlug},
+		{name: "@agent_pane_context_override", value: metadata.Ticket, clearWhenEmpty: true},
+		{name: "@agent_pane_context_slug", value: tmuxattention.DisplaySlug(metadata.Ticket, metadata.FeatureSlug), clearWhenEmpty: true},
 	}
 	for _, option := range options {
 		if option.value == "" {

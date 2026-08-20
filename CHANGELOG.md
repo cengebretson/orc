@@ -6,6 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Publish each Orc-launched tmux pane's exact ticket and concise feature slug
+  through tmux-attention's persistent project-context options, so tabs and the
+  right-side status no longer depend on an agent calling `project set`. When a
+  Git worktree is ready, also write tmux-attention 0.12.0's private
+  `tmux-attention-context` file under the absolute Git directory; any pane in
+  that checkout can then derive the same context without dirtying the tree.
+  Both paths are optional display integration and never block agent launch.
+
 ## [0.27.0] - 2026-08-18
 
 ### Added

@@ -160,6 +160,47 @@ func TestSetPaneMetadataClearsMissingAgentIdentity(t *testing.T) {
 	}
 }
 
+func TestSetPaneMetadataPublishesTmuxAttentionProjectContext(t *testing.T) {
+	calls := stubCommands(t)
+	if err := SetPaneMetadata("%7", mux.Metadata{
+		Ticket: "ORC-7", FeatureSlug: "ORC-7-native-worktree",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]bool{
+		"set-option -p -t %7 @orc_feature_slug ORC-7-native-worktree":  false,
+		"set-option -p -t %7 @agent_pane_context_override ORC-7":       false,
+		"set-option -p -t %7 @agent_pane_context_slug native-worktree": false,
+	}
+	for _, call := range *calls {
+		joined := strings.Join(call.args, " ")
+		if _, ok := want[joined]; ok {
+			want[joined] = true
+		}
+	}
+	for command, found := range want {
+		if !found {
+			t.Errorf("missing %q; calls: %#v", command, *calls)
+		}
+	}
+}
+
+func TestSetPaneMetadataClearsTmuxAttentionContextWithoutTicket(t *testing.T) {
+	calls := stubCommands(t)
+	if err := SetPaneMetadata("%7", mux.Metadata{}); err != nil {
+		t.Fatal(err)
+	}
+	var clearedProject, clearedSlug bool
+	for _, call := range *calls {
+		joined := strings.Join(call.args, " ")
+		clearedProject = clearedProject || joined == "set-option -p -u -t %7 @agent_pane_context_override"
+		clearedSlug = clearedSlug || joined == "set-option -p -u -t %7 @agent_pane_context_slug"
+	}
+	if !clearedProject || !clearedSlug {
+		t.Fatalf("tmux-attention context clear calls missing: %#v", *calls)
+	}
+}
+
 func TestMetadataUsesCommandBoundary(t *testing.T) {
 	calls := stubCommands(t)
 	err := SetWindowMetadata("orc", "build", mux.Metadata{

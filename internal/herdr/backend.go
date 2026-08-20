@@ -814,7 +814,7 @@ func appendTokens(args []string, meta mux.Metadata) []string {
 		"agent_id": meta.AgentID, "agent_instance": meta.AgentInstance,
 		"ticket": meta.Ticket, "stage": meta.Stage, "worker": meta.Worker,
 		"engine": meta.Engine, "provider_session": meta.ProviderSessionID,
-		"feature_dir": meta.FeatureDir, "workflow": meta.Workflow,
+		"feature_dir": meta.FeatureDir, "feature_slug": meta.FeatureSlug, "workflow": meta.Workflow,
 		"repository": meta.Repository, "branch": meta.Branch,
 		"next_action": meta.NextAction, "model": meta.Model,
 	}

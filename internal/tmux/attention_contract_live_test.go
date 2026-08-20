@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/cengebretson/orc/internal/mux"
 )
 
 // findAttentionCLI locates an installed tmux-attention CLI, or reports that
@@ -122,9 +124,24 @@ func TestLiveAttentionPluginContract(t *testing.T) {
 		t.Errorf("AttentionSource = %q, want claude", got.source)
 	}
 
+	// Orc's exact ticket metadata must feed tmux-attention's persistent project
+	// context without invoking the optional plugin CLI to set it.
+	if err := SetPaneMetadata(target, mux.Metadata{
+		Ticket: "ORC-42", FeatureSlug: "ORC-42-contract-test",
+	}); err != nil {
+		t.Fatalf("SetPaneMetadata: %v", err)
+	}
+	attention("turn-start", "--target", target)
+	context, err := exec.Command("tmux", "display-message", "-p", "-t", target, "#{E:@tmux_attention_context}").Output()
+	if err != nil {
+		t.Fatalf("read tmux-attention context: %v", err)
+	}
+	if got := strings.TrimSpace(string(context)); got != "ORC-42 · contract-test" {
+		t.Errorf("tmux-attention context = %q, want %q", got, "ORC-42 · contract-test")
+	}
+
 	// An active turn must surface as ContextActive, which feeds the `context`
 	// observation source.
-	attention("turn-start", "--target", target, "--project", "ORC-CONTRACT")
 	if got := paneNamed(target); !got.contextActive {
 		t.Error("ContextActive = false after turn-start; the active-turn option has been renamed or rescoped")
 	}

@@ -218,6 +218,7 @@ workflows:
 
 	var created mux.WorktreeTargetSpec
 	var recorded worktreeLaunch
+	var contextDir, contextProject, contextSlug string
 	var sentDir, sentRunDir string
 	var sentArgv []string
 	var taskCell mux.TaskCellSpec
@@ -250,6 +251,10 @@ workflows:
 			recorded = launch
 			return nil
 		},
+		WriteWorktreeContext: func(worktreeDir, project, featureSlug string) error {
+			contextDir, contextProject, contextSlug = worktreeDir, project, featureSlug
+			return nil
+		},
 		SetMuxRuntime: func(string, state.MuxRuntime) error { return nil },
 		AppendHistory: func(string, string, string, string) error { return nil },
 		RunForeground: func(LaunchOptions) error {
@@ -269,13 +274,16 @@ workflows:
 	if recorded.Spec.WorktreeDir != wantWorktree || sentDir != wantWorktree || sentRunDir != wantWorktree {
 		t.Fatalf("recorded/sent paths = %#v, %q, %q", recorded, sentDir, sentRunDir)
 	}
+	if contextDir != wantWorktree || contextProject != "ORC-9" || contextSlug != "ORC-9-native" {
+		t.Fatalf("tmux-attention context = %q, %q, %q", contextDir, contextProject, contextSlug)
+	}
 	if joined := strings.Join(sentArgv, " "); !strings.Contains(joined, "--cd "+wantWorktree) || sentArgv[len(sentArgv)-1] != "build this" {
 		t.Fatalf("sent argv = %#v", sentArgv)
 	}
 	if taskCell.CWD != wantWorktree || taskCell.TestCommand != "make test" || taskCell.WatchCommand != "orc --workspace '"+root+"' --mux herdr watch 'ORC-9'" {
 		t.Fatalf("task cell = %#v", taskCell)
 	}
-	if taskCell.Metadata.Ticket != "ORC-9" || taskCell.Metadata.Worker != "dev" {
+	if taskCell.Metadata.Ticket != "ORC-9" || taskCell.Metadata.FeatureSlug != "ORC-9-native" || taskCell.Metadata.Worker != "dev" {
 		t.Fatalf("task cell metadata = %#v", taskCell.Metadata)
 	}
 	if s.Repos["app"].Worktree != filepath.Join("worktrees", "app", "ORC-9-native") || s.NextAction.CWD != filepath.Join("worktrees", "app", "ORC-9-native") {

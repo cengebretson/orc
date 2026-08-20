@@ -199,6 +199,8 @@ rather than defining its own:
 | `@agent_pane_attention_updated_at` | epoch seconds the state was last written |
 | `@agent_pane_attention_source` | what set it |
 | `@agent_pane_context_active` | `1` while an agent turn is running |
+| `@agent_pane_context_override` | persistent pane-local ticket or project label |
+| `@agent_pane_context_slug` | descriptive slug shown beside the project in detailed status |
 
 `@agent_pane_context_active` is read as the `context` observation source and
 outranks title and screen inference: an agent hook reported it, rather than Orc
@@ -246,6 +248,20 @@ pane-scoped `@agent_pane_attention`.
 Setting it on the window still works — tmux resolves `@` options through
 pane → window → session, so a pane with no value of its own reports the
 window's.
+
+For panes Orc launches, the exact `STATE.yaml` ticket and feature slug are also
+published through `@agent_pane_context_override` and
+`@agent_pane_context_slug`. tmux-attention therefore renders the durable ticket
+identity without relying on an agent to call `project set`. These writes are
+harmless when the optional plugin is absent.
+
+When Orc launches inside a Git worktree, it also writes the same identity to
+`tmux-attention-context` under that checkout's absolute Git directory. This is
+tmux-attention 0.12.0's private worktree metadata contract: it keeps the checkout
+clean and lets non-Orc panes opened in the same worktree derive the ticket and
+slug. A recorded branch prevents stale metadata from surviving a checkout to
+unrelated work. Failure to write this display-only file is reported as a launch
+warning and never blocks the agent.
 
 `orc` may optionally emit it from workflow transitions, but `STATE.yaml` remains
 authoritative:
@@ -295,6 +311,7 @@ that identify the work without replacing the durable state contract:
 - `@orc_provider_engine`
 - `@orc_provider_session`
 - `@orc_feature_dir`
+- `@orc_feature_slug`
 
 The exact agent pane is marked `@orc_agent=1` and receives the same identity
 options. These options support live reverse lookup and safe targeting in a

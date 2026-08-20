@@ -18,7 +18,10 @@ func TestPrepareAgentLaunchStampsBeforeReturningWrappedCommand(t *testing.T) {
 		mux.Target{Backend: "tmux", Workspace: "orc", Tab: "develop", Pane: "%7"},
 		"develop",
 		"/work",
-		mux.Metadata{AgentID: "agent-1", AgentInstance: "instance-1", FeatureDir: "/work"},
+		mux.Metadata{
+			AgentID: "agent-1", AgentInstance: "instance-1", Ticket: "ORC-9",
+			FeatureDir: "/work", FeatureSlug: "ORC-9-native-worktree",
+		},
 		[]string{"codex", "build this"},
 	)
 	if err != nil {
@@ -34,17 +37,19 @@ func TestPrepareAgentLaunchStampsBeforeReturningWrappedCommand(t *testing.T) {
 	if !reflect.DeepEqual(argv, wantArgv) {
 		t.Fatalf("argv = %#v, want %#v", argv, wantArgv)
 	}
-	var stampedID, stampedInstance, initializedState, initializedSequence, resetObservedState, resetSeen bool
+	var stampedID, stampedInstance, stampedProject, stampedSlug, initializedState, initializedSequence, resetObservedState, resetSeen bool
 	for _, call := range *calls {
 		joined := strings.Join(call.args, " ")
 		stampedID = stampedID || joined == "set-option -p -t %7 @orc_agent_id agent-1"
 		stampedInstance = stampedInstance || joined == "set-option -p -t %7 @orc_agent_instance instance-1"
+		stampedProject = stampedProject || joined == "set-option -p -t %7 @agent_pane_context_override ORC-9"
+		stampedSlug = stampedSlug || joined == "set-option -p -t %7 @agent_pane_context_slug native-worktree"
 		initializedState = initializedState || joined == "set-option -p -t %7 @orc_agent_state unknown"
 		initializedSequence = initializedSequence || joined == "set-option -p -t %7 @orc_agent_state_seq 0"
 		resetObservedState = resetObservedState || joined == "set-option -p -t %7 @orc_agent_observed_state unknown"
 		resetSeen = resetSeen || joined == "set-option -p -t %7 @orc_agent_seen_seq 0"
 	}
-	if !stampedID || !stampedInstance || !initializedState || !initializedSequence || !resetObservedState || !resetSeen {
+	if !stampedID || !stampedInstance || !stampedProject || !stampedSlug || !initializedState || !initializedSequence || !resetObservedState || !resetSeen {
 		t.Fatalf("identity/lifecycle stamp calls missing: %#v", *calls)
 	}
 }

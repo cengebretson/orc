@@ -533,12 +533,12 @@ func TestSetTargetMetadataPublishesSidebarTokens(t *testing.T) {
 		}
 		return response(`{}`), nil
 	}}
-	meta := mux.Metadata{AgentID: "agent-9", AgentInstance: "instance-9", Ticket: "ORC-9", Stage: "develop", Worker: "builder", Engine: "codex", FeatureDir: "/work/orc-9"}
+	meta := mux.Metadata{AgentID: "agent-9", AgentInstance: "instance-9", Ticket: "ORC-9", Stage: "develop", Worker: "builder", Engine: "codex", FeatureDir: "/work/orc-9", FeatureSlug: "ORC-9-native"}
 	if err := b.SetTargetMetadata(mux.Target{Backend: "herdr", Workspace: "w9", Tab: "t1", Pane: "p1"}, meta); err != nil {
 		t.Fatal(err)
 	}
 	joined := strings.Join(calls, "\n")
-	for _, want := range []string{"workspace report-metadata w9 --source orc --token owned=1", "pane report-metadata p1 --source orc --display-agent builder", "--token agent_id=agent-9", "--token agent_instance=instance-9", "--token ticket=ORC-9", "--token stage=develop", "--token feature_dir=/work/orc-9"} {
+	for _, want := range []string{"workspace report-metadata w9 --source orc --token owned=1", "pane report-metadata p1 --source orc --display-agent builder", "--token agent_id=agent-9", "--token agent_instance=instance-9", "--token ticket=ORC-9", "--token stage=develop", "--token feature_dir=/work/orc-9", "--token feature_slug=ORC-9-native"} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("calls missing %q:\n%s", want, joined)
 		}

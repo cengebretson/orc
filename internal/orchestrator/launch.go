@@ -13,6 +13,7 @@ import (
 	"github.com/cengebretson/orc/internal/runner"
 	"github.com/cengebretson/orc/internal/state"
 	"github.com/cengebretson/orc/internal/tmux"
+	"github.com/cengebretson/orc/internal/tmuxattention"
 	"github.com/cengebretson/orc/internal/workers"
 )
 
@@ -60,29 +61,31 @@ type Launcher struct {
 	// assemble a launcher from mismatched halves.
 	Mux mux.Backend
 
-	SetMuxRuntime      func(featureDir string, target state.MuxRuntime) error
-	SetMuxAgentRuntime func(featureDir string, target state.MuxRuntime, agent state.AgentRuntime) error
-	SetRuntime         func(featureDir, tmuxSession string) error
-	SetRuntimeTarget   func(featureDir, tmuxSession, pane string) error
-	RecordWorktree     func(featureDir, root string, launch worktreeLaunch) error
-	AppendHistory      func(featureDir, stage, workerID, result string) error
-	RunForeground      func(opts LaunchOptions) error
-	NewAgentID         func() (string, error)
-	NewInstanceID      func() (string, error)
+	SetMuxRuntime        func(featureDir string, target state.MuxRuntime) error
+	SetMuxAgentRuntime   func(featureDir string, target state.MuxRuntime, agent state.AgentRuntime) error
+	SetRuntime           func(featureDir, tmuxSession string) error
+	SetRuntimeTarget     func(featureDir, tmuxSession, pane string) error
+	RecordWorktree       func(featureDir, root string, launch worktreeLaunch) error
+	WriteWorktreeContext func(worktreeDir, project, featureSlug string) error
+	AppendHistory        func(featureDir, stage, workerID, result string) error
+	RunForeground        func(opts LaunchOptions) error
+	NewAgentID           func() (string, error)
+	NewInstanceID        func() (string, error)
 }
 
 func NewLauncher() Launcher {
 	return Launcher{
-		Mux:                tmux.New(),
-		SetMuxRuntime:      state.SetMuxRuntime,
-		SetMuxAgentRuntime: state.SetMuxAgentRuntime,
-		SetRuntime:         state.SetRuntime,
-		SetRuntimeTarget:   state.SetRuntimeTarget,
-		RecordWorktree:     recordWorktree,
-		AppendHistory:      state.AppendHistory,
-		RunForeground:      runForeground,
-		NewAgentID:         agentidentity.NewAgentID,
-		NewInstanceID:      agentidentity.NewInstanceID,
+		Mux:                  tmux.New(),
+		SetMuxRuntime:        state.SetMuxRuntime,
+		SetMuxAgentRuntime:   state.SetMuxAgentRuntime,
+		SetRuntime:           state.SetRuntime,
+		SetRuntimeTarget:     state.SetRuntimeTarget,
+		RecordWorktree:       recordWorktree,
+		WriteWorktreeContext: tmuxattention.WriteWorktreeContext,
+		AppendHistory:        state.AppendHistory,
+		RunForeground:        runForeground,
+		NewAgentID:           agentidentity.NewAgentID,
+		NewInstanceID:        agentidentity.NewInstanceID,
 	}
 }
 
@@ -297,6 +300,11 @@ func (l Launcher) launchTarget(backend mux.TargetBackend, opts LaunchOptions, re
 	runDir := opts.Plan.CWD
 	launchArgv := opts.Plan.LaunchArgv
 	if worktreeReady {
+		if l.WriteWorktreeContext != nil {
+			if err := l.WriteWorktreeContext(worktree.Spec.WorktreeDir, opts.State.Ticket, opts.State.Slug); err != nil {
+				result.addFallback(opts, fmt.Sprintf("warning: could not write tmux-attention worktree context: %v", err))
+			}
+		}
 		launchDir = worktree.Spec.WorktreeDir
 		if !pathWithin(runDir, worktree.Spec.WorktreeDir) {
 			runDir = worktree.Spec.WorktreeDir
@@ -400,11 +408,12 @@ func (l Launcher) nextAgentRuntime(opts LaunchOptions) (state.AgentRuntime, erro
 
 func windowMetadata(opts LaunchOptions, window string) mux.Metadata {
 	metadata := mux.Metadata{
-		Ticket:     opts.State.Ticket,
-		Stage:      window,
-		Workflow:   opts.State.Workflow,
-		NextAction: opts.State.NextAction.Prompt,
-		FeatureDir: opts.FeatureDir,
+		Ticket:      opts.State.Ticket,
+		Stage:       window,
+		Workflow:    opts.State.Workflow,
+		NextAction:  opts.State.NextAction.Prompt,
+		FeatureDir:  opts.FeatureDir,
+		FeatureSlug: opts.State.Slug,
 	}
 	repositories := make([]string, 0, len(opts.State.Repos))
 	for name := range opts.State.Repos {

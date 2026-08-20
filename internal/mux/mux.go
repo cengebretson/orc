@@ -108,6 +108,7 @@ type Metadata struct {
 	Model             string
 	ProviderSessionID string
 	FeatureDir        string
+	FeatureSlug       string
 }
 
 // Target is an exact backend-owned terminal location. Identifiers are opaque:
